@@ -1,0 +1,24 @@
+# Build output
+build/
+dist/
+out/
+*.o
+*.a
+*.elf
+*.bin
+*.map
+
+# Local demo captures
+docs/*.mp4
+docs/*.mov
+docs/*.webm
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

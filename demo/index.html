@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>openvela 智能手环 Demo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="stage" aria-label="智能手环演示">
+      <section class="watch" id="watch" aria-live="polite">
+        <div class="screen">
+          <div class="content" id="content"></div>
+          <div class="waves" aria-hidden="true">
+            <span class="wave wave-one"></span>
+            <span class="wave wave-two"></span>
+          </div>
+          <div class="pager-dot" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <nav class="controls" aria-label="页面切换">
+        <button type="button" id="prevBtn" aria-label="上一页">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <div class="dots" aria-hidden="true">
+          <span class="active"></span>
+          <span></span>
+          <span></span>
+        </div>
+        <button type="button" id="nextBtn" aria-label="下一页">
+          <span aria-hidden="true">›</span>
+        </button>
+      </nav>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

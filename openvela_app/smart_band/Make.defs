@@ -1,0 +1,9 @@
+############################################################################
+# packages/demos/smart_band_basic/Make.defs
+#
+# Adds the smart_band_basic demo to the openvela packages build when selected.
+############################################################################
+
+ifneq ($(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC),)
+CONFIGURED_APPS += $(APPDIR)/packages/demos/smart_band_basic
+endif
