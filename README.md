@@ -1,4 +1,4 @@
-# openvela 智能手环 Demo
+# openvela Smart Band Demo
 
 这是一个面向初赛交付的智能手环应用样例，技术路线选择 **openvela 原生应用 C + LVGL**。实现口径对齐 openvela `packages` 顶层仓库中提到的两个示例方向：原生应用示例仓库 `packages_demos` 和快应用示例仓库 `packages_fe_examples`。本项目当前优先实现原生 `packages/demos` 风格应用，同时提供静态桌面演示，方便在没有开发板或模拟器时录制页面切换、表盘、心率和计步效果。
 
