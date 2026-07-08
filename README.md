@@ -44,9 +44,9 @@ smart_band
 应用在 openvela/NuttX 下会订阅 `/dev/uorb/sensor_hrate0`、
 `/dev/uorb/sensor_accel0`、`/dev/uorb/sensor_ambient_temp0` 和
 `/dev/charge/goldfish_battery`。若温度设备名不同，会回退尝试
-`/dev/uorb/sensor_temp0`。时间仍来自模拟器系统时钟，应用启动时会在
-未设置 `TZ` 的情况下设置 `TZ=CST-8` 并调用 `tzset()`，使页面时间和
-当前 Asia/Shanghai 宿主机时间一致。
+`/dev/uorb/sensor_temp0`。时间仍来自模拟器系统时钟，应用在 NuttX 下
+启动时会设置 `TZ=CST-8` 并调用 `tzset()`，使页面时间和当前
+Asia/Shanghai 宿主机时间一致。
 
 可以用滚动脚本验证模拟器传感器值是否进入应用：
 

@@ -219,12 +219,7 @@ static void set_label_text_fmt_int(lv_obj_t *label, const char *fmt, int value)
 static void configure_local_time(void)
 {
 #if defined(__NuttX__)
-  const char *tz = getenv("TZ");
-
-  if (tz == NULL || tz[0] == '\0')
-    {
-      setenv("TZ", SMART_BAND_DEFAULT_TZ, 1);
-    }
+  setenv("TZ", SMART_BAND_DEFAULT_TZ, 1);
 #endif
 
   tzset();
