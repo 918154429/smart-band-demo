@@ -1,5 +1,6 @@
 #include "app_lvgl.h"
 
+#include "sensor_bridge.h"
 #include "watch_model.h"
 
 #include <stdio.h>
@@ -19,6 +20,7 @@ typedef struct
   lv_obj_t *dots[SMART_BAND_PAGE_COUNT];
   lv_timer_t *timer;
   smart_band_state_t model;
+  smart_band_sensor_bridge_t sensors;
 } smart_band_ui_t;
 
 static smart_band_ui_t g_ui;
@@ -71,8 +73,9 @@ static void update_dots(void)
 static void render_face_page(void)
 {
   char battery_text[24];
-  snprintf(battery_text, sizeof(battery_text), "Battery %d%%",
-           g_ui.model.battery_percent);
+  snprintf(battery_text, sizeof(battery_text), "Battery %d%%%s",
+           g_ui.model.battery_percent,
+           g_ui.model.battery_sensor_active ? " sensor" : "");
 
   set_label_text(g_ui.title, smart_band_page_title(g_ui.model.page));
   set_label_text(g_ui.clock, g_ui.model.time_text);
@@ -94,8 +97,15 @@ static void render_heart_page(void)
   set_label_text(g_ui.date, g_ui.model.time_text);
   set_label_text(g_ui.metric, metric_text);
   set_label_text(g_ui.unit, "BPM");
-  set_label_text(g_ui.status, g_ui.model.heart_rate > 110 ? "High intensity" :
-                                                           "Heart normal");
+  if (g_ui.model.heart_sensor_active)
+    {
+      set_label_text(g_ui.status, "Sensor HR");
+    }
+  else
+    {
+      set_label_text(g_ui.status, g_ui.model.heart_rate > 110 ?
+                                  "High intensity" : "Heart normal");
+    }
   lv_bar_set_range(g_ui.progress, 0, 100);
   lv_bar_set_value(g_ui.progress, (g_ui.model.heart_rate * 100) / 135, LV_ANIM_ON);
 }
@@ -107,7 +117,8 @@ static void render_steps_page(void)
   int progress = smart_band_step_progress(&g_ui.model);
 
   snprintf(metric_text, sizeof(metric_text), "%d", g_ui.model.steps);
-  snprintf(status_text, sizeof(status_text), "Goal %d steps - %d%%",
+  snprintf(status_text, sizeof(status_text), "%s %d - %d%%",
+           g_ui.model.step_sensor_active ? "Sensor" : "Goal",
            SMART_BAND_STEP_GOAL,
            progress);
 
@@ -156,6 +167,7 @@ static void timer_cb(lv_timer_t *timer)
 {
   (void)timer;
   smart_band_state_tick(&g_ui.model, time(NULL));
+  smart_band_sensor_bridge_update(&g_ui.sensors, &g_ui.model);
   render_page();
 }
 
@@ -223,6 +235,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
     }
 
   smart_band_state_init(&g_ui.model, time(NULL));
+  smart_band_sensor_bridge_init(&g_ui.sensors);
   g_ui.screen = root;
 
   lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
@@ -259,6 +272,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
       return -1;
     }
 
+  smart_band_sensor_bridge_update(&g_ui.sensors, &g_ui.model);
   render_page();
   return 0;
 }
@@ -270,4 +284,6 @@ void smart_band_lvgl_destroy(void)
       lv_timer_del(g_ui.timer);
       g_ui.timer = NULL;
     }
+
+  smart_band_sensor_bridge_deinit(&g_ui.sensors);
 }

@@ -11,7 +11,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
   set(STACKSIZE ${CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE})
   set(MODULE ${CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC})
   set(MAINSRC smart_band_main.c)
-  set(CSRCS watch_model.c app_lvgl.c)
+  set(CSRCS watch_model.c sensor_bridge.c app_lvgl.c)
 
   nuttx_add_application(
     NAME

@@ -24,6 +24,8 @@ openvela `packages` 顶层仓库说明了两个示例方向：
 - LVGL 图形库、`LV_USE_NUTTX` 和 `LV_USE_NUTTX_LIBUV`。
 - 目标屏幕或模拟器显示驱动。
 - 触摸输入或鼠标输入，用于 LVGL 手势事件。
+- uORB/Sensors，用于读取 `sensor_hrate0`、`sensor_accel0`，可用时读取 `sensor_step_counter0`。
+- goldfish 电池驱动，用于读取 `/dev/charge/goldfish_battery`。
 - NuttX/openvela shell，用于启动 `smart_band`。
 
 ## 2. 拷贝应用
@@ -59,6 +61,8 @@ include $(wildcard $(APPDIR)/packages/demos/smart_band_basic/Make.defs)
 
 - `LV_USE_NUTTX`
 - `LV_USE_NUTTX_LIBUV`
+- `SENSORS`
+- `UORB`
 - `LVX_USE_DEMO_SMART_BAND_BASIC`
 - 当前模拟器或开发板对应的 framebuffer/display/input 配置
 
@@ -97,6 +101,7 @@ smart_band
 - 再向左滑动进入计步页面。
 - 向右滑动返回上一页。
 - 心率、步数、电量每秒刷新一次。
+- 模拟器传感器可用时，心率页面显示 `Sensor HR`，电池显示 `sensor` 后缀，计步页面显示 `Sensor` 前缀。
 
 ## 6. 常见问题
 
@@ -111,6 +116,10 @@ smart_band
 ### 手势没有反应
 
 确认触摸或鼠标输入设备已接入 LVGL indev。应用使用 `LV_EVENT_GESTURE` 和 `lv_indev_get_gesture_dir()` 处理左右滑动。
+
+### 传感器没有数据显示
+
+应用会尝试打开 `/dev/uorb/sensor_hrate0`、`/dev/uorb/sensor_accel0`、`/dev/uorb/sensor_step_counter0` 和 `/dev/charge/goldfish_battery`。goldfish 当前常见配置有心率、加速度和电池；如果 step counter 没有注册，应用会用加速度变化派生步数，并在读不到任何传感器时继续使用模拟值。
 
 ### 字体或中文显示异常
 

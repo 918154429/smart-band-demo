@@ -1,6 +1,7 @@
 config LVX_USE_DEMO_SMART_BAND_BASIC
 	bool "Smart band basic LVGL demo"
 	depends on GRAPHICS_LVGL && LV_USE_NUTTX && LV_USE_NUTTX_LIBUV
+	depends on SENSORS && UORB
 	default n
 	---help---
 		Enable the basic smart band demo application. It follows the
