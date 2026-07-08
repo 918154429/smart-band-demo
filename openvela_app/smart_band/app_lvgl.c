@@ -108,17 +108,6 @@ static const lv_font_t *font_16(void)
 #endif
 }
 
-static const lv_font_t *font_cjk(void)
-{
-#if LV_FONT_SIMSUN_16_CJK
-  return &lv_font_simsun_16_cjk;
-#elif LV_FONT_MONTSERRAT_16
-  return &lv_font_montserrat_16;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
 static const lv_font_t *font_20(void)
 {
 #if LV_FONT_MONTSERRAT_20
@@ -280,7 +269,12 @@ static void format_watch_date(char *buffer, size_t size)
 {
   static const char *const weekdays[] =
   {
-    "周日", "周一", "周二", "周三", "周四", "周五", "周六"
+    "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
+  };
+  static const char *const months[] =
+  {
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
   };
 
   struct tm local_now;
@@ -292,8 +286,8 @@ static void format_watch_date(char *buffer, size_t size)
       return;
     }
 
-  snprintf(buffer, size, "%02d月%02d日 %s", local_now.tm_mon + 1,
-           local_now.tm_mday, weekdays[local_now.tm_wday]);
+  snprintf(buffer, size, "%s %02d %s", weekdays[local_now.tm_wday],
+           local_now.tm_mday, months[local_now.tm_mon]);
 }
 
 static void split_time_text(char *hour, size_t hour_size, char *minute,
@@ -367,7 +361,7 @@ static int create_date_row(lv_obj_t *parent, lv_obj_t **date_label,
   right_dot = create_box(parent, (g_ui.screen_w + text_w) / 2 + sx(11),
                          y + sy(7), dot, dot, lv_color_hex(0x77c4bd),
                          LV_RADIUS_CIRCLE);
-  *date_label = create_label(parent, "07月08日 周三", font_cjk(),
+  *date_label = create_label(parent, "WED 08 JUL", font_20(),
                              lv_color_hex(0x6f8790), LV_TEXT_ALIGN_CENTER);
 
   if (left_dot == NULL || right_dot == NULL || *date_label == NULL)
@@ -375,7 +369,7 @@ static int create_date_row(lv_obj_t *parent, lv_obj_t **date_label,
       return -1;
     }
 
-  place_label(*date_label, (g_ui.screen_w - text_w) / 2, y, text_w, sy(26));
+  place_label(*date_label, (g_ui.screen_w - text_w) / 2, y, text_w, sy(28));
   return 0;
 }
 
@@ -393,9 +387,9 @@ static int create_ornament(lv_obj_t *parent, lv_coord_t y)
                     line_h, lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
   right = create_box(parent, center + sx(70), y + sy(16), line_w, line_h,
                      lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
-  badge = create_box(parent, center - sx(28), y, sx(56), sy(34),
+  badge = create_box(parent, center - sx(22), y, sx(44), sy(34),
                      lv_color_hex(0xeff9f7), LV_RADIUS_CIRCLE);
-  label = create_label(badge, "健康", font_cjk(), lv_color_hex(0x79c5be),
+  label = create_label(badge, "HR", font_16(), lv_color_hex(0x79c5be),
                        LV_TEXT_ALIGN_CENTER);
 
   if (left == NULL || right == NULL || badge == NULL || label == NULL)
@@ -403,7 +397,7 @@ static int create_ornament(lv_obj_t *parent, lv_coord_t y)
       return -1;
     }
 
-  place_label(label, 0, sy(7), sx(56), sy(20));
+  place_label(label, 0, sy(7), sx(44), sy(20));
   return 0;
 }
 
@@ -439,35 +433,35 @@ static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
 {
   lv_coord_t margin = sx(22);
   lv_coord_t card_w = g_ui.screen_w - margin * 2;
-  lv_coord_t card_h = sy(62);
-  lv_coord_t orb_size = min_coord(sx(42), card_h - sy(16));
-  lv_coord_t value_x = sx(86);
+  lv_coord_t card_h = sy(72);
+  lv_coord_t orb_size = min_coord(sx(54), card_h - sy(18));
+  lv_coord_t value_x = sx(112);
   lv_obj_t *card;
   lv_obj_t *divider;
   lv_obj_t *label;
 
-  card = create_box(parent, margin, y, card_w, card_h, bg_color, sx(18));
+  card = create_box(parent, margin, y, card_w, card_h, bg_color, sx(24));
   if (card == NULL)
     {
       return -1;
     }
 
-  lv_obj_set_style_shadow_width(card, sx(8), 0);
+  lv_obj_set_style_shadow_width(card, sx(12), 0);
   lv_obj_set_style_shadow_color(card, lv_color_hex(0x374a5b), 0);
-  lv_obj_set_style_shadow_opa(card, LV_OPA_10, 0);
-  lv_obj_set_style_shadow_offset_y(card, sy(4), 0);
+  lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
+  lv_obj_set_style_shadow_offset_y(card, sy(6), 0);
 
-  if (create_orb(card, sx(14), (card_h - orb_size) / 2, orb_size,
+  if (create_orb(card, sx(16), (card_h - orb_size) / 2, orb_size,
                  orb_color, orb_text) == NULL)
     {
       return -1;
     }
 
-  divider = create_box(card, sx(68), (card_h - sy(40)) / 2, 1, sy(40),
+  divider = create_box(card, sx(88), (card_h - sy(52)) / 2, 1, sy(52),
                        lv_color_hex(0xd4dde1), 0);
-  label = create_label(card, label_text, font_cjk(), label_color,
+  label = create_label(card, label_text, font_14(), label_color,
                        LV_TEXT_ALIGN_LEFT);
-  *value_out = create_label(card, "--", font_cjk(), lv_color_hex(0x293b53),
+  *value_out = create_label(card, "--", font_20(), lv_color_hex(0x293b53),
                             LV_TEXT_ALIGN_LEFT);
 
   if (divider == NULL || label == NULL || *value_out == NULL)
@@ -475,9 +469,9 @@ static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
       return -1;
     }
 
-  place_label(label, value_x, sy(10), card_w - value_x - sx(14), sy(20));
-  place_label(*value_out, value_x, sy(32), card_w - value_x - sx(14),
-              sy(26));
+  place_label(label, value_x, sy(14), card_w - value_x - sx(16), sy(20));
+  place_label(*value_out, value_x, sy(38), card_w - value_x - sx(16),
+              sy(28));
   return 0;
 }
 
@@ -488,9 +482,9 @@ static int create_face_page(void)
   lv_coord_t time_h = g_ui.compact_band ? sy(64) : sy(78);
   lv_coord_t hour_w = g_ui.compact_band ? sx(112) : sx(122);
   lv_coord_t minute_x = g_ui.compact_band ? sx(178) : sx(184);
-  lv_coord_t cards_y = g_ui.compact_band ? sy(238) : sy(250);
-  lv_coord_t card_gap = sy(10);
-  lv_coord_t card_h = sy(62);
+  lv_coord_t cards_y = g_ui.compact_band ? sy(246) : sy(260);
+  lv_coord_t card_gap = sy(12);
+  lv_coord_t card_h = sy(72);
   lv_coord_t dot = g_ui.compact_band ? sx(10) : sx(14);
   lv_coord_t colon_x;
   lv_obj_t *time_row;
@@ -542,25 +536,25 @@ static int create_face_page(void)
 
   if (create_metric_card(g_ui.face_page, cards_y,
                          lv_color_hex(0xf2f5ff), lv_color_hex(0x9caddc),
-                         "Zz", "睡眠", lv_color_hex(0x8799cf),
+                         "Zz", "Sleep", lv_color_hex(0x8799cf),
                          &g_ui.face_sleep_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + card_h + card_gap,
                          lv_color_hex(0xfff0eb), lv_color_hex(0xf08d88),
-                         "HR", "心率", lv_color_hex(0xea7770),
+                         "HR", "Heart Rate", lv_color_hex(0xea7770),
                          &g_ui.face_heart_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 2,
                          lv_color_hex(0xeefbf8), lv_color_hex(0x80cbc3),
-                         "OK", "压力", lv_color_hex(0x43a79e),
+                         "OK", "Stress", lv_color_hex(0x43a79e),
                          &g_ui.face_stress_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 3,
                          lv_color_hex(0xfff6e2), lv_color_hex(0xf5c66e),
-                         "C", "天气", lv_color_hex(0xe8ae46),
+                         "C", "Weather", lv_color_hex(0xe8ae46),
                          &g_ui.face_weather_value) != 0)
     {
       return -1;
     }
 
-  g_ui.face_battery = create_label(g_ui.face_page, "电量 --%", font_cjk(),
+  g_ui.face_battery = create_label(g_ui.face_page, "BAT --%", font_12(),
                                    lv_color_hex(0x6f8790),
                                    LV_TEXT_ALIGN_CENTER);
   if (g_ui.face_battery == NULL)
@@ -569,9 +563,9 @@ static int create_face_page(void)
     }
 
   place_label(g_ui.face_battery,
-              g_ui.screen_w - sx(g_ui.compact_band ? 112 : 120),
+              g_ui.screen_w - sx(g_ui.compact_band ? 88 : 96),
               g_ui.compact_band ? sy(18) : sy(22),
-              sx(g_ui.compact_band ? 92 : 98), sy(20));
+              sx(g_ui.compact_band ? 68 : 74), sy(20));
   return 0;
 }
 
@@ -639,7 +633,7 @@ static int create_mini_card(lv_obj_t *page, int col, int row,
   lv_obj_t *title_label;
 
   card = create_box(page, x, y, card_w, card_h, lv_color_hex(0xffffff),
-                    sx(16));
+                    sx(20));
   if (card == NULL)
     {
       return -1;
@@ -648,9 +642,9 @@ static int create_mini_card(lv_obj_t *page, int col, int row,
   lv_obj_set_style_border_width(card, 1, 0);
   lv_obj_set_style_border_color(card, lv_color_hex(0xe7eff0), 0);
 
-  title_label = create_label(card, title, font_cjk(), lv_color_hex(0x7d9298),
+  title_label = create_label(card, title, font_12(), lv_color_hex(0x7d9298),
                              LV_TEXT_ALIGN_LEFT);
-  *value_out = create_label(card, "--", font_cjk(), lv_color_hex(0x293b53),
+  *value_out = create_label(card, "--", font_20(), lv_color_hex(0x293b53),
                             LV_TEXT_ALIGN_LEFT);
   if (title_label == NULL || *value_out == NULL)
     {
@@ -674,7 +668,7 @@ static int create_heart_page(void)
       return -1;
     }
 
-  title = create_label(g_ui.heart_page, "心率", font_cjk(),
+  title = create_label(g_ui.heart_page, "Heart Rate", font_20(),
                        lv_color_hex(0x5a7680), LV_TEXT_ALIGN_CENTER);
   if (title == NULL)
     {
@@ -687,13 +681,13 @@ static int create_heart_page(void)
                          lv_color_hex(0xf08d88), "HR",
                          &g_ui.heart_value,
                          &g_ui.heart_progress) == NULL ||
-      create_mini_card(g_ui.heart_page, 0, 0, "静息",
+      create_mini_card(g_ui.heart_page, 0, 0, "Resting",
                        &g_ui.heart_status) != 0 ||
-      create_mini_card(g_ui.heart_page, 1, 0, "来源",
+      create_mini_card(g_ui.heart_page, 1, 0, "Status",
                        &g_ui.heart_source) != 0 ||
-      create_mini_card(g_ui.heart_page, 0, 1, "电量",
+      create_mini_card(g_ui.heart_page, 0, 1, "Battery",
                        &g_ui.heart_battery) != 0 ||
-      create_mini_card(g_ui.heart_page, 1, 1, "压力",
+      create_mini_card(g_ui.heart_page, 1, 1, "Stress",
                        &g_ui.heart_stress) != 0)
     {
       return -1;
@@ -714,7 +708,7 @@ static int create_steps_page(void)
       return -1;
     }
 
-  title = create_label(g_ui.steps_page, "步数", font_cjk(),
+  title = create_label(g_ui.steps_page, "Activity", font_20(),
                        lv_color_hex(0x5a7680), LV_TEXT_ALIGN_CENTER);
   if (title == NULL)
     {
@@ -727,13 +721,13 @@ static int create_steps_page(void)
                          lv_color_hex(0x80cbc3), "ST",
                          &g_ui.steps_value,
                          &g_ui.steps_progress) == NULL ||
-      create_mini_card(g_ui.steps_page, 0, 0, "目标",
+      create_mini_card(g_ui.steps_page, 0, 0, "Goal",
                        &g_ui.steps_goal) != 0 ||
-      create_mini_card(g_ui.steps_page, 1, 0, "完成",
+      create_mini_card(g_ui.steps_page, 1, 0, "Progress",
                        &g_ui.steps_percent) != 0 ||
-      create_mini_card(g_ui.steps_page, 0, 1, "来源",
+      create_mini_card(g_ui.steps_page, 0, 1, "Source",
                        &g_ui.steps_source) != 0 ||
-      create_mini_card(g_ui.steps_page, 1, 1, "气温",
+      create_mini_card(g_ui.steps_page, 1, 1, "Weather",
                        &g_ui.steps_weather) != 0)
     {
       return -1;
@@ -887,7 +881,7 @@ static void open_app(smart_band_app_id_t id)
   if (smart_band_app_build(id, g_ui.app_content, &host) != 0)
     {
       lv_obj_clean(g_ui.app_content);
-      set_label_text(g_ui.app_title, "应用异常");
+      set_label_text(g_ui.app_title, "App failed");
     }
 
   set_page_visible(g_ui.apps_launcher, false);
@@ -938,7 +932,7 @@ static int create_launcher_card(lv_obj_t *parent,
 
   icon_text = create_label(icon, def->icon, font_16(), lv_color_hex(0xffffff),
                            LV_TEXT_ALIGN_CENTER);
-  title = create_label(card, def->title, font_cjk(), lv_color_hex(0x293b53),
+  title = create_label(card, def->title, font_12(), lv_color_hex(0x293b53),
                        LV_TEXT_ALIGN_CENTER);
   if (icon_text == NULL || title == NULL)
     {
@@ -975,7 +969,7 @@ static int create_apps_page(void)
       return -1;
     }
 
-  title = create_label(g_ui.apps_page, "应用", font_cjk(),
+  title = create_label(g_ui.apps_page, "Apps", font_20(),
                        lv_color_hex(0x293b53), LV_TEXT_ALIGN_CENTER);
   if (title == NULL)
     {
@@ -1016,7 +1010,7 @@ static int create_apps_page(void)
                                        sx(44), sy(38),
                                        lv_color_hex(0x6f8790), app_back_cb,
                                        0);
-  g_ui.app_title = create_label(g_ui.app_detail, "应用", font_cjk(),
+  g_ui.app_title = create_label(g_ui.app_detail, "Apps", font_20(),
                                 lv_color_hex(0x293b53),
                                 LV_TEXT_ALIGN_CENTER);
   g_ui.app_content = create_plain_layer(g_ui.app_detail, 0, sy(94),
@@ -1267,7 +1261,7 @@ static void update_face(void)
 {
   char hour[3];
   char minute[3];
-  char date_text[32];
+  char date_text[20];
   char value[32];
 
   split_time_text(hour, sizeof(hour), minute, sizeof(minute));
@@ -1276,18 +1270,19 @@ static void update_face(void)
   set_label_text(g_ui.face_hour, hour);
   set_label_text(g_ui.face_minute, minute);
   set_label_text(g_ui.face_date, date_text);
-  set_label_text(g_ui.face_sleep_value, "7时48分");
+  set_label_text(g_ui.face_sleep_value, "7h 48m");
   set_label_text_fmt_int(g_ui.face_heart_value, "%d bpm", g_ui.model.heart_rate);
-  set_label_text(g_ui.face_stress_value, "低");
+  set_label_text(g_ui.face_stress_value, "Low");
   set_temperature_label(g_ui.face_weather_value);
 
-  snprintf(value, sizeof(value), "电量 %d%%", g_ui.model.battery_percent);
+  snprintf(value, sizeof(value), "BAT %d%%%s", g_ui.model.battery_percent,
+           g_ui.model.battery_sensor_active ? "" : " sim");
   set_label_text(g_ui.face_battery, value);
 }
 
 static void update_heart_detail(void)
 {
-  char date_text[32];
+  char date_text[20];
   char value[32];
   int progress = (g_ui.model.heart_rate * 100) / 135;
 
@@ -1304,15 +1299,15 @@ static void update_heart_detail(void)
   lv_bar_set_value(g_ui.heart_progress, progress, LV_ANIM_ON);
   set_label_text(g_ui.heart_status, "62");
   set_label_text(g_ui.heart_source,
-                 g_ui.model.heart_sensor_active ? "传感器" :
-                 (g_ui.model.heart_rate > 110 ? "偏高" : "正常"));
+                 g_ui.model.heart_sensor_active ? "Sensor" :
+                 (g_ui.model.heart_rate > 110 ? "High" : "Good"));
   set_label_text_fmt_int(g_ui.heart_battery, "%d%%", g_ui.model.battery_percent);
-  set_label_text(g_ui.heart_stress, "低");
+  set_label_text(g_ui.heart_stress, "Low");
 }
 
 static void update_steps_detail(void)
 {
-  char date_text[32];
+  char date_text[20];
   char value[32];
   int progress = smart_band_step_progress(&g_ui.model);
 
@@ -1325,13 +1320,13 @@ static void update_steps_detail(void)
   set_label_text(g_ui.steps_goal, "8000");
   set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
   set_label_text(g_ui.steps_source,
-                 g_ui.model.step_sensor_active ? "传感器" : "模拟");
+                 g_ui.model.step_sensor_active ? "Sensor" : "Model");
   set_temperature_label(g_ui.steps_weather);
 }
 
 static void update_apps_page(void)
 {
-  char date_text[32];
+  char date_text[20];
 
   format_watch_date(date_text, sizeof(date_text));
   set_label_text(g_ui.apps_date, date_text);
@@ -1365,7 +1360,7 @@ static void app_back_cb(lv_event_t *event)
     }
 
   g_ui.active_app = SMART_BAND_APP_NONE;
-  set_label_text(g_ui.app_title, "应用");
+  set_label_text(g_ui.app_title, "Apps");
   set_page_visible(g_ui.app_detail, false);
   set_page_visible(g_ui.apps_launcher, true);
 }
