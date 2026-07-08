@@ -29,9 +29,11 @@ typedef struct
   int heart_rate;
   int steps;
   int battery_percent;
+  int temperature_c;
   bool heart_sensor_active;
   bool step_sensor_active;
   bool battery_sensor_active;
+  bool temperature_sensor_active;
   char time_text[SMART_BAND_TIME_TEXT_LEN];
   char date_text[SMART_BAND_DATE_TEXT_LEN];
   char status_text[SMART_BAND_STATUS_TEXT_LEN];

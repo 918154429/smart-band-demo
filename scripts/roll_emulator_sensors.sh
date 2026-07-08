@@ -21,6 +21,7 @@ AUTH_TOKEN="$(tr -d '\r\n' < "$AUTH_TOKEN_FILE")"
 
 heart_rates=(72 88 104 118 82 96)
 battery_levels=(100 96 92 88 94 99)
+temperatures=(24 27 31 29 26 23)
 wrist_tilts=(0 1 0 1 0 1)
 accelerations=(
   "0:9.81:0"
@@ -42,13 +43,15 @@ emit_console_commands() {
   while [ "$LOOPS" -eq 0 ] || [ "$loop" -lt "$LOOPS" ]; do
     index=$((loop % count))
 
-    echo "roll[$loop]: heart=${heart_rates[$index]} accel=${accelerations[$index]} battery=${battery_levels[$index]} wrist=${wrist_tilts[$index]}" >&2
+    echo "roll[$loop]: heart=${heart_rates[$index]} temp=${temperatures[$index]} accel=${accelerations[$index]} battery=${battery_levels[$index]} wrist=${wrist_tilts[$index]}" >&2
 
     printf 'sensor set heart-rate %s\n' "${heart_rates[$index]}"
+    printf 'sensor set temperature %s\n' "${temperatures[$index]}"
     printf 'sensor set acceleration %s\n' "${accelerations[$index]}"
     printf 'sensor set wrist-tilt %s\n' "${wrist_tilts[$index]}"
     printf 'power capacity %s\n' "${battery_levels[$index]}"
     printf 'sensor get heart-rate\n'
+    printf 'sensor get temperature\n'
     printf 'sensor get acceleration\n'
     printf 'power display\n'
 

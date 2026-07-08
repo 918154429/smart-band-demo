@@ -5,12 +5,14 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #define DESIGN_W 330
 #define DESIGN_H 626
 #define CARD_COUNT 4
+#define SMART_BAND_DEFAULT_TZ "CST-8"
 
 typedef struct
 {
@@ -211,6 +213,28 @@ static void set_label_text_fmt_int(lv_obj_t *label, const char *fmt, int value)
 {
   char buffer[32];
   snprintf(buffer, sizeof(buffer), fmt, value);
+  set_label_text(label, buffer);
+}
+
+static void configure_local_time(void)
+{
+#if defined(__NuttX__)
+  const char *tz = getenv("TZ");
+
+  if (tz == NULL || tz[0] == '\0')
+    {
+      setenv("TZ", SMART_BAND_DEFAULT_TZ, 1);
+    }
+#endif
+
+  tzset();
+}
+
+static void set_temperature_label(lv_obj_t *label)
+{
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "%dC%s", g_ui.model.temperature_c,
+           g_ui.model.temperature_sensor_active ? "" : " sim");
   set_label_text(label, buffer);
 }
 
@@ -891,7 +915,7 @@ static void update_face(void)
   set_label_text(g_ui.face_sleep_value, "7h 48m");
   set_label_text_fmt_int(g_ui.face_heart_value, "%d bpm", g_ui.model.heart_rate);
   set_label_text(g_ui.face_stress_value, "Low");
-  set_label_text(g_ui.face_weather_value, "24C");
+  set_temperature_label(g_ui.face_weather_value);
 
   snprintf(value, sizeof(value), "BAT %d%%%s", g_ui.model.battery_percent,
            g_ui.model.battery_sensor_active ? "" : " sim");
@@ -939,7 +963,7 @@ static void update_steps_detail(void)
   set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
   set_label_text(g_ui.steps_source,
                  g_ui.model.step_sensor_active ? "Sensor" : "Model");
-  set_label_text(g_ui.steps_weather, "24C");
+  set_temperature_label(g_ui.steps_weather);
 }
 
 static void render_page(void)
@@ -1055,6 +1079,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
   memset(&g_ui, 0, sizeof(g_ui));
   g_ui.root = root;
+  configure_local_time();
   smart_band_state_init(&g_ui.model, time(NULL));
   smart_band_sensor_bridge_init(&g_ui.sensors);
 

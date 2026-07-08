@@ -4,9 +4,9 @@
 
 ## 已完成功能
 
-- 表盘页面：显示当前时间、日期、电量与页面指示点。
-- 健康页面：模拟心率采集并刷新 UI。
-- 计步页面：模拟步数累计、目标进度和活动状态。
+- 表盘页面：显示当前时间、日期、电量、温度与页面指示点。
+- 健康页面：优先读取模拟器心率传感器，缺失时回退到模型数据。
+- 计步页面：优先读取模拟器计步/加速度传感器，缺失时回退到模型数据。
 - 基础交互：支持左右滑动切换页面；桌面演示也支持键盘方向键和按钮。
 - 异常处理：时间获取失败时显示兜底文本；模拟数据做范围限制；UI 初始化失败会直接返回错误码。
 
@@ -39,6 +39,19 @@ demo/index.html
 
 ```sh
 smart_band
+```
+
+应用在 openvela/NuttX 下会订阅 `/dev/uorb/sensor_hrate0`、
+`/dev/uorb/sensor_accel0`、`/dev/uorb/sensor_ambient_temp0` 和
+`/dev/charge/goldfish_battery`。若温度设备名不同，会回退尝试
+`/dev/uorb/sensor_temp0`。时间仍来自模拟器系统时钟，应用启动时会在
+未设置 `TZ` 的情况下设置 `TZ=CST-8` 并调用 `tzset()`，使页面时间和
+当前 Asia/Shanghai 宿主机时间一致。
+
+可以用滚动脚本验证模拟器传感器值是否进入应用：
+
+```sh
+SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 scripts/roll_emulator_sensors.sh
 ```
 
 ## 本机基础测试

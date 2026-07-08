@@ -64,6 +64,8 @@ static void simulate_health_data(smart_band_state_t *state)
 
   state->heart_rate = clamp_int(66 + pulse_wave + motion_wave / 3, 55, 135);
   state->steps += 4 + (int)(state->ticks % 6u);
+  state->temperature_c = clamp_int(24 + (int)(state->ticks % 3u) - 1,
+                                   -40, 80);
 
   if (state->steps > 99999)
     {
@@ -98,6 +100,7 @@ void smart_band_state_init(smart_band_state_t *state, time_t now)
   state->heart_rate = 72;
   state->steps = 1260;
   state->battery_percent = 96;
+  state->temperature_c = 24;
   snprintf(state->status_text, sizeof(state->status_text), "Stable");
   format_time(state, now);
 }

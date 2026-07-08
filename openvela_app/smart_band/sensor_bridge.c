@@ -15,6 +15,8 @@
 #define SMART_BAND_HRATE_DEV "/dev/uorb/sensor_hrate0"
 #define SMART_BAND_ACCEL_DEV "/dev/uorb/sensor_accel0"
 #define SMART_BAND_STEP_DEV "/dev/uorb/sensor_step_counter0"
+#define SMART_BAND_TEMP_DEV "/dev/uorb/sensor_ambient_temp0"
+#define SMART_BAND_TEMP_FALLBACK_DEV "/dev/uorb/sensor_temp0"
 #define SMART_BAND_BATTERY_DEV "/dev/charge/goldfish_battery"
 #define SMART_BAND_SENSOR_INTERVAL_US 1000000
 
@@ -145,6 +147,36 @@ static void update_battery(smart_band_sensor_bridge_t *bridge,
     }
 }
 
+static void update_temperature(smart_band_sensor_bridge_t *bridge,
+                               smart_band_state_t *state)
+{
+  struct sensor_temp sample;
+  float rounded;
+
+  if (read_latest(bridge->temp_fd, &sample, sizeof(sample)))
+    {
+      int value_c;
+
+      rounded = sample.temperature >= 0.0f ? sample.temperature + 0.5f :
+                sample.temperature - 0.5f;
+      value_c = clamp_int((int)rounded, -40, 80);
+      if (!bridge->have_temperature ||
+          bridge->last_temperature_c != value_c)
+        {
+          printf("smart_band: temperature sensor %dC\n", value_c);
+        }
+
+      bridge->last_temperature_c = value_c;
+      bridge->have_temperature = true;
+    }
+
+  if (bridge->have_temperature)
+    {
+      state->temperature_c = bridge->last_temperature_c;
+      state->temperature_sensor_active = true;
+    }
+}
+
 void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
 {
   if (bridge == NULL)
@@ -157,11 +189,18 @@ void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
   bridge->accel_fd = -1;
   bridge->step_fd = -1;
   bridge->battery_fd = -1;
+  bridge->temp_fd = -1;
+  bridge->last_temperature_c = 24;
 
   bridge->hrate_fd = open_sensor(SMART_BAND_HRATE_DEV);
   bridge->accel_fd = open_sensor(SMART_BAND_ACCEL_DEV);
   bridge->step_fd = open_sensor(SMART_BAND_STEP_DEV);
   bridge->battery_fd = open(SMART_BAND_BATTERY_DEV, O_RDONLY | O_NONBLOCK);
+  bridge->temp_fd = open_sensor(SMART_BAND_TEMP_DEV);
+  if (bridge->temp_fd < 0)
+    {
+      bridge->temp_fd = open_sensor(SMART_BAND_TEMP_FALLBACK_DEV);
+    }
 }
 
 void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
@@ -175,6 +214,7 @@ void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
   state->heart_sensor_active = false;
   state->step_sensor_active = false;
   state->battery_sensor_active = false;
+  state->temperature_sensor_active = false;
 
   update_heart_rate(bridge, state);
   update_steps_from_counter(bridge, state);
@@ -184,6 +224,7 @@ void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
     }
 
   update_battery(bridge, state);
+  update_temperature(bridge, state);
 }
 
 void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
@@ -213,8 +254,15 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
       close(bridge->battery_fd);
     }
 
+  if (bridge->temp_fd >= 0)
+    {
+      close(bridge->temp_fd);
+    }
+
   bridge->hrate_fd = -1;
   bridge->accel_fd = -1;
   bridge->step_fd = -1;
   bridge->battery_fd = -1;
+  bridge->temp_fd = -1;
+  bridge->have_temperature = false;
 }
