@@ -46,6 +46,7 @@ void smart_band_next_page(smart_band_state_t *state);
 void smart_band_prev_page(smart_band_state_t *state);
 const char *smart_band_page_title(smart_band_page_t page);
 int smart_band_step_progress(const smart_band_state_t *state);
+bool smart_band_display_time(time_t now, struct tm *display_time);
 
 #ifdef __cplusplus
 }

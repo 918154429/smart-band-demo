@@ -45,8 +45,7 @@ smart_band
 `/dev/uorb/sensor_accel0`、`/dev/uorb/sensor_ambient_temp0` 和
 `/dev/charge/goldfish_battery`。若温度设备名不同，会回退尝试
 `/dev/uorb/sensor_temp0`。时间仍来自模拟器系统时钟，应用在 NuttX 下
-启动时会设置 `TZ=CST-8` 并调用 `tzset()`，使页面时间和当前
-Asia/Shanghai 宿主机时间一致。
+会按 UTC+8 格式化显示，避免模拟器 shell 的默认 UTC 时区影响手环页面。
 
 可以用滚动脚本验证模拟器传感器值是否进入应用：
 

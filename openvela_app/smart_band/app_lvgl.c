@@ -228,7 +228,8 @@ static void configure_local_time(void)
 static void set_temperature_label(lv_obj_t *label)
 {
   char buffer[32];
-  snprintf(buffer, sizeof(buffer), "%dC%s", g_ui.model.temperature_c,
+  snprintf(buffer, sizeof(buffer), "%d%s%s", g_ui.model.temperature_c,
+           "\xC2\xB0" "C",
            g_ui.model.temperature_sensor_active ? "" : " sim");
   set_label_text(label, buffer);
 }
@@ -246,21 +247,9 @@ static void format_watch_date(char *buffer, size_t size)
   };
 
   struct tm local_now;
-  struct tm *tm_result = NULL;
   time_t now = time(NULL);
 
-#if defined(_POSIX_VERSION) || defined(__NuttX__)
-  tm_result = localtime_r(&now, &local_now);
-#else
-  tm_result = localtime(&now);
-  if (tm_result != NULL)
-    {
-      local_now = *tm_result;
-      tm_result = &local_now;
-    }
-#endif
-
-  if (tm_result == NULL)
+  if (!smart_band_display_time(now, &local_now))
     {
       snprintf(buffer, size, "%s", g_ui.model.date_text);
       return;

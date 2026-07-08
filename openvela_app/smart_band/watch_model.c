@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define SMART_BAND_UTC_OFFSET_SECONDS (8 * 60 * 60)
+
 static int clamp_int(int value, int min_value, int max_value)
 {
   if (value < min_value)
@@ -21,23 +23,11 @@ static int clamp_int(int value, int min_value, int max_value)
 static void format_time(smart_band_state_t *state, time_t now)
 {
   struct tm local_now;
-  struct tm *tm_result = NULL;
   int year;
   int month;
   int day;
 
-#if defined(_POSIX_VERSION) || defined(__NuttX__)
-  tm_result = localtime_r(&now, &local_now);
-#else
-  tm_result = localtime(&now);
-  if (tm_result != NULL)
-    {
-      local_now = *tm_result;
-      tm_result = &local_now;
-    }
-#endif
-
-  if (tm_result == NULL)
+  if (!smart_band_display_time(now, &local_now))
     {
       snprintf(state->time_text, sizeof(state->time_text), "--:--");
       snprintf(state->date_text, sizeof(state->date_text), "----/--/--");
@@ -55,6 +45,32 @@ static void format_time(smart_band_state_t *state, time_t now)
   snprintf(state->date_text, sizeof(state->date_text), "%04d/%02d/%02d",
            year, month, day);
   state->time_valid = true;
+}
+
+bool smart_band_display_time(time_t now, struct tm *display_time)
+{
+  struct tm *tm_result = NULL;
+
+  if (display_time == NULL)
+    {
+      return false;
+    }
+
+#if defined(__NuttX__)
+  now += SMART_BAND_UTC_OFFSET_SECONDS;
+  tm_result = gmtime_r(&now, display_time);
+#elif defined(_POSIX_VERSION)
+  tm_result = localtime_r(&now, display_time);
+#else
+  tm_result = localtime(&now);
+  if (tm_result != NULL)
+    {
+      *display_time = *tm_result;
+      tm_result = display_time;
+    }
+#endif
+
+  return tm_result != NULL;
 }
 
 static void simulate_health_data(smart_band_state_t *state)
