@@ -164,28 +164,8 @@ const char *smart_band_page_title(smart_band_page_t page)
         return "Heart";
       case SMART_BAND_PAGE_STEPS:
         return "Steps";
-      case SMART_BAND_PAGE_WEATHER:
-        return "Weather";
-      case SMART_BAND_PAGE_CALENDAR:
-        return "Calendar";
-      case SMART_BAND_PAGE_MUSIC:
-        return "Music";
-      case SMART_BAND_PAGE_TIMER:
-        return "Timer";
-      case SMART_BAND_PAGE_CALCULATOR:
-        return "Calculator";
-      case SMART_BAND_PAGE_TODO:
-        return "Todo";
-      case SMART_BAND_PAGE_HOME:
-        return "Home";
-      case SMART_BAND_PAGE_SETTINGS:
-        return "Settings";
-      case SMART_BAND_PAGE_CHART:
-        return "Chart";
-      case SMART_BAND_PAGE_PET:
-        return "Pet";
-      case SMART_BAND_PAGE_WOODEN_FISH:
-        return "Wooden Fish";
+      case SMART_BAND_PAGE_APPS:
+        return "Apps";
       default:
         return "Unknown";
     }
