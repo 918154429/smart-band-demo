@@ -6,32 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct
-{
-  const char *label;
-  char code;
-  uint32_t color;
-  uint8_t col;
-  uint8_t row;
-  uint8_t col_span;
-  uint8_t row_span;
-} calculator_key_t;
-
-typedef struct
-{
-  const calculator_key_t *key;
-  lv_coord_t x;
-  lv_coord_t y;
-  lv_coord_t w;
-  lv_coord_t h;
-} calculator_key_hit_t;
-
-#define CALCULATOR_KEY_COUNT 19
-
 static lv_obj_t *g_display;
 static lv_obj_t *g_expression;
-static calculator_key_hit_t g_key_hits[CALCULATOR_KEY_COUNT];
-static size_t g_key_hit_count;
 static char g_text[24] = "0";
 static char g_lhs_text[24];
 static double g_lhs;
@@ -315,17 +291,29 @@ void smart_band_calculator_app_update(const smart_band_app_host_t *host)
   lv_refr_now(NULL);
 }
 
-static void calculator_handle_key(const calculator_key_t *key_info)
+static void calculator_handle_key_text(const char *key_text)
 {
   char key;
 
-  if (key_info == NULL)
+  if (key_text == NULL || key_text[0] == '\0')
     {
       return;
     }
 
-  key = key_info->code;
-  printf("smart_band: calculator key %s\n", key_info->label);
+  if (strcmp(key_text, "DEL") == 0)
+    {
+      key = 'B';
+    }
+  else if (strcmp(key_text, "+/-") == 0)
+    {
+      key = 'S';
+    }
+  else
+    {
+      key = key_text[0];
+    }
+
+  printf("smart_band: calculator key %s\n", key_text);
   if (key >= '0' && key <= '9')
     {
       calculator_append_char(key);
@@ -358,209 +346,72 @@ static void calculator_handle_key(const calculator_key_t *key_info)
   smart_band_calculator_app_update(NULL);
 }
 
-static void calculator_cb(lv_event_t *event)
+static void calculator_keypad_cb(lv_event_t *event)
 {
-  const calculator_key_t *key_info =
-    (const calculator_key_t *)lv_event_get_user_data(event);
+  lv_obj_t *keypad = (lv_obj_t *)lv_event_get_target(event);
+  uint32_t id;
+  const char *text;
 
-  if (lv_event_get_code(event) != LV_EVENT_PRESSED)
+  if (lv_event_get_code(event) != LV_EVENT_VALUE_CHANGED || keypad == NULL)
     {
       return;
     }
 
-  calculator_handle_key(key_info);
+  id = lv_buttonmatrix_get_selected_button(keypad);
+  text = lv_buttonmatrix_get_button_text(keypad, id);
+  calculator_handle_key_text(text);
 }
 
-static const calculator_key_t *calculator_key_at(lv_coord_t x, lv_coord_t y)
+static lv_coord_t calculator_visible_height(lv_obj_t *parent,
+                                            const smart_band_app_host_t *host)
 {
-  for (size_t i = 0; i < g_key_hit_count; i++)
-    {
-      const calculator_key_hit_t *hit = &g_key_hits[i];
+  lv_coord_t parent_h = lv_obj_get_height(parent);
+  lv_coord_t parent_y = lv_obj_get_y(parent);
+  lv_coord_t visible_h;
 
-      if (x >= hit->x && x < hit->x + hit->w &&
-          y >= hit->y && y < hit->y + hit->h)
-        {
-          return hit->key;
-        }
+  if (parent_h <= 0)
+    {
+      parent_h = host->screen_h;
     }
 
-  return NULL;
-}
-
-static void calculator_touch_layer_cb(lv_event_t *event)
-{
-  lv_obj_t *target = (lv_obj_t *)lv_event_get_target(event);
-  lv_indev_t *indev = lv_indev_get_act();
-  lv_area_t area;
-  lv_point_t point;
-  lv_coord_t x;
-  lv_coord_t y;
-  const calculator_key_t *key;
-
-  if (lv_event_get_code(event) != LV_EVENT_PRESSED ||
-      target == NULL || indev == NULL)
+  visible_h = host->screen_h - parent_y - host->sy(8);
+  if (visible_h > 0 && visible_h < parent_h)
     {
-      return;
+      return visible_h;
     }
 
-  lv_indev_get_point(indev, &point);
-  lv_obj_get_coords(target, &area);
-  x = point.x - area.x1;
-  y = point.y - area.y1;
-  key = calculator_key_at(x, y);
-  if (key == NULL)
-    {
-      printf("smart_band: calculator touch %d,%d no key\n", (int)x, (int)y);
-      return;
-    }
-
-  calculator_handle_key(key);
-}
-
-static lv_obj_t *calculator_create_key(lv_obj_t *parent,
-                                       const smart_band_app_host_t *host,
-                                       const calculator_key_t *key,
-                                       lv_coord_t x, lv_coord_t y,
-                                       lv_coord_t w, lv_coord_t h)
-{
-  lv_obj_t *button = lv_btn_create(parent);
-  lv_obj_t *label;
-
-  if (button == NULL)
-    {
-      return NULL;
-    }
-
-  lv_obj_remove_style_all(button);
-  lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_pos(button, x, y);
-  lv_obj_set_size(button, w, h);
-  lv_obj_set_style_bg_color(button, lv_color_hex(key->color), 0);
-  lv_obj_set_style_bg_color(button, lv_color_hex(0x293b53),
-                            LV_STATE_PRESSED);
-  lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(button, host->sx(12), 0);
-  lv_obj_set_style_shadow_width(button, host->sx(4), 0);
-  lv_obj_set_style_shadow_color(button, lv_color_hex(0x314856), 0);
-  lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0);
-  lv_obj_set_style_shadow_offset_y(button, host->sy(3), 0);
-  lv_obj_add_event_cb(button, calculator_cb, LV_EVENT_PRESSED, (void *)key);
-
-  label = lv_label_create(button);
-  if (label == NULL)
-    {
-      return NULL;
-    }
-
-  lv_obj_remove_style_all(label);
-  lv_obj_clear_flag(label, LV_OBJ_FLAG_CLICKABLE);
-  lv_label_set_text(label, key->label);
-  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-  lv_obj_set_style_text_font(label, host->font_14(), 0);
-  lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), 0);
-  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_pos(label, host->sx(3), (h - host->sy(20)) / 2);
-  lv_obj_set_size(label, w - host->sx(6), host->sy(22));
-  return button;
-}
-
-static lv_obj_t *calculator_create_touch_layer(lv_obj_t *parent,
-                                               const smart_band_app_host_t *host)
-{
-  lv_coord_t h = lv_obj_get_height(parent);
-  lv_obj_t *touch = lv_obj_create(parent);
-  lv_obj_t *display_box;
-
-  if (touch == NULL)
-    {
-      return NULL;
-    }
-
-  if (h <= 0)
-    {
-      h = host->screen_h;
-    }
-
-  lv_obj_remove_style_all(touch);
-  lv_obj_add_flag(touch, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(touch, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_pos(touch, 0, 0);
-  lv_obj_set_size(touch, host->screen_w, h);
-  lv_obj_set_style_bg_opa(touch, LV_OPA_TRANSP, 0);
-  lv_obj_add_event_cb(touch, calculator_touch_layer_cb,
-                      LV_EVENT_PRESSED, NULL);
-
-  display_box = host->create_box(touch, host->sx(16), host->sy(4),
-                                 host->screen_w - host->sx(32),
-                                 host->sy(66), lv_color_hex(0xf3f7fb),
-                                 host->sx(18));
-  if (display_box == NULL)
-    {
-      return NULL;
-    }
-
-  lv_obj_set_style_border_width(display_box, 1, 0);
-  lv_obj_set_style_border_color(display_box, lv_color_hex(0xe3edf2), 0);
-
-  g_expression = host->create_label(display_box, "", host->font_12(),
-                                    lv_color_hex(0x81939a),
-                                    LV_TEXT_ALIGN_RIGHT);
-  g_display = host->create_label(display_box, g_text, host->font_32(),
-                                 lv_color_hex(0x293b53),
-                                 LV_TEXT_ALIGN_RIGHT);
-  if (g_expression == NULL || g_display == NULL)
-    {
-      return NULL;
-    }
-
-  host->place_label(g_expression, host->sx(12), host->sy(7),
-                    lv_obj_get_width(display_box) - host->sx(24),
-                    host->sy(18));
-  host->place_label(g_display, host->sx(12), host->sy(24),
-                    lv_obj_get_width(display_box) - host->sx(24),
-                    host->sy(36));
-  return touch;
+  return parent_h;
 }
 
 int smart_band_calculator_app_build(lv_obj_t *parent,
                                     const smart_band_app_host_t *host)
 {
-  static const calculator_key_t keys[] =
+  static const char *button_map[] =
   {
-    { "C",   'C', 0xf08d88, 0, 0, 1, 1 },
-    { "DEL", 'B', 0x8aa8d8, 1, 0, 1, 1 },
-    { "/",   '/', 0x80cbc3, 2, 0, 1, 1 },
-    { "*",   '*', 0x80cbc3, 3, 0, 1, 1 },
-    { "7",   '7', 0x6f8790, 0, 1, 1, 1 },
-    { "8",   '8', 0x6f8790, 1, 1, 1, 1 },
-    { "9",   '9', 0x6f8790, 2, 1, 1, 1 },
-    { "-",   '-', 0x80cbc3, 3, 1, 1, 1 },
-    { "4",   '4', 0x6f8790, 0, 2, 1, 1 },
-    { "5",   '5', 0x6f8790, 1, 2, 1, 1 },
-    { "6",   '6', 0x6f8790, 2, 2, 1, 1 },
-    { "+",   '+', 0x80cbc3, 3, 2, 1, 1 },
-    { "1",   '1', 0x6f8790, 0, 3, 1, 1 },
-    { "2",   '2', 0x6f8790, 1, 3, 1, 1 },
-    { "3",   '3', 0x6f8790, 2, 3, 1, 1 },
-    { "=",   '=', 0xf5c66e, 3, 3, 1, 2 },
-    { "+/-", 'S', 0x6f8790, 0, 4, 1, 1 },
-    { "0",   '0', 0x6f8790, 1, 4, 1, 1 },
-    { ".",   '.', 0x6f8790, 2, 4, 1, 1 }
+    "C", "DEL", "/", "*", "\n",
+    "7", "8", "9", "-", "\n",
+    "4", "5", "6", "+", "\n",
+    "1", "2", "3", "=", "\n",
+    "+/-", "0", ".", "=",
+    ""
   };
   lv_coord_t margin = host->sx(16);
-  lv_coord_t gap_x = host->sx(7);
-  lv_coord_t gap_y = host->sy(7);
-  lv_coord_t display_h = host->sy(66);
-  lv_coord_t grid_y = host->sy(82);
-  lv_coord_t key_w = (host->screen_w - margin * 2 - gap_x * 3) / 4;
-  lv_coord_t key_h = host->sy(46);
+  lv_coord_t page_h = calculator_visible_height(parent, host);
+  lv_coord_t display_h = host->sy(56);
+  lv_coord_t grid_y = host->sy(68);
+  lv_coord_t keypad_h = page_h - grid_y - host->sy(8);
   lv_obj_t *display_box;
+  lv_obj_t *keypad;
+
+  if (keypad_h < host->sy(250) &&
+      page_h > grid_y + host->sy(258))
+    {
+      keypad_h = host->sy(250);
+    }
 
   calculator_clear_all();
   g_display = NULL;
   g_expression = NULL;
-  g_key_hit_count = 0;
 
   display_box = host->create_box(parent, margin, host->sy(4),
                                  host->screen_w - margin * 2, display_h,
@@ -591,36 +442,38 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
                     lv_obj_get_width(display_box) - host->sx(24),
                     host->sy(36));
 
-  for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
-    {
-      const calculator_key_t *key = &keys[i];
-      lv_coord_t x = margin + key->col * (key_w + gap_x);
-      lv_coord_t y = grid_y + key->row * (key_h + gap_y);
-      lv_coord_t w = key_w * key->col_span +
-                     gap_x * (key->col_span - 1);
-      lv_coord_t h = key_h * key->row_span +
-                     gap_y * (key->row_span - 1);
-      lv_obj_t *button = calculator_create_key(parent, host, key, x, y, w, h);
-      if (button == NULL)
-        {
-          return -1;
-        }
-
-      if (g_key_hit_count < CALCULATOR_KEY_COUNT)
-        {
-          g_key_hits[g_key_hit_count].key = key;
-          g_key_hits[g_key_hit_count].x = x;
-          g_key_hits[g_key_hit_count].y = y;
-          g_key_hits[g_key_hit_count].w = w;
-          g_key_hits[g_key_hit_count].h = h;
-          g_key_hit_count++;
-        }
-    }
-
-  if (calculator_create_touch_layer(parent, host) == NULL)
+  keypad = lv_btnmatrix_create(parent);
+  if (keypad == NULL)
     {
       return -1;
     }
+
+  lv_obj_remove_style_all(keypad);
+  lv_obj_add_flag(keypad, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(keypad, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_pos(keypad, margin, grid_y);
+  lv_obj_set_size(keypad, host->screen_w - margin * 2, keypad_h);
+  lv_obj_set_style_bg_opa(keypad, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(keypad, 0, 0);
+  lv_obj_set_style_pad_all(keypad, 0, 0);
+  lv_obj_set_style_pad_row(keypad, host->sy(7), 0);
+  lv_obj_set_style_pad_column(keypad, host->sx(7), 0);
+  lv_obj_set_style_bg_color(keypad, lv_color_hex(0x6f8790), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(keypad, lv_color_hex(0x293b53),
+                            LV_PART_ITEMS | LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(keypad, LV_OPA_COVER, LV_PART_ITEMS);
+  lv_obj_set_style_radius(keypad, host->sx(12), LV_PART_ITEMS);
+  lv_obj_set_style_border_width(keypad, 0, LV_PART_ITEMS);
+  lv_obj_set_style_text_font(keypad, host->font_14(), LV_PART_ITEMS);
+  lv_obj_set_style_text_color(keypad, lv_color_hex(0xffffff), LV_PART_ITEMS);
+  lv_obj_set_style_text_align(keypad, LV_TEXT_ALIGN_CENTER, LV_PART_ITEMS);
+  lv_obj_set_style_shadow_width(keypad, host->sx(3), LV_PART_ITEMS);
+  lv_obj_set_style_shadow_color(keypad, lv_color_hex(0x314856), LV_PART_ITEMS);
+  lv_obj_set_style_shadow_opa(keypad, LV_OPA_20, LV_PART_ITEMS);
+  lv_obj_set_style_shadow_offset_y(keypad, host->sy(2), LV_PART_ITEMS);
+  lv_buttonmatrix_set_map(keypad, button_map);
+  lv_obj_add_event_cb(keypad, calculator_keypad_cb, LV_EVENT_VALUE_CHANGED,
+                      NULL);
 
   smart_band_calculator_app_update(host);
   return 0;
