@@ -68,6 +68,7 @@ typedef struct
   lv_coord_t screen_h;
   lv_point_t press_point;
   bool press_valid;
+  bool compact_band;
 } smart_band_ui_t;
 
 static smart_band_ui_t g_ui;
@@ -476,9 +477,16 @@ static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
 
 static int create_face_page(void)
 {
-  lv_coord_t cards_y = sy(260);
+  const lv_font_t *time_font = g_ui.compact_band ? font_32() : font_time();
+  lv_coord_t time_y = g_ui.compact_band ? sy(102) : sy(114);
+  lv_coord_t time_h = g_ui.compact_band ? sy(64) : sy(78);
+  lv_coord_t hour_w = g_ui.compact_band ? sx(112) : sx(122);
+  lv_coord_t minute_x = g_ui.compact_band ? sx(178) : sx(184);
+  lv_coord_t cards_y = g_ui.compact_band ? sy(246) : sy(260);
   lv_coord_t card_gap = sy(12);
   lv_coord_t card_h = sy(72);
+  lv_coord_t dot = g_ui.compact_band ? sx(10) : sx(14);
+  lv_coord_t colon_x;
   lv_obj_t *time_row;
   lv_obj_t *colon_one;
   lv_obj_t *colon_two;
@@ -497,30 +505,34 @@ static int create_face_page(void)
     }
 
   strip_obj(time_row);
-  lv_obj_set_pos(time_row, sx(22), sy(114));
-  lv_obj_set_size(time_row, g_ui.screen_w - sx(44), sy(78));
+  lv_obj_set_pos(time_row, sx(22), time_y);
+  lv_obj_set_size(time_row, g_ui.screen_w - sx(44), time_h);
   lv_obj_set_style_bg_opa(time_row, LV_OPA_TRANSP, 0);
+  colon_x = (g_ui.screen_w - sx(44)) / 2 - dot / 2;
 
-  g_ui.face_hour = create_label(time_row, "--", font_time(),
+  g_ui.face_hour = create_label(time_row, "--", time_font,
                                 lv_color_hex(0x00796c), LV_TEXT_ALIGN_RIGHT);
-  g_ui.face_minute = create_label(time_row, "--", font_time(),
+  g_ui.face_minute = create_label(time_row, "--", time_font,
                                   lv_color_hex(0x293b53), LV_TEXT_ALIGN_LEFT);
-  colon_one = create_box(time_row, (g_ui.screen_w - sx(44)) / 2 - sx(7),
-                         sy(22), sx(14), sx(14), lv_color_hex(0x79c5be),
+  colon_one = create_box(time_row, colon_x,
+                         time_h / 2 - sy(g_ui.compact_band ? 12 : 18),
+                         dot, dot, lv_color_hex(0x79c5be),
                          LV_RADIUS_CIRCLE);
-  colon_two = create_box(time_row, (g_ui.screen_w - sx(44)) / 2 - sx(7),
-                         sy(48), sx(14), sx(14), lv_color_hex(0x79c5be),
+  colon_two = create_box(time_row, colon_x,
+                         time_h / 2 + sy(g_ui.compact_band ? 8 : 8),
+                         dot, dot, lv_color_hex(0x79c5be),
                          LV_RADIUS_CIRCLE);
 
   if (g_ui.face_hour == NULL || g_ui.face_minute == NULL ||
       colon_one == NULL || colon_two == NULL ||
-      create_ornament(g_ui.face_page, sy(206)) != 0)
+      create_ornament(g_ui.face_page,
+                      g_ui.compact_band ? sy(190) : sy(206)) != 0)
     {
       return -1;
     }
 
-  place_label(g_ui.face_hour, 0, 0, sx(122), sy(76));
-  place_label(g_ui.face_minute, sx(184), 0, sx(122), sy(76));
+  place_label(g_ui.face_hour, 0, 0, hour_w, time_h);
+  place_label(g_ui.face_minute, minute_x, 0, hour_w, time_h);
 
   if (create_metric_card(g_ui.face_page, cards_y,
                          lv_color_hex(0xf2f5ff), lv_color_hex(0x9caddc),
@@ -550,8 +562,10 @@ static int create_face_page(void)
       return -1;
     }
 
-  place_label(g_ui.face_battery, g_ui.screen_w - sx(96), sy(22), sx(74),
-              sy(20));
+  place_label(g_ui.face_battery,
+              g_ui.screen_w - sx(g_ui.compact_band ? 88 : 96),
+              g_ui.compact_band ? sy(18) : sy(22),
+              sx(g_ui.compact_band ? 68 : 74), sy(20));
   return 0;
 }
 
@@ -1094,6 +1108,7 @@ static int create_ui_tree(lv_obj_t *root)
     }
 
   compact_band = root_w <= 540 && root_h <= 540;
+  g_ui.compact_band = compact_band;
   watch_h = min_coord(root_h - 48, 720);
   watch_h = max_coord(watch_h, 360);
   watch_w = (watch_h * 194) / 368;
