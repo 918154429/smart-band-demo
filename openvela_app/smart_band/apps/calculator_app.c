@@ -301,6 +301,18 @@ void smart_band_calculator_app_update(const smart_band_app_host_t *host)
           lv_label_set_text(g_expression, "");
         }
     }
+
+  if (g_display != NULL)
+    {
+      lv_obj_invalidate(g_display);
+    }
+
+  if (g_expression != NULL)
+    {
+      lv_obj_invalidate(g_expression);
+    }
+
+  lv_refr_now(NULL);
 }
 
 static void calculator_handle_key(const calculator_key_t *key_info)
@@ -458,6 +470,7 @@ static lv_obj_t *calculator_create_touch_layer(lv_obj_t *parent,
 {
   lv_coord_t h = lv_obj_get_height(parent);
   lv_obj_t *touch = lv_obj_create(parent);
+  lv_obj_t *display_box;
 
   if (touch == NULL)
     {
@@ -477,6 +490,36 @@ static lv_obj_t *calculator_create_touch_layer(lv_obj_t *parent,
   lv_obj_set_style_bg_opa(touch, LV_OPA_TRANSP, 0);
   lv_obj_add_event_cb(touch, calculator_touch_layer_cb,
                       LV_EVENT_PRESSED, NULL);
+
+  display_box = host->create_box(touch, host->sx(16), host->sy(4),
+                                 host->screen_w - host->sx(32),
+                                 host->sy(66), lv_color_hex(0xf3f7fb),
+                                 host->sx(18));
+  if (display_box == NULL)
+    {
+      return NULL;
+    }
+
+  lv_obj_set_style_border_width(display_box, 1, 0);
+  lv_obj_set_style_border_color(display_box, lv_color_hex(0xe3edf2), 0);
+
+  g_expression = host->create_label(display_box, "", host->font_12(),
+                                    lv_color_hex(0x81939a),
+                                    LV_TEXT_ALIGN_RIGHT);
+  g_display = host->create_label(display_box, g_text, host->font_32(),
+                                 lv_color_hex(0x293b53),
+                                 LV_TEXT_ALIGN_RIGHT);
+  if (g_expression == NULL || g_display == NULL)
+    {
+      return NULL;
+    }
+
+  host->place_label(g_expression, host->sx(12), host->sy(7),
+                    lv_obj_get_width(display_box) - host->sx(24),
+                    host->sy(18));
+  host->place_label(g_display, host->sx(12), host->sy(24),
+                    lv_obj_get_width(display_box) - host->sx(24),
+                    host->sy(36));
   return touch;
 }
 
