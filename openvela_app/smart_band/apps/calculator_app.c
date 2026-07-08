@@ -19,6 +19,7 @@ typedef struct
 
 static lv_obj_t *g_display;
 static lv_obj_t *g_expression;
+static lv_obj_t *g_display_box;
 static char g_text[24] = "0";
 static char g_lhs_text[24];
 static double g_lhs;
@@ -319,6 +320,24 @@ void smart_band_calculator_app_update(const smart_band_app_host_t *host)
 
       lv_obj_invalidate(g_expression);
     }
+
+  if (g_display_box != NULL)
+    {
+      lv_obj_invalidate(g_display_box);
+      lv_obj_move_foreground(g_display_box);
+    }
+
+  if (g_expression != NULL)
+    {
+      lv_obj_move_foreground(g_expression);
+    }
+
+  if (g_display != NULL)
+    {
+      lv_obj_move_foreground(g_display);
+    }
+
+  lv_refr_now(NULL);
 }
 
 static void calc_press(char key)
@@ -471,6 +490,7 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
   calc_clear();
   g_display = NULL;
   g_expression = NULL;
+  g_display_box = NULL;
 
   display_box = host->create_box(parent, margin, 0,
                                  host->screen_w - margin * 2, display_h,
@@ -482,24 +502,38 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
 
   lv_obj_set_style_border_width(display_box, 1, 0);
   lv_obj_set_style_border_color(display_box, lv_color_hex(0xe1edf1), 0);
+  g_display_box = display_box;
 
-  g_expression = host->create_label(display_box, "", host->font_12(),
-                                    lv_color_hex(0x7e9198),
-                                    LV_TEXT_ALIGN_RIGHT);
-  g_display = host->create_label(display_box, g_text, host->font_20(),
-                                 lv_color_hex(0x293b53),
-                                 LV_TEXT_ALIGN_RIGHT);
+  g_expression = lv_label_create(parent);
+  g_display = lv_label_create(parent);
   if (g_expression == NULL || g_display == NULL)
     {
       return -1;
     }
 
-  host->place_label(g_expression, host->sx(10), 4,
-                    lv_obj_get_width(display_box) - host->sx(20),
-                    calc_min_coord(host->sy(18), display_h / 3));
-  host->place_label(g_display, host->sx(10), display_h / 3,
-                    lv_obj_get_width(display_box) - host->sx(20),
-                    display_h - display_h / 3 - 4);
+  lv_obj_remove_style_all(g_expression);
+  lv_obj_remove_style_all(g_display);
+  lv_obj_clear_flag(g_expression, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(g_display, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(g_expression, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_display, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_label_set_text(g_expression, "");
+  lv_label_set_text(g_display, g_text);
+  lv_label_set_long_mode(g_expression, LV_LABEL_LONG_CLIP);
+  lv_label_set_long_mode(g_display, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(g_expression, host->font_12(), 0);
+  lv_obj_set_style_text_font(g_display, host->font_20(), 0);
+  lv_obj_set_style_text_color(g_expression, lv_color_hex(0x6f8790), 0);
+  lv_obj_set_style_text_color(g_display, lv_color_hex(0x102a3a), 0);
+  lv_obj_set_style_text_align(g_expression, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(g_display, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(g_expression, margin + host->sx(8), 3);
+  lv_obj_set_size(g_expression, host->screen_w - margin * 2 - host->sx(16),
+                  calc_min_coord(host->sy(17), display_h / 3));
+  lv_obj_set_pos(g_display, margin + host->sx(8), display_h / 3);
+  lv_obj_set_size(g_display, host->screen_w - margin * 2 - host->sx(16),
+                  display_h - display_h / 3 - 3);
 
   for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
     {
