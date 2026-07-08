@@ -22,6 +22,9 @@ static void format_time(smart_band_state_t *state, time_t now)
 {
   struct tm local_now;
   struct tm *tm_result = NULL;
+  int year;
+  int month;
+  int day;
 
 #if defined(_POSIX_VERSION) || defined(__NuttX__)
   tm_result = localtime_r(&now, &local_now);
@@ -42,10 +45,15 @@ static void format_time(smart_band_state_t *state, time_t now)
       return;
     }
 
+  year = clamp_int(local_now.tm_year + 1900, 0, 9999);
+  month = clamp_int(local_now.tm_mon + 1, 1, 12);
+  day = clamp_int(local_now.tm_mday, 1, 31);
+
   snprintf(state->time_text, sizeof(state->time_text), "%02d:%02d",
-           local_now.tm_hour, local_now.tm_min);
+           clamp_int(local_now.tm_hour, 0, 23),
+           clamp_int(local_now.tm_min, 0, 59));
   snprintf(state->date_text, sizeof(state->date_text), "%04d/%02d/%02d",
-           local_now.tm_year + 1900, local_now.tm_mon + 1, local_now.tm_mday);
+           year, month, day);
   state->time_valid = true;
 }
 
