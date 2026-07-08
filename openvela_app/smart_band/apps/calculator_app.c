@@ -296,6 +296,11 @@ static void calculator_cb(lv_event_t *event)
     (const calculator_key_t *)lv_event_get_user_data(event);
   char key;
 
+  if (lv_event_get_code(event) != LV_EVENT_PRESSED)
+    {
+      return;
+    }
+
   if (key_info == NULL)
     {
       return;
@@ -332,6 +337,54 @@ static void calculator_cb(lv_event_t *event)
     }
 
   smart_band_calculator_app_update(NULL);
+}
+
+static lv_obj_t *calculator_create_key(lv_obj_t *parent,
+                                       const smart_band_app_host_t *host,
+                                       const calculator_key_t *key,
+                                       lv_coord_t x, lv_coord_t y,
+                                       lv_coord_t w, lv_coord_t h)
+{
+  lv_obj_t *button = lv_btn_create(parent);
+  lv_obj_t *label;
+
+  if (button == NULL)
+    {
+      return NULL;
+    }
+
+  lv_obj_remove_style_all(button);
+  lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_pos(button, x, y);
+  lv_obj_set_size(button, w, h);
+  lv_obj_set_style_bg_color(button, lv_color_hex(key->color), 0);
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x293b53),
+                            LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(button, host->sx(12), 0);
+  lv_obj_set_style_shadow_width(button, host->sx(4), 0);
+  lv_obj_set_style_shadow_color(button, lv_color_hex(0x314856), 0);
+  lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0);
+  lv_obj_set_style_shadow_offset_y(button, host->sy(3), 0);
+  lv_obj_add_event_cb(button, calculator_cb, LV_EVENT_PRESSED, (void *)key);
+
+  label = lv_label_create(button);
+  if (label == NULL)
+    {
+      return NULL;
+    }
+
+  lv_obj_remove_style_all(label);
+  lv_obj_clear_flag(label, LV_OBJ_FLAG_CLICKABLE);
+  lv_label_set_text(label, key->label);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(label, host->font_14(), 0);
+  lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), 0);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(label, host->sx(3), (h - host->sy(20)) / 2);
+  lv_obj_set_size(label, w - host->sx(6), host->sy(22));
+  return button;
 }
 
 int smart_band_calculator_app_build(lv_obj_t *parent,
@@ -410,18 +463,11 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
                      gap_x * (key->col_span - 1);
       lv_coord_t h = key_h * key->row_span +
                      gap_y * (key->row_span - 1);
-      lv_obj_t *button;
-
-      button = host->create_action_button(parent, key->label, x, y, w, h,
-                                          lv_color_hex(key->color),
-                                          calculator_cb, (uintptr_t)key);
+      lv_obj_t *button = calculator_create_key(parent, host, key, x, y, w, h);
       if (button == NULL)
         {
           return -1;
         }
-
-      lv_obj_set_style_radius(button, host->sx(12), 0);
-      lv_obj_set_style_shadow_width(button, host->sx(4), 0);
     }
 
   smart_band_calculator_app_update(host);
