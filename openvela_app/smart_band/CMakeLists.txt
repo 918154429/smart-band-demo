@@ -20,9 +20,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     apps/calculator_app.c
     apps/timer_app.c
     apps/music_app.c
-    apps/settings_app.c
     apps/stopwatch_app.c
-    apps/flashlight_app.c
     apps/mines_app.c
     apps/tetris_app.c
     apps/wooden_fish_app.c)

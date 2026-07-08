@@ -13,16 +13,10 @@ void smart_band_timer_app_tick(const smart_band_app_host_t *host);
 int smart_band_music_app_build(lv_obj_t *parent,
                                const smart_band_app_host_t *host);
 void smart_band_music_app_update(const smart_band_app_host_t *host);
-int smart_band_settings_app_build(lv_obj_t *parent,
-                                  const smart_band_app_host_t *host);
-void smart_band_settings_app_update(const smart_band_app_host_t *host);
 int smart_band_stopwatch_app_build(lv_obj_t *parent,
                                    const smart_band_app_host_t *host);
 void smart_band_stopwatch_app_update(const smart_band_app_host_t *host);
 void smart_band_stopwatch_app_tick(const smart_band_app_host_t *host);
-int smart_band_flashlight_app_build(lv_obj_t *parent,
-                                    const smart_band_app_host_t *host);
-void smart_band_flashlight_app_update(const smart_band_app_host_t *host);
 int smart_band_mines_app_build(lv_obj_t *parent,
                                const smart_band_app_host_t *host);
 void smart_band_mines_app_update(const smart_band_app_host_t *host);
@@ -41,9 +35,7 @@ static const smart_band_app_def_t g_apps[SMART_BAND_APP_COUNT] =
   {SMART_BAND_APP_CALCULATOR, "Calculator", "12", 0x80cbc3},
   {SMART_BAND_APP_TIMER, "Timer", "TM", 0xa98bd6},
   {SMART_BAND_APP_MUSIC, "2048", "2K", 0xf08d88},
-  {SMART_BAND_APP_SETTINGS, "Settings", "SE", 0x6f8790},
   {SMART_BAND_APP_STOPWATCH, "Stopwatch", "SW", 0x73a1d6},
-  {SMART_BAND_APP_FLASHLIGHT, "Flashlight", "FL", 0xf5d36e},
   {SMART_BAND_APP_MINES, "Mines", "MI", 0x8aa8d8},
   {SMART_BAND_APP_TETRIS, "Tetris", "TE", 0x62bfb6},
   {SMART_BAND_APP_WOODEN_FISH, "Wooden Fish", "WF", 0xd9a85f}
@@ -80,12 +72,8 @@ int smart_band_app_build(smart_band_app_id_t id, lv_obj_t *parent,
         return smart_band_timer_app_build(parent, host);
       case SMART_BAND_APP_MUSIC:
         return smart_band_music_app_build(parent, host);
-      case SMART_BAND_APP_SETTINGS:
-        return smart_band_settings_app_build(parent, host);
       case SMART_BAND_APP_STOPWATCH:
         return smart_band_stopwatch_app_build(parent, host);
-      case SMART_BAND_APP_FLASHLIGHT:
-        return smart_band_flashlight_app_build(parent, host);
       case SMART_BAND_APP_MINES:
         return smart_band_mines_app_build(parent, host);
       case SMART_BAND_APP_TETRIS:
@@ -114,14 +102,8 @@ void smart_band_app_update(smart_band_app_id_t id,
       case SMART_BAND_APP_MUSIC:
         smart_band_music_app_update(host);
         break;
-      case SMART_BAND_APP_SETTINGS:
-        smart_band_settings_app_update(host);
-        break;
       case SMART_BAND_APP_STOPWATCH:
         smart_band_stopwatch_app_update(host);
-        break;
-      case SMART_BAND_APP_FLASHLIGHT:
-        smart_band_flashlight_app_update(host);
         break;
       case SMART_BAND_APP_MINES:
         smart_band_mines_app_update(host);

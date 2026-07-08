@@ -909,17 +909,17 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_set_size(card, w, h);
   lv_obj_set_style_bg_color(card, lv_color_hex(0xffffff), 0);
   lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(card, sx(18), 0);
+  lv_obj_set_style_radius(card, sx(16), 0);
   lv_obj_set_style_border_width(card, 1, 0);
   lv_obj_set_style_border_color(card, lv_color_hex(0xe6eeee), 0);
-  lv_obj_set_style_shadow_width(card, sx(8), 0);
+  lv_obj_set_style_shadow_width(card, sx(5), 0);
   lv_obj_set_style_shadow_color(card, lv_color_hex(0x314856), 0);
-  lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
-  lv_obj_set_style_shadow_offset_y(card, sy(4), 0);
+  lv_obj_set_style_shadow_opa(card, LV_OPA_10, 0);
+  lv_obj_set_style_shadow_offset_y(card, sy(2), 0);
   lv_obj_add_event_cb(card, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
 
-  icon = create_box(card, (w - sx(42)) / 2, sy(8), sx(42), sx(42),
+  icon = create_box(card, sx(11), sy(10), sx(38), sx(38),
                     lv_color_hex(def->color), LV_RADIUS_CIRCLE);
   if (icon == NULL)
     {
@@ -945,8 +945,8 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(title, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
-  place_label(icon_text, 0, sy(11), sx(42), sy(22));
-  place_label(title, sx(6), sy(54), w - sx(12), sy(18));
+  place_label(icon_text, 0, sy(9), sx(38), sy(22));
+  place_label(title, sx(56), sy(16), w - sx(62), sy(24));
   return 0;
 }
 
@@ -954,12 +954,12 @@ static int create_apps_page(void)
 {
   const smart_band_app_def_t *apps = smart_band_apps_catalog();
   lv_obj_t *title;
-  lv_coord_t margin = sx(20);
-  lv_coord_t gap_x = sx(12);
-  lv_coord_t gap_y = sy(8);
+  lv_coord_t margin = sx(18);
+  lv_coord_t gap_x = sx(10);
+  lv_coord_t gap_y = sy(10);
   lv_coord_t card_w = (g_ui.screen_w - margin * 2 - gap_x) / 2;
-  lv_coord_t card_h = sy(74);
-  lv_coord_t grid_y = sy(128);
+  lv_coord_t card_h = sy(62);
+  lv_coord_t grid_y = sy(126);
 
   g_ui.apps_page = create_page(g_ui.screen);
   if (g_ui.apps_page == NULL ||
@@ -976,7 +976,7 @@ static int create_apps_page(void)
       return -1;
     }
 
-  place_label(title, sx(22), sy(96), g_ui.screen_w - sx(44), sy(28));
+  place_label(title, sx(22), sy(94), g_ui.screen_w - sx(44), sy(28));
 
   g_ui.apps_launcher = create_plain_layer(g_ui.apps_page, 0, 0,
                                           g_ui.screen_w, g_ui.screen_h);
