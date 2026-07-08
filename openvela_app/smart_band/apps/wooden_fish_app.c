@@ -17,7 +17,7 @@ static void wooden_fish_update_count(void)
 {
   char value[32];
 
-  snprintf(value, sizeof(value), "功德 %d", g_merit);
+  snprintf(value, sizeof(value), "Merit %d", g_merit);
   if (g_count != NULL)
     {
       lv_label_set_text(g_count, value);
@@ -67,7 +67,7 @@ static void show_merit_animation(void)
       return;
     }
 
-  lv_label_set_text(label, "功德+1");
+  lv_label_set_text(label, "Merit +1");
   lv_obj_set_style_text_font(label, g_float_font, 0);
   lv_obj_set_style_text_color(label, lv_color_hex(0xd99a32), 0);
   lv_obj_set_style_text_opa(label, LV_OPA_COVER, 0);
@@ -103,7 +103,7 @@ void smart_band_wooden_fish_app_tick(const smart_band_app_host_t *host)
   if (g_hint != NULL && g_last_tap_tick != 0 &&
       lv_tick_get() - g_last_tap_tick > 1200)
     {
-      lv_label_set_text(g_hint, "速度 平稳");
+      lv_label_set_text(g_hint, "Speed steady");
     }
 }
 
@@ -119,18 +119,18 @@ static void update_speed_hint(uint32_t now)
 
   if (g_last_tap_tick == 0)
     {
-      lv_label_set_text(g_hint, "速度 已开始");
+      lv_label_set_text(g_hint, "First knock");
       return;
     }
 
   delta = now - g_last_tap_tick;
   if (delta < 220)
     {
-      lv_label_set_text(g_hint, "慢一点  过快");
+      lv_label_set_text(g_hint, "Too fast");
       return;
     }
 
-  snprintf(text, sizeof(text), "速度 %lu/min",
+  snprintf(text, sizeof(text), "Speed %lu/min",
            (unsigned long)(60000u / delta));
   lv_label_set_text(g_hint, text);
 }
@@ -159,12 +159,12 @@ static void fish_cb(lv_event_t *event)
   g_last_tap_tick = 0;
   if (g_hint != NULL)
     {
-      lv_label_set_text(g_hint, "速度 准备好");
+      lv_label_set_text(g_hint, "Ready to knock");
     }
 
   if (g_reset_note != NULL)
     {
-      lv_label_set_text(g_reset_note, "功德化成您的好运");
+      lv_label_set_text(g_reset_note, "Merit becomes your luck");
     }
 
   wooden_fish_update_count();
@@ -182,16 +182,33 @@ static int add_tappable(lv_obj_t *obj)
   return 0;
 }
 
+static lv_obj_t *create_part(const smart_band_app_host_t *host,
+                             lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
+                             lv_coord_t w, lv_coord_t h, uint32_t color,
+                             lv_coord_t radius)
+{
+  lv_obj_t *part = host->create_box(parent, x, y, w, h,
+                                    lv_color_hex(color), radius);
+
+  if (part != NULL)
+    {
+      lv_obj_set_style_shadow_width(part, 0, 0);
+    }
+
+  return part;
+}
+
 int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                                      const smart_band_app_host_t *host)
 {
   lv_coord_t center = host->screen_w / 2;
+  lv_obj_t *head;
   lv_obj_t *body;
   lv_obj_t *belly;
-  lv_obj_t *head;
-  lv_obj_t *left_ear;
-  lv_obj_t *right_ear;
   lv_obj_t *snout;
+  lv_obj_t *hammer_handle;
+  lv_obj_t *hammer_head;
+  lv_obj_t *knock;
   lv_obj_t *reset;
 
   g_stage = parent;
@@ -199,13 +216,13 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
   g_hint = NULL;
   g_reset_note = NULL;
   g_float_font = host->font_20();
-  g_float_start_y = host->sy(58);
+  g_float_start_y = host->sy(56);
   g_last_tap_tick = 0;
 
-  g_count = host->create_label(parent, "功德 0", host->font_20(),
+  g_count = host->create_label(parent, "Merit 0", host->font_20(),
                                lv_color_hex(0x293b53),
                                LV_TEXT_ALIGN_CENTER);
-  g_hint = host->create_label(parent, "速度 准备好", host->font_12(),
+  g_hint = host->create_label(parent, "Ready to knock", host->font_12(),
                               lv_color_hex(0x6f8790),
                               LV_TEXT_ALIGN_CENTER);
   g_reset_note = host->create_label(parent, "", host->font_12(),
@@ -219,48 +236,56 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
   host->place_label(g_count, host->sx(18), host->sy(2),
                     host->screen_w - host->sx(36), host->sy(28));
   host->place_label(g_hint, host->sx(18), host->sy(30),
-                    host->screen_w - host->sx(36), host->sy(22));
+                    host->screen_w - host->sx(36), host->sy(20));
 
-  if (host->create_box(parent, center - host->sx(73), host->sy(238),
-                       host->sx(146), host->sy(24), lv_color_hex(0xf3ead7),
-                       LV_RADIUS_CIRCLE) == NULL ||
-      host->create_box(parent, center - host->sx(82), host->sy(218),
-                       host->sx(66), host->sy(42), lv_color_hex(0xf5b4c8),
-                       host->sx(24)) == NULL ||
-      host->create_box(parent, center + host->sx(16), host->sy(218),
-                       host->sx(66), host->sy(42), lv_color_hex(0xf5b4c8),
-                       host->sx(24)) == NULL ||
-      host->create_box(parent, center - host->sx(38), host->sy(210),
-                       host->sx(76), host->sy(52), lv_color_hex(0xf7c7d5),
-                       host->sx(28)) == NULL ||
-      host->create_box(parent, center - host->sx(96), host->sy(250),
-                       host->sx(192), host->sy(30), lv_color_hex(0xaad9c8),
-                       LV_RADIUS_CIRCLE) == NULL)
+  if (create_part(host, parent, center - host->sx(94), host->sy(243),
+                  host->sx(188), host->sy(28), 0xaad9c8,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center - host->sx(76), host->sy(221),
+                  host->sx(62), host->sy(42), 0xf5a9c3,
+                  host->sx(24)) == NULL ||
+      create_part(host, parent, center + host->sx(14), host->sy(221),
+                  host->sx(62), host->sy(42), 0xf5a9c3,
+                  host->sx(24)) == NULL ||
+      create_part(host, parent, center - host->sx(42), host->sy(210),
+                  host->sx(84), host->sy(56), 0xf7c4d5,
+                  host->sx(28)) == NULL ||
+      create_part(host, parent, center - host->sx(66), host->sy(252),
+                  host->sx(132), host->sy(18), 0xf3ead7,
+                  LV_RADIUS_CIRCLE) == NULL)
     {
       return -1;
     }
 
-  body = host->create_box(parent, center - host->sx(58), host->sy(132),
-                          host->sx(116), host->sy(104),
-                          lv_color_hex(0xb98358), host->sx(42));
-  belly = host->create_box(parent, center - host->sx(39), host->sy(158),
-                           host->sx(78), host->sy(64),
-                           lv_color_hex(0xd9b28a), host->sx(32));
-  left_ear = host->create_box(parent, center - host->sx(56), host->sy(72),
-                              host->sx(35), host->sx(35),
-                              lv_color_hex(0x9d6a49), LV_RADIUS_CIRCLE);
-  right_ear = host->create_box(parent, center + host->sx(21), host->sy(72),
-                               host->sx(35), host->sx(35),
-                               lv_color_hex(0x9d6a49), LV_RADIUS_CIRCLE);
-  head = host->create_box(parent, center - host->sx(63), host->sy(76),
-                          host->sx(126), host->sy(92),
-                          lv_color_hex(0xb98358), host->sx(42));
-  snout = host->create_box(parent, center - host->sx(35), host->sy(120),
-                           host->sx(70), host->sy(30),
-                           lv_color_hex(0xd9b28a), LV_RADIUS_CIRCLE);
-  if (body == NULL || belly == NULL || left_ear == NULL ||
-      right_ear == NULL || head == NULL || snout == NULL ||
-      add_tappable(head) != 0)
+  body = create_part(host, parent, center - host->sx(70), host->sy(122),
+                     host->sx(140), host->sy(108), 0xba8257,
+                     host->sx(48));
+  belly = create_part(host, parent, center - host->sx(38), host->sy(150),
+                      host->sx(76), host->sy(60), 0xdbb083,
+                      host->sx(30));
+  if (body == NULL || belly == NULL)
+    {
+      return -1;
+    }
+
+  if (create_part(host, parent, center - host->sx(60), host->sy(76),
+                  host->sx(34), host->sx(34), 0x9b6947,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center + host->sx(26), host->sy(76),
+                  host->sx(34), host->sx(34), 0x9b6947,
+                  LV_RADIUS_CIRCLE) == NULL)
+    {
+      return -1;
+    }
+
+  head = create_part(host, parent, center - host->sx(62), host->sy(82),
+                     host->sx(124), host->sy(92), 0xbe875c,
+                     host->sx(42));
+  snout = create_part(host, parent, center - host->sx(34), host->sy(126),
+                      host->sx(68), host->sy(30), 0xe0b98f,
+                      LV_RADIUS_CIRCLE);
+  if (head == NULL || snout == NULL ||
+      add_tappable(head) != 0 || add_tappable(body) != 0)
     {
       return -1;
     }
@@ -268,29 +293,56 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
   lv_obj_set_style_border_width(head, 1, 0);
   lv_obj_set_style_border_color(head, lv_color_hex(0x8d5d42), 0);
 
-  if (host->create_box(parent, center - host->sx(32), host->sy(110),
-                       host->sx(10), host->sx(10), lv_color_hex(0x293b53),
-                       LV_RADIUS_CIRCLE) == NULL ||
-      host->create_box(parent, center + host->sx(22), host->sy(110),
-                       host->sx(10), host->sx(10), lv_color_hex(0x293b53),
-                       LV_RADIUS_CIRCLE) == NULL ||
-      host->create_box(parent, center - host->sx(8), host->sy(131),
-                       host->sx(16), host->sy(9), lv_color_hex(0x6b4632),
-                       LV_RADIUS_CIRCLE) == NULL ||
-      host->create_box(parent, center - host->sx(18), host->sy(150),
-                       host->sx(36), host->sy(4), lv_color_hex(0x6b4632),
-                       LV_RADIUS_CIRCLE) == NULL)
+  if (create_part(host, parent, center - host->sx(30), host->sy(116),
+                  host->sx(10), host->sx(10), 0x293b53,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center + host->sx(20), host->sy(116),
+                  host->sx(10), host->sx(10), 0x293b53,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center - host->sx(7), host->sy(137),
+                  host->sx(14), host->sy(8), 0x6b4632,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center - host->sx(18), host->sy(154),
+                  host->sx(36), host->sy(4), 0x6b4632,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center - host->sx(88), host->sy(206),
+                  host->sx(32), host->sy(18), 0x8f6043,
+                  LV_RADIUS_CIRCLE) == NULL ||
+      create_part(host, parent, center + host->sx(56), host->sy(206),
+                  host->sx(32), host->sy(18), 0x8f6043,
+                  LV_RADIUS_CIRCLE) == NULL)
     {
       return -1;
     }
 
-  host->place_label(g_reset_note, host->sx(18), host->sy(286),
-                    host->screen_w - host->sx(36), host->sy(22));
+  hammer_handle = create_part(host, parent, center + host->sx(70),
+                              host->sy(70), host->sx(15), host->sy(90),
+                              0x7b5a3e, host->sx(7));
+  hammer_head = create_part(host, parent, center + host->sx(47),
+                            host->sy(58), host->sx(58), host->sy(24),
+                            0xc58d5c, host->sx(12));
+  if (hammer_handle == NULL || hammer_head == NULL)
+    {
+      return -1;
+    }
+
+  lv_obj_set_style_transform_rotation(hammer_handle, -280, 0);
+  lv_obj_set_style_transform_rotation(hammer_head, -280, 0);
+  lv_obj_set_style_border_width(hammer_head, 1, 0);
+  lv_obj_set_style_border_color(hammer_head, lv_color_hex(0x8d5d42), 0);
+
+  host->place_label(g_reset_note, host->sx(18), host->sy(278),
+                    host->screen_w - host->sx(36), host->sy(20));
+
+  knock = host->create_action_button(parent, "Knock",
+                                     center - host->sx(112), host->sy(308),
+                                     host->sx(96), host->sy(38),
+                                     lv_color_hex(0xf5c66e), fish_cb, 1);
   reset = host->create_action_button(parent, "Reset",
-                                     center - host->sx(52), host->sy(314),
-                                     host->sx(104), host->sy(36),
+                                     center + host->sx(16), host->sy(308),
+                                     host->sx(96), host->sy(38),
                                      lv_color_hex(0x6f8790), fish_cb, 2);
-  if (reset == NULL)
+  if (knock == NULL || reset == NULL)
     {
       return -1;
     }
