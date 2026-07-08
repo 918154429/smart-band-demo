@@ -1,5 +1,6 @@
 config LVX_USE_DEMO_SMART_BAND_BASIC
 	bool "Smart band basic LVGL demo"
+	depends on GRAPHICS_LVGL && LV_USE_NUTTX && LV_USE_NUTTX_LIBUV
 	default n
 	---help---
 		Enable the basic smart band demo application. It follows the
@@ -15,17 +16,6 @@ config LVX_DEMO_SMART_BAND_BASIC_PRIORITY
 
 config LVX_DEMO_SMART_BAND_BASIC_STACKSIZE
 	int "Smart band basic stack size"
-	default 8192
-
-config LVX_DEMO_SMART_BAND_BASIC_LOOP_DELAY_US
-	int "LVGL loop delay in microseconds"
-	default 5000
-
-config LVX_DEMO_SMART_BAND_BASIC_STANDALONE_INIT
-	bool "Call lv_init() in smart_band main"
-	default n
-	---help---
-		Enable this only when the board/simulator has not initialized LVGL
-		before starting the application.
+	default 32768
 
 endif

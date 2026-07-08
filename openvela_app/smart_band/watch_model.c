@@ -66,15 +66,15 @@ static void simulate_health_data(smart_band_state_t *state)
 
   if (state->heart_rate >= 110)
     {
-      snprintf(state->status_text, sizeof(state->status_text), "运动中");
+      snprintf(state->status_text, sizeof(state->status_text), "Active");
     }
   else if (state->steps >= SMART_BAND_STEP_GOAL)
     {
-      snprintf(state->status_text, sizeof(state->status_text), "目标达成");
+      snprintf(state->status_text, sizeof(state->status_text), "Goal Met");
     }
   else
     {
-      snprintf(state->status_text, sizeof(state->status_text), "状态稳定");
+      snprintf(state->status_text, sizeof(state->status_text), "Stable");
     }
 }
 
@@ -90,7 +90,7 @@ void smart_band_state_init(smart_band_state_t *state, time_t now)
   state->heart_rate = 72;
   state->steps = 1260;
   state->battery_percent = 96;
-  snprintf(state->status_text, sizeof(state->status_text), "状态稳定");
+  snprintf(state->status_text, sizeof(state->status_text), "Stable");
   format_time(state, now);
 }
 
@@ -132,13 +132,13 @@ const char *smart_band_page_title(smart_band_page_t page)
   switch (page)
     {
       case SMART_BAND_PAGE_FACE:
-        return "表盘";
+        return "Face";
       case SMART_BAND_PAGE_HEART:
-        return "心率";
+        return "Heart";
       case SMART_BAND_PAGE_STEPS:
-        return "计步";
+        return "Steps";
       default:
-        return "未知";
+        return "Unknown";
     }
 }
 

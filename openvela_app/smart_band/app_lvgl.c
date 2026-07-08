@@ -71,13 +71,14 @@ static void update_dots(void)
 static void render_face_page(void)
 {
   char battery_text[24];
-  snprintf(battery_text, sizeof(battery_text), "电量 %d%%", g_ui.model.battery_percent);
+  snprintf(battery_text, sizeof(battery_text), "Battery %d%%",
+           g_ui.model.battery_percent);
 
   set_label_text(g_ui.title, smart_band_page_title(g_ui.model.page));
   set_label_text(g_ui.clock, g_ui.model.time_text);
   set_label_text(g_ui.date, g_ui.model.date_text);
   set_label_text(g_ui.metric, g_ui.model.status_text);
-  set_label_text(g_ui.unit, "左右滑动切换");
+  set_label_text(g_ui.unit, "Swipe left/right");
   set_label_text(g_ui.status, battery_text);
   lv_bar_set_range(g_ui.progress, 0, 100);
   lv_bar_set_value(g_ui.progress, g_ui.model.battery_percent, LV_ANIM_ON);
@@ -89,11 +90,12 @@ static void render_heart_page(void)
   snprintf(metric_text, sizeof(metric_text), "%d", g_ui.model.heart_rate);
 
   set_label_text(g_ui.title, smart_band_page_title(g_ui.model.page));
-  set_label_text(g_ui.clock, "实时心率");
+  set_label_text(g_ui.clock, "Heart Rate");
   set_label_text(g_ui.date, g_ui.model.time_text);
   set_label_text(g_ui.metric, metric_text);
   set_label_text(g_ui.unit, "BPM");
-  set_label_text(g_ui.status, g_ui.model.heart_rate > 110 ? "请关注强度" : "心率正常");
+  set_label_text(g_ui.status, g_ui.model.heart_rate > 110 ? "High intensity" :
+                                                           "Heart normal");
   lv_bar_set_range(g_ui.progress, 0, 100);
   lv_bar_set_value(g_ui.progress, (g_ui.model.heart_rate * 100) / 135, LV_ANIM_ON);
 }
@@ -105,11 +107,12 @@ static void render_steps_page(void)
   int progress = smart_band_step_progress(&g_ui.model);
 
   snprintf(metric_text, sizeof(metric_text), "%d", g_ui.model.steps);
-  snprintf(status_text, sizeof(status_text), "目标 %d 步 · %d%%", SMART_BAND_STEP_GOAL,
+  snprintf(status_text, sizeof(status_text), "Goal %d steps - %d%%",
+           SMART_BAND_STEP_GOAL,
            progress);
 
   set_label_text(g_ui.title, smart_band_page_title(g_ui.model.page));
-  set_label_text(g_ui.clock, "今日步数");
+  set_label_text(g_ui.clock, "Today Steps");
   set_label_text(g_ui.date, g_ui.model.date_text);
   set_label_text(g_ui.metric, metric_text);
   set_label_text(g_ui.unit, "STEPS");
@@ -137,12 +140,12 @@ static void render_page(void)
         render_steps_page();
         break;
       default:
-        set_label_text(g_ui.title, "异常");
+        set_label_text(g_ui.title, "Error");
         set_label_text(g_ui.clock, "--");
-        set_label_text(g_ui.date, "页面状态无效");
+        set_label_text(g_ui.date, "Invalid page");
         set_label_text(g_ui.metric, "0");
         set_label_text(g_ui.unit, "");
-        set_label_text(g_ui.status, "请重启应用");
+        set_label_text(g_ui.status, "Restart app");
         break;
     }
 
@@ -229,7 +232,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
   lv_obj_set_style_pad_all(root, 0, 0);
 
-  g_ui.title = create_label(root, "表盘", 14, 24, lv_color_hex(0x94a3b8));
+  g_ui.title = create_label(root, "Face", 14, 24, lv_color_hex(0x94a3b8));
   g_ui.clock = create_label(root, "--:--", 46, 36, lv_color_hex(0xf8fafc));
   g_ui.date = create_label(root, "----/--/--", 92, 24, lv_color_hex(0xcbd5e1));
   g_ui.metric = create_label(root, "0", 124, 34, lv_color_hex(0x2dd4bf));

@@ -1,6 +1,6 @@
 # openvela 复现说明
 
-本文档说明如何把本仓库的智能手环应用接入 openvela 平台。应用选择原生 **C + LVGL** 路线，工程口径对齐 openvela `packages` 顶层仓库中的原生应用示例方向 `packages_demos`。传感器数据当前使用模拟值，后续可替换为 Sensor/uORB 提供的真实心率或计步数据。
+本文档说明如何把本仓库的智能手环应用接入 openvela 平台。应用选择原生 **C + LVGL** 路线，工程口径对齐 openvela `packages/demos` 原生应用示例。传感器数据当前使用模拟值，后续可替换为 Sensor/uORB 提供的真实心率或计步数据。
 
 openvela `packages` 顶层仓库说明了两个示例方向：
 
@@ -13,9 +13,15 @@ openvela `packages` 顶层仓库说明了两个示例方向：
 
 准备 openvela SDK、交叉编译工具链、目标板或模拟器。不同 openvela 版本的命令可能略有差异，请以当前 SDK 的 `README`、`build.sh`、`menuconfig` 入口为准。
 
+当前验证目标优先使用 openvela goldfish 模拟器，例如：
+
+```sh
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap -j2
+```
+
 需要启用的能力：
 
-- LVGL 图形库。官方 Bandx 手环示例还会启用 `LV_USE_FRAGMENT`。
+- LVGL 图形库、`LV_USE_NUTTX` 和 `LV_USE_NUTTX_LIBUV`。
 - 目标屏幕或模拟器显示驱动。
 - 触摸输入或鼠标输入，用于 LVGL 手势事件。
 - NuttX/openvela shell，用于启动 `smart_band`。
@@ -25,17 +31,17 @@ openvela `packages` 顶层仓库说明了两个示例方向：
 假设 openvela 根目录为 `$OPENVELA_ROOT`：
 
 ```sh
-mkdir -p "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic"
-cp -r openvela_app/smart_band/* "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic/"
+mkdir -p "$OPENVELA_ROOT/packages/demos/smart_band_basic"
+cp -r openvela_app/smart_band/* "$OPENVELA_ROOT/packages/demos/smart_band_basic/"
 ```
 
-如果当前 SDK 的 `apps/packages/demos/Kconfig` 没有自动扫描子目录，需要加入：
+当前 openvela 仓库的 `packages/demos/CMakeLists.txt` 会通过 `nuttx_add_subdirectory()` 自动扫描子目录，`packages/demos/Make.defs` 也会自动包含子目录 `Make.defs`。如果你使用的是其他 SDK 版本且没有自动扫描，需要手工加入：
 
 ```text
 source "packages/demos/smart_band_basic/Kconfig"
 ```
 
-如果当前 `apps/packages/demos/Make.defs` 没有自动包含子目录 `Make.defs`，需要加入：
+以及：
 
 ```make
 include $(wildcard $(APPDIR)/packages/demos/smart_band_basic/Make.defs)
@@ -46,30 +52,23 @@ include $(wildcard $(APPDIR)/packages/demos/smart_band_basic/Make.defs)
 进入 openvela SDK 后打开配置：
 
 ```sh
-./build.sh vendor/openvela/boards/vela/configs/goldfish-armeabi-v7a-ap menuconfig
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap menuconfig
 ```
 
 在配置中启用：
 
-- `LV_USE_FRAGMENT`
+- `LV_USE_NUTTX`
+- `LV_USE_NUTTX_LIBUV`
 - `LVX_USE_DEMO_SMART_BAND_BASIC`
 - 当前模拟器或开发板对应的 framebuffer/display/input 配置
-
-如果你的板级初始化没有提前执行 `lv_init()`，同时启用：
-
-```text
-LVX_DEMO_SMART_BAND_BASIC_STANDALONE_INIT
-```
-
-多数已经集成 LVGL 的图形系统不需要打开这个选项。
 
 ## 4. 编译与运行
 
 模拟器示例：
 
 ```sh
-./build.sh vendor/openvela/boards/vela/configs/goldfish-armeabi-v7a-ap distclean -j8
-./build.sh vendor/openvela/boards/vela/configs/goldfish-armeabi-v7a-ap -j8
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap distclean -j2
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap -j2
 ./emulator.sh vela
 ```
 
@@ -103,11 +102,11 @@ smart_band
 
 ### 编译提示找不到 LVGL
 
-确认 SDK 已启用 LVGL 相关配置。官方 Bandx 示例至少会打开 `LV_USE_FRAGMENT` 和 `LVX_USE_DEMO_BANDX`；本项目对应打开 `LVX_USE_DEMO_SMART_BAND_BASIC`。
+确认 SDK 已启用 LVGL 相关配置。本项目依赖 `GRAPHICS_LVGL`、`LV_USE_NUTTX`、`LV_USE_NUTTX_LIBUV` 和 `LVX_USE_DEMO_SMART_BAND_BASIC`。
 
 ### 运行后黑屏
 
-确认显示驱动、LVGL tick、输入设备和 framebuffer 初始化已经完成。若当前系统没有全局 LVGL 初始化，打开 `LVX_DEMO_SMART_BAND_BASIC_STANDALONE_INIT` 再试。
+确认显示驱动、LVGL tick、输入设备和 framebuffer 初始化已经完成。当前 C 入口会按 openvela demo 风格自行执行 `lv_init()`、`lv_nuttx_init()` 和 libuv UI 循环。
 
 ### 手势没有反应
 
@@ -115,4 +114,4 @@ smart_band
 
 ### 字体或中文显示异常
 
-当前 C 版 UI 使用少量中文文本。如果目标固件没有包含中文字体，可以把 `app_lvgl.c` 中的中文标签替换为英文，或在 openvela/LVGL 配置中加入中文字体资源。
+当前 C 版 UI 已改为英文 ASCII 文案，默认 LVGL 字体即可显示。若后续需要中文界面，需要在 openvela/LVGL 配置中加入中文字体资源。

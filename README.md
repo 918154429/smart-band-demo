@@ -13,7 +13,7 @@
 ## 目录结构
 
 ```text
-openvela_app/smart_band/    可复制到 apps/packages/demos/smart_band_basic 的 C + LVGL 应用
+openvela_app/smart_band/    可复制到 packages/demos/smart_band_basic 的 C + LVGL 应用
 demo/                       无依赖浏览器演示，用于截图和录屏
 docs/                       复现说明、录屏脚本和截图建议
 tests/                      可在本机运行的基础逻辑测试
@@ -35,7 +35,7 @@ demo/index.html
 
 ## openvela 运行说明
 
-详细步骤见 [docs/openvela-runbook.md](docs/openvela-runbook.md)。核心流程是把 `openvela_app/smart_band` 拷贝到 openvela `apps/packages/demos/smart_band_basic`，在配置中启用 LVGL、显示驱动和 `LVX_USE_DEMO_SMART_BAND_BASIC`，然后在模拟器或开发板 shell 中运行：
+详细步骤见 [docs/openvela-runbook.md](docs/openvela-runbook.md)。核心流程是把 `openvela_app/smart_band` 拷贝到 openvela `packages/demos/smart_band_basic`，在配置中启用 LVGL、显示驱动和 `LVX_USE_DEMO_SMART_BAND_BASIC`，然后在模拟器或开发板 shell 中运行：
 
 ```sh
 smart_band

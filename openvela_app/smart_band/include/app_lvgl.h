@@ -1,7 +1,7 @@
 #ifndef SMART_BAND_APP_LVGL_H
 #define SMART_BAND_APP_LVGL_H
 
-#include <lvgl.h>
+#include <lvgl/lvgl.h>
 
 #ifdef __cplusplus
 extern "C" {
