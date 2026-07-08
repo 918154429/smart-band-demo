@@ -4,15 +4,15 @@
 
 ## 已完成功能
 
-- 表盘页面：显示当前时间、日期、电量、温度与页面指示点。
-- 健康页面：优先读取模拟器心率传感器，缺失时回退到模型数据。
-- 计步页面：优先读取模拟器计步/加速度传感器，缺失时回退到模型数据。
+- 表盘页面：中文表盘显示当前时间、日期、电量、睡眠、心率、压力和温度。
+- 健康页面：优先读取模拟器心率传感器，缺失时回退到模型数据，并用清晰卡片展示来源、静息值、电量和压力。
+- 计步页面：优先读取模拟器计步/加速度传感器，缺失时回退到模型数据，并展示步数、目标、完成度、来源和气温。
 - 应用中心：已模仿 openvela 原生 demo 与快应用 examples 的组织方式，在一个
-  Apps 页面内提供可点击的小应用图标。当前包含天气、计算器、计时器、音乐控制、
+  应用中心页面内提供可点击的小应用图标。当前包含天气、计算器、计时器、2048、
   设置、秒表、手电筒、扫雷、俄罗斯方块和电子木鱼 10 个可运行应用；实现为当前
   原生 LVGL 应用内部逻辑，没有直接调用示例仓库的应用入口。
-- 基础交互：支持左右滑动切换页面；桌面演示也支持键盘方向键和按钮。
-- 异常处理：时间获取失败时显示兜底文本；模拟数据做范围限制；UI 初始化失败会直接返回错误码。
+- 基础交互：支持左右滑动切换表盘、心率、步数和应用中心页面；桌面演示也支持键盘方向键和按钮。
+- 异常处理：时间获取失败时显示兜底文本；传感器缺失时自动回退模拟数据；模拟数据做范围限制；UI 初始化失败会直接返回错误码。
 
 ## 目录结构
 
@@ -40,7 +40,7 @@ demo/index.html
 
 ## openvela 运行说明
 
-详细步骤见 [docs/openvela-runbook.md](docs/openvela-runbook.md)。核心流程是把 `openvela_app/smart_band` 拷贝到 openvela `packages/demos/smart_band_basic`，在配置中启用 LVGL、显示驱动和 `LVX_USE_DEMO_SMART_BAND_BASIC`，然后在模拟器或开发板 shell 中运行：
+详细步骤见 [docs/openvela-runbook.md](docs/openvela-runbook.md)。核心流程是把 `openvela_app/smart_band` 拷贝到 openvela `packages/demos/smart_band_basic`，在配置中启用 LVGL、显示驱动、`LV_FONT_SIMSUN_16_CJK` 和 `LVX_USE_DEMO_SMART_BAND_BASIC`，然后在模拟器或开发板 shell 中运行：
 
 ```sh
 smart_band
@@ -51,6 +51,12 @@ smart_band
 `/dev/charge/goldfish_battery`。若温度设备名不同，会回退尝试
 `/dev/uorb/sensor_temp0`。时间仍来自模拟器系统时钟，应用在 NuttX 下
 会按 UTC+8 格式化显示，避免模拟器 shell 的默认 UTC 时区影响手环页面。
+
+手环主页面使用短中文文案。若中文显示为方块，请确认 openvela/LVGL 配置中已启用：
+
+```text
+CONFIG_LV_FONT_SIMSUN_16_CJK=y
+```
 
 可以用滚动脚本验证模拟器传感器值是否进入应用：
 

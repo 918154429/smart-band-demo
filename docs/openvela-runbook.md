@@ -1,6 +1,6 @@
 # openvela 复现说明
 
-本文档说明如何把本仓库的智能手环应用接入 openvela 平台。应用选择原生 **C + LVGL** 路线，工程口径对齐 openvela `packages/demos` 原生应用示例。传感器数据当前使用模拟值，后续可替换为 Sensor/uORB 提供的真实心率或计步数据。
+本文档说明如何把本仓库的智能手环应用接入 openvela 平台。应用选择原生 **C + LVGL** 路线，工程口径对齐 openvela `packages/demos` 原生应用示例。主页面包含中文表盘、心率、步数和应用中心四页；传感器可用时读取 Sensor/uORB 数据，缺失时自动回退模拟数据。
 
 openvela `packages` 顶层仓库说明了两个示例方向：
 
@@ -26,15 +26,20 @@ openvela `packages` 顶层仓库说明了两个示例方向：
 - 触摸输入或鼠标输入，用于 LVGL 手势事件。
 - uORB/Sensors，用于读取 `sensor_hrate0`、`sensor_accel0`，可用时读取 `sensor_step_counter0`。
 - goldfish 电池驱动，用于读取 `/dev/charge/goldfish_battery`。
+- `LV_FONT_SIMSUN_16_CJK`，用于显示主界面的中文文案。
 - NuttX/openvela shell，用于启动 `smart_band`。
 
 ## 2. 拷贝应用
 
-假设 openvela 根目录为 `$OPENVELA_ROOT`：
+假设 openvela 根目录为 `$OPENVELA_ROOT`。当前 goldfish 配置实际编译入口
+是 `$OPENVELA_ROOT/apps/packages/demos/smart_band_basic`，同时保留
+`$OPENVELA_ROOT/packages/demos/smart_band_basic` 作为 packages 镜像；两处需要保持同步：
 
 ```sh
 mkdir -p "$OPENVELA_ROOT/packages/demos/smart_band_basic"
 cp -r openvela_app/smart_band/* "$OPENVELA_ROOT/packages/demos/smart_band_basic/"
+mkdir -p "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic"
+cp -r openvela_app/smart_band/* "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic/"
 ```
 
 当前 openvela 仓库的 `packages/demos/CMakeLists.txt` 会通过 `nuttx_add_subdirectory()` 自动扫描子目录，`packages/demos/Make.defs` 也会自动包含子目录 `Make.defs`。如果你使用的是其他 SDK 版本且没有自动扫描，需要手工加入：
@@ -64,16 +69,35 @@ include $(wildcard $(APPDIR)/packages/demos/smart_band_basic/Make.defs)
 - `SENSORS`
 - `UORB`
 - `LVX_USE_DEMO_SMART_BAND_BASIC`
+- `LV_FONT_SIMSUN_16_CJK`
 - 当前模拟器或开发板对应的 framebuffer/display/input 配置
+
+也可以直接在目标 defconfig 中加入：
+
+```text
+CONFIG_LV_FONT_SIMSUN_16_CJK=y
+CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC=y
+```
 
 ## 4. 编译与运行
 
 模拟器示例：
 
 ```sh
-./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap distclean -j2
 ./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap -j2
-./emulator.sh vela
+./emulator.sh cmake_out/vela_goldfish-arm64-v8a-ap -skin xiaomi_smart_band_8_pro -skindir prebuilts/emulator/skins/
+```
+
+如果当前工作区的顶层 Make 链在最终链接时报 `nsh_main` 或
+`g_builtins` 缺失，可使用已经验证过的 CMake 目标构建同一份模拟器
+`nuttx` 产物：
+
+```sh
+export PATH="$OPENVELA_ROOT/prebuilts/build-tools/linux-x86_64/bin:$OPENVELA_ROOT/prebuilts/gcc/linux-x86_64/aarch64-none-elf/bin:$PATH"
+cmake --build cmake_out/vela_goldfish-arm64-v8a-ap --target apps/packages/demos/smart_band_basic/libapps_smart_band.a -j2
+cmake --build cmake_out/vela_goldfish-arm64-v8a-ap --target apps/graphics/lvgl/liblvgl.a -j2
+cmake --build cmake_out/vela_goldfish-arm64-v8a-ap --target nuttx -j2
+./emulator.sh cmake_out/vela_goldfish-arm64-v8a-ap -skin xiaomi_smart_band_8_pro -skindir prebuilts/emulator/skins/
 ```
 
 进入 shell 后执行：
@@ -96,12 +120,11 @@ smart_band
 
 ## 5. 交互与验收
 
-- 初始页面显示当前时间和日期。
-- 向左滑动进入心率页面。
-- 再向左滑动进入计步页面。
-- 向右滑动返回上一页。
-- 心率、步数、电量每秒刷新一次。
-- 模拟器传感器可用时，心率页面显示 `Sensor HR`，电池显示 `sensor` 后缀，计步页面显示 `Sensor` 前缀。
+- 初始表盘显示当前时间、日期、电量、睡眠、心率、压力和温度。
+- 向左滑动进入心率页面，再向左进入步数页面，再向左进入应用中心。
+- 向右滑动返回上一页，底部圆点同步显示当前页。
+- 心率、步数、电量、温度每秒刷新一次。
+- 模拟器传感器可用时，详情页来源显示 `传感器`；读不到设备时显示 `模拟` 并继续运行。
 
 ## 6. 常见问题
 
@@ -123,4 +146,9 @@ smart_band
 
 ### 字体或中文显示异常
 
-当前 C 版 UI 已改为英文 ASCII 文案，默认 LVGL 字体即可显示。若后续需要中文界面，需要在 openvela/LVGL 配置中加入中文字体资源。
+当前 C 版主 UI 使用短中文文案，需要在 openvela/LVGL 配置中启用 `CONFIG_LV_FONT_SIMSUN_16_CJK=y`。若仍显示方块，请先清理构建缓存后重新编译：
+
+```sh
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap distclean -j2
+./build.sh vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap -j2
+```
