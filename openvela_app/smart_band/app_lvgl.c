@@ -1077,6 +1077,7 @@ static int create_ui_tree(lv_obj_t *root)
   lv_coord_t watch_w;
   lv_coord_t watch_h;
   lv_coord_t frame_radius;
+  bool compact_band;
 
   lv_obj_update_layout(root);
   root_w = lv_obj_get_width(root);
@@ -1092,6 +1093,7 @@ static int create_ui_tree(lv_obj_t *root)
       root_h = 480;
     }
 
+  compact_band = root_w <= 540 && root_h <= 540;
   watch_h = min_coord(root_h - 48, 720);
   watch_h = max_coord(watch_h, 360);
   watch_w = (watch_h * 194) / 368;
@@ -1110,6 +1112,31 @@ static int create_ui_tree(lv_obj_t *root)
   lv_obj_set_style_bg_color(root, lv_color_hex(0xeef4f3), 0);
   lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
   lv_obj_set_style_pad_all(root, 0, 0);
+
+  if (compact_band)
+    {
+      g_ui.watch = root;
+      g_ui.screen = root;
+      g_ui.screen_w = root_w;
+      g_ui.screen_h = root_h;
+      lv_obj_set_style_bg_color(root, lv_color_hex(0xffffff), 0);
+      lv_obj_set_style_bg_grad_color(root, lv_color_hex(0xfffcf6), 0);
+      lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_VER, 0);
+
+      if (create_background_waves() != 0 || create_face_page() != 0 ||
+          create_heart_page() != 0 || create_steps_page() != 0 ||
+          create_apps_page() != 0 || create_dots() != 0)
+        {
+          return -1;
+        }
+
+      enable_touch_navigation(g_ui.screen);
+      enable_touch_navigation_tree(g_ui.face_page);
+      enable_touch_navigation_tree(g_ui.heart_page);
+      enable_touch_navigation_tree(g_ui.steps_page);
+      enable_touch_navigation(g_ui.apps_page);
+      return 0;
+    }
 
   g_ui.watch = lv_obj_create(root);
   if (g_ui.watch == NULL)
