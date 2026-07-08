@@ -13,6 +13,30 @@
 #define DESIGN_H 626
 #define CARD_COUNT 4
 #define SMART_BAND_DEFAULT_TZ "CST-8"
+#define SMART_BAND_TOOL_START SMART_BAND_PAGE_WEATHER
+#define SMART_BAND_TOOL_COUNT \
+  ((int)SMART_BAND_PAGE_COUNT - (int)SMART_BAND_TOOL_START)
+
+typedef struct
+{
+  smart_band_page_t page;
+  const char *title;
+  const char *orb_text;
+  const char *caption;
+  uint32_t hero_color;
+  uint32_t orb_color;
+  const char *mini_titles[4];
+} smart_band_tool_config_t;
+
+typedef struct
+{
+  lv_obj_t *page_obj;
+  lv_obj_t *date;
+  lv_obj_t *value;
+  lv_obj_t *caption;
+  lv_obj_t *progress;
+  lv_obj_t *mini_values[4];
+} smart_band_tool_ui_t;
 
 typedef struct
 {
@@ -49,6 +73,7 @@ typedef struct
   lv_obj_t *steps_percent;
   lv_obj_t *steps_source;
   lv_obj_t *steps_weather;
+  smart_band_tool_ui_t tools[SMART_BAND_TOOL_COUNT];
 
   lv_timer_t *timer;
   smart_band_state_t model;
@@ -60,6 +85,65 @@ typedef struct
 } smart_band_ui_t;
 
 static smart_band_ui_t g_ui;
+
+static const smart_band_tool_config_t g_tool_configs[SMART_BAND_TOOL_COUNT] =
+{
+  {
+    SMART_BAND_PAGE_WEATHER, "Weather", "WX", "Weather quick app",
+    0xfff6e2, 0xf5c66e,
+    {"Sky", "Range", "Humidity", "Wind"}
+  },
+  {
+    SMART_BAND_PAGE_CALENDAR, "Calendar", "CA", "Calendar quick app",
+    0xf2f5ff, 0x9caddc,
+    {"Next", "Drink", "Sleep", "Notes"}
+  },
+  {
+    SMART_BAND_PAGE_MUSIC, "Music", "MU", "Player demo",
+    0xfff0eb, 0xf08d88,
+    {"Volume", "Next", "Mode", "List"}
+  },
+  {
+    SMART_BAND_PAGE_TIMER, "Timer", "HG", "Hourglass demo",
+    0xf4f0ff, 0xa98bd6,
+    {"Work", "Break", "Round", "State"}
+  },
+  {
+    SMART_BAND_PAGE_CALCULATOR, "Calculator", "12", "Calculator demo",
+    0xeefbf8, 0x80cbc3,
+    {"Input", "Last", "Mode", "Answer"}
+  },
+  {
+    SMART_BAND_PAGE_TODO, "Todo", "TD", "Todo quick app",
+    0xf2f7ff, 0x8aa8d8,
+    {"Walk", "Water", "Code", "Review"}
+  },
+  {
+    SMART_BAND_PAGE_HOME, "Home Control", "HC", "Home quick app",
+    0xfff6e9, 0xe7b45b,
+    {"Light", "AC", "TV", "Air"}
+  },
+  {
+    SMART_BAND_PAGE_SETTINGS, "Settings", "SE", "Settings quick app",
+    0xf4f7f6, 0x6f8790,
+    {"DND", "Sound", "Wake", "Lang"}
+  },
+  {
+    SMART_BAND_PAGE_CHART, "Health Chart", "CH", "Chart quick app",
+    0xeefbf8, 0x62bfb6,
+    {"Now", "Min", "Max", "Avg"}
+  },
+  {
+    SMART_BAND_PAGE_PET, "Virtual Pet", "PT", "Pet native demo",
+    0xfff4f8, 0xe58dad,
+    {"Food", "Water", "XP", "Sleep"}
+  },
+  {
+    SMART_BAND_PAGE_WOODEN_FISH, "Wooden Fish", "WF", "Wooden fish demo",
+    0xfff8e8, 0xd9a85f,
+    {"Auto", "Mode", "Today", "Sound"}
+  }
+};
 
 static void page_drag_cb(lv_event_t *event);
 static void dot_click_cb(lv_event_t *event);
@@ -225,12 +309,42 @@ static void configure_local_time(void)
   tzset();
 }
 
+static int clamp_percent(int value)
+{
+  if (value < 0)
+    {
+      return 0;
+    }
+
+  if (value > 100)
+    {
+      return 100;
+    }
+
+  return value;
+}
+
+static void format_temperature(char *buffer, size_t size)
+{
+  snprintf(buffer, size, "%d%s%s", g_ui.model.temperature_c,
+           "\xC2\xB0" "C",
+           g_ui.model.temperature_sensor_active ? "" : " sim");
+}
+
+static void format_duration(char *buffer, size_t size, int seconds)
+{
+  if (seconds < 0)
+    {
+      seconds = 0;
+    }
+
+  snprintf(buffer, size, "%02d:%02d", seconds / 60, seconds % 60);
+}
+
 static void set_temperature_label(lv_obj_t *label)
 {
   char buffer[32];
-  snprintf(buffer, sizeof(buffer), "%d%s%s", g_ui.model.temperature_c,
-           "\xC2\xB0" "C",
-           g_ui.model.temperature_sensor_active ? "" : " sim");
+  format_temperature(buffer, sizeof(buffer));
   set_label_text(label, buffer);
 }
 
@@ -692,6 +806,81 @@ static int create_steps_page(void)
   return 0;
 }
 
+static int create_tool_page(const smart_band_tool_config_t *config,
+                            smart_band_tool_ui_t *tool)
+{
+  lv_obj_t *title;
+  lv_obj_t *hero;
+
+  if (config == NULL || tool == NULL)
+    {
+      return -1;
+    }
+
+  tool->page_obj = create_page(g_ui.screen);
+  if (tool->page_obj == NULL ||
+      create_leaf_mark(tool->page_obj, sy(32)) != 0 ||
+      create_date_row(tool->page_obj, &tool->date, sy(78)) != 0)
+    {
+      return -1;
+    }
+
+  title = create_label(tool->page_obj, config->title, font_20(),
+                       lv_color_hex(0x5a7680), LV_TEXT_ALIGN_CENTER);
+  if (title == NULL)
+    {
+      return -1;
+    }
+
+  place_label(title, sx(22), sy(112), g_ui.screen_w - sx(44), sy(28));
+
+  hero = create_detail_hero(tool->page_obj,
+                            lv_color_hex(config->hero_color),
+                            lv_color_hex(config->orb_color),
+                            config->orb_text, &tool->value,
+                            &tool->progress);
+  if (hero == NULL)
+    {
+      return -1;
+    }
+
+  tool->caption = create_label(hero, config->caption, font_12(),
+                               lv_color_hex(0x7d9298),
+                               LV_TEXT_ALIGN_CENTER);
+  if (tool->caption == NULL)
+    {
+      return -1;
+    }
+
+  place_label(tool->caption, sx(16), sy(140),
+              lv_obj_get_width(hero) - sx(32), sy(18));
+
+  for (int i = 0; i < 4; i++)
+    {
+      if (create_mini_card(tool->page_obj, i % 2, i / 2,
+                           config->mini_titles[i],
+                           &tool->mini_values[i]) != 0)
+        {
+          return -1;
+        }
+    }
+
+  return 0;
+}
+
+static int create_tool_pages(void)
+{
+  for (int i = 0; i < SMART_BAND_TOOL_COUNT; i++)
+    {
+      if (create_tool_page(&g_tool_configs[i], &g_ui.tools[i]) != 0)
+        {
+          return -1;
+        }
+    }
+
+  return 0;
+}
+
 static int create_dots(void)
 {
   lv_coord_t dot = sx(8);
@@ -831,7 +1020,7 @@ static int create_ui_tree(lv_obj_t *root)
 
   if (create_background_waves() != 0 || create_face_page() != 0 ||
       create_heart_page() != 0 || create_steps_page() != 0 ||
-      create_dots() != 0)
+      create_tool_pages() != 0 || create_dots() != 0)
     {
       return -1;
     }
@@ -854,6 +1043,11 @@ static void update_dots(void)
 
 static void set_page_visible(lv_obj_t *page, bool visible)
 {
+  if (page == NULL)
+    {
+      return;
+    }
+
   if (visible)
     {
       lv_obj_clear_flag(page, LV_OBJ_FLAG_HIDDEN);
@@ -869,6 +1063,12 @@ static void update_page_visibility(void)
   set_page_visible(g_ui.face_page, g_ui.model.page == SMART_BAND_PAGE_FACE);
   set_page_visible(g_ui.heart_page, g_ui.model.page == SMART_BAND_PAGE_HEART);
   set_page_visible(g_ui.steps_page, g_ui.model.page == SMART_BAND_PAGE_STEPS);
+  for (int i = 0; i < SMART_BAND_TOOL_COUNT; i++)
+    {
+      set_page_visible(g_ui.tools[i].page_obj,
+                       g_ui.model.page == g_tool_configs[i].page);
+    }
+
   update_dots();
 }
 
@@ -950,11 +1150,229 @@ static void update_steps_detail(void)
   set_temperature_label(g_ui.steps_weather);
 }
 
+static void set_tool_values(smart_band_tool_ui_t *tool, const char *value,
+                            const char *caption, int progress,
+                            const char *mini0, const char *mini1,
+                            const char *mini2, const char *mini3)
+{
+  if (tool == NULL)
+    {
+      return;
+    }
+
+  set_label_text(tool->value, value);
+  set_label_text(tool->caption, caption);
+  lv_bar_set_value(tool->progress, clamp_percent(progress), LV_ANIM_ON);
+  set_label_text(tool->mini_values[0], mini0);
+  set_label_text(tool->mini_values[1], mini1);
+  set_label_text(tool->mini_values[2], mini2);
+  set_label_text(tool->mini_values[3], mini3);
+}
+
+static void format_calendar_day(char *buffer, size_t size)
+{
+  static const char *const months[] =
+  {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+
+  struct tm display_time;
+
+  if (!smart_band_display_time(time(NULL), &display_time))
+    {
+      snprintf(buffer, size, "Today");
+      return;
+    }
+
+  snprintf(buffer, size, "%s %02d", months[display_time.tm_mon],
+           display_time.tm_mday);
+}
+
+static void update_tool_page(const smart_band_tool_config_t *config,
+                             smart_band_tool_ui_t *tool)
+{
+  char date_text[20];
+  char value[48];
+  char caption[48];
+  char mini0[32];
+  char mini1[32];
+  char mini2[32];
+  char mini3[32];
+  unsigned int ticks = g_ui.model.ticks;
+
+  if (config == NULL || tool == NULL)
+    {
+      return;
+    }
+
+  format_watch_date(date_text, sizeof(date_text));
+  set_label_text(tool->date, date_text);
+
+  switch (config->page)
+    {
+      case SMART_BAND_PAGE_WEATHER:
+        format_temperature(value, sizeof(value));
+        snprintf(caption, sizeof(caption), "%s weather",
+                 g_ui.model.temperature_sensor_active ? "Sensor" : "Model");
+        snprintf(mini0, sizeof(mini0), "%s",
+                 g_ui.model.temperature_c >= 30 ? "Sunny" : "Cloudy");
+        snprintf(mini1, sizeof(mini1), "32/24");
+        snprintf(mini2, sizeof(mini2), "%d%%", 55 + (int)(ticks % 8u));
+        snprintf(mini3, sizeof(mini3), "E%d", 2 + (int)(ticks % 3u));
+        set_tool_values(tool, value, caption,
+                        (g_ui.model.temperature_c + 10) * 2,
+                        mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_CALENDAR:
+        format_calendar_day(value, sizeof(value));
+        snprintf(caption, sizeof(caption), "Today schedule");
+        snprintf(mini0, sizeof(mini0), "16:00");
+        snprintf(mini1, sizeof(mini1), "15:00");
+        snprintf(mini2, sizeof(mini2), "23:00");
+        snprintf(mini3, sizeof(mini3), "%u", 2u + ticks % 3u);
+        set_tool_values(tool, value, caption, (int)(ticks % 100u),
+                        mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_MUSIC:
+        snprintf(value, sizeof(value), "Lo-Fi Set");
+        format_duration(caption, sizeof(caption), (int)(ticks % 212u));
+        snprintf(mini0, sizeof(mini0), "%d%%", 64 + (int)(ticks % 8u));
+        snprintf(mini1, sizeof(mini1), "City");
+        snprintf(mini2, sizeof(mini2), "Loop");
+        snprintf(mini3, sizeof(mini3), "12");
+        set_tool_values(tool, value, caption, (int)((ticks % 212u) * 100u /
+                        212u), mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_TIMER:
+        {
+          int elapsed = (int)(ticks % (25u * 60u));
+          int remaining = 25 * 60 - elapsed;
+
+          format_duration(value, sizeof(value), remaining);
+          snprintf(caption, sizeof(caption), "Focus timer");
+          snprintf(mini0, sizeof(mini0), "25m");
+          snprintf(mini1, sizeof(mini1), "5m");
+          snprintf(mini2, sizeof(mini2), "%u/4", 1u + (ticks / 300u) % 4u);
+          snprintf(mini3, sizeof(mini3), "%s", elapsed == 0 ? "Ready" : "Run");
+          set_tool_values(tool, value, caption, elapsed * 100 / (25 * 60),
+                          mini0, mini1, mini2, mini3);
+        }
+        break;
+
+      case SMART_BAND_PAGE_CALCULATOR:
+        {
+          int lhs = 12 + (g_ui.model.heart_rate % 20);
+          int rhs = g_ui.model.temperature_c;
+
+          snprintf(value, sizeof(value), "%d+%d=%d", lhs, rhs, lhs + rhs);
+          snprintf(caption, sizeof(caption), "Quick calculator");
+          snprintf(mini0, sizeof(mini0), "+/-");
+          snprintf(mini1, sizeof(mini1), "x2");
+          snprintf(mini2, sizeof(mini2), "Basic");
+          snprintf(mini3, sizeof(mini3), "%d", lhs + rhs);
+          set_tool_values(tool, value, caption, (lhs + rhs) % 100,
+                          mini0, mini1, mini2, mini3);
+        }
+        break;
+
+      case SMART_BAND_PAGE_TODO:
+        {
+          int done = 2 + (int)((ticks / 20u) % 4u);
+
+          snprintf(value, sizeof(value), "%d/5 done", done);
+          snprintf(caption, sizeof(caption), "Today tasks");
+          snprintf(mini0, sizeof(mini0), "OK");
+          snprintf(mini1, sizeof(mini1), "OK");
+          snprintf(mini2, sizeof(mini2), "%s", done >= 4 ? "OK" : "Next");
+          snprintf(mini3, sizeof(mini3), "%s", done >= 5 ? "OK" : "Later");
+          set_tool_values(tool, value, caption, done * 20,
+                          mini0, mini1, mini2, mini3);
+        }
+        break;
+
+      case SMART_BAND_PAGE_HOME:
+        snprintf(value, sizeof(value), "%u online", 2u + (ticks / 10u) % 3u);
+        snprintf(caption, sizeof(caption), "Home control");
+        snprintf(mini0, sizeof(mini0), "%d%%", 70 + (int)(ticks % 10u));
+        snprintf(mini1, sizeof(mini1), "%d%s", g_ui.model.temperature_c,
+                 "\xC2\xB0" "C");
+        snprintf(mini2, sizeof(mini2), "Ch12");
+        snprintf(mini3, sizeof(mini3), "Auto");
+        set_tool_values(tool, value, caption, 72, mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_SETTINGS:
+        {
+          int brightness = 62 + (int)(ticks % 24u);
+
+          snprintf(value, sizeof(value), "Bright %d%%", brightness);
+          snprintf(caption, sizeof(caption), "Band settings");
+          snprintf(mini0, sizeof(mini0), "Off");
+          snprintf(mini1, sizeof(mini1), "45%%");
+          snprintf(mini2, sizeof(mini2), "On");
+          snprintf(mini3, sizeof(mini3), "EN");
+          set_tool_values(tool, value, caption, brightness,
+                          mini0, mini1, mini2, mini3);
+        }
+        break;
+
+      case SMART_BAND_PAGE_CHART:
+        snprintf(value, sizeof(value), "HR Trend");
+        snprintf(caption, sizeof(caption), "7 samples");
+        snprintf(mini0, sizeof(mini0), "%d", g_ui.model.heart_rate);
+        snprintf(mini1, sizeof(mini1), "62");
+        snprintf(mini2, sizeof(mini2), "118");
+        snprintf(mini3, sizeof(mini3), "82");
+        set_tool_values(tool, value, caption,
+                        (g_ui.model.heart_rate * 100) / 160,
+                        mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_PET:
+        snprintf(value, sizeof(value), "Happy Lv3");
+        snprintf(caption, sizeof(caption), "Virtual pet");
+        snprintf(mini0, sizeof(mini0), "%u%%", 80u + ticks % 8u);
+        snprintf(mini1, sizeof(mini1), "%u%%", 72u + ticks % 9u);
+        snprintf(mini2, sizeof(mini2), "%u%%", 40u + ticks % 50u);
+        snprintf(mini3, sizeof(mini3), "Off");
+        set_tool_values(tool, value, caption, 76 + (int)(ticks % 18u),
+                        mini0, mini1, mini2, mini3);
+        break;
+
+      case SMART_BAND_PAGE_WOODEN_FISH:
+        snprintf(value, sizeof(value), "Merit %u", 108u + ticks / 2u);
+        snprintf(caption, sizeof(caption), "Tap focus");
+        snprintf(mini0, sizeof(mini0), "Off");
+        snprintf(mini1, sizeof(mini1), "Calm");
+        snprintf(mini2, sizeof(mini2), "+%u", 8u + ticks / 12u);
+        snprintf(mini3, sizeof(mini3), "Off");
+        set_tool_values(tool, value, caption, (int)((108u + ticks / 2u) %
+                        100u), mini0, mini1, mini2, mini3);
+        break;
+
+      default:
+        break;
+    }
+}
+
+static void update_tool_pages(void)
+{
+  for (int i = 0; i < SMART_BAND_TOOL_COUNT; i++)
+    {
+      update_tool_page(&g_tool_configs[i], &g_ui.tools[i]);
+    }
+}
+
 static void render_page(void)
 {
   update_face();
   update_heart_detail();
   update_steps_detail();
+  update_tool_pages();
   update_page_visibility();
 }
 

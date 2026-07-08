@@ -5,7 +5,18 @@ import unittest
 PAGE_FACE = 0
 PAGE_HEART = 1
 PAGE_STEPS = 2
-PAGE_COUNT = 3
+PAGE_WEATHER = 3
+PAGE_CALENDAR = 4
+PAGE_MUSIC = 5
+PAGE_TIMER = 6
+PAGE_CALCULATOR = 7
+PAGE_TODO = 8
+PAGE_HOME = 9
+PAGE_SETTINGS = 10
+PAGE_CHART = 11
+PAGE_PET = 12
+PAGE_WOODEN_FISH = 13
+PAGE_COUNT = 14
 STEP_GOAL = 8000
 
 
@@ -56,7 +67,7 @@ class WatchModelTest(unittest.TestCase):
     def test_page_wraps_in_both_directions(self):
         state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
         state.prev_page()
-        self.assertEqual(state.page, PAGE_STEPS)
+        self.assertEqual(state.page, PAGE_WOODEN_FISH)
         state.next_page()
         self.assertEqual(state.page, PAGE_FACE)
         state.next_page()
