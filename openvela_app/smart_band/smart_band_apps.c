@@ -40,7 +40,7 @@ static const smart_band_app_def_t g_apps[SMART_BAND_APP_COUNT] =
   {SMART_BAND_APP_WEATHER, "Weather", "WX", 0xf5c66e},
   {SMART_BAND_APP_CALCULATOR, "Calculator", "12", 0x80cbc3},
   {SMART_BAND_APP_TIMER, "Timer", "TM", 0xa98bd6},
-  {SMART_BAND_APP_MUSIC, "Music", "MU", 0xf08d88},
+  {SMART_BAND_APP_MUSIC, "2048", "2K", 0xf08d88},
   {SMART_BAND_APP_SETTINGS, "Settings", "SE", 0x6f8790},
   {SMART_BAND_APP_STOPWATCH, "Stopwatch", "SW", 0x73a1d6},
   {SMART_BAND_APP_FLASHLIGHT, "Flashlight", "FL", 0xf5d36e},
