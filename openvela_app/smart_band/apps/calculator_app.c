@@ -17,8 +17,21 @@ typedef struct
   uint8_t row_span;
 } calculator_key_t;
 
+typedef struct
+{
+  const calculator_key_t *key;
+  lv_coord_t x;
+  lv_coord_t y;
+  lv_coord_t w;
+  lv_coord_t h;
+} calculator_key_hit_t;
+
+#define CALCULATOR_KEY_COUNT 19
+
 static lv_obj_t *g_display;
 static lv_obj_t *g_expression;
+static calculator_key_hit_t g_key_hits[CALCULATOR_KEY_COUNT];
+static size_t g_key_hit_count;
 static char g_text[24] = "0";
 static char g_lhs_text[24];
 static double g_lhs;
@@ -290,16 +303,9 @@ void smart_band_calculator_app_update(const smart_band_app_host_t *host)
     }
 }
 
-static void calculator_cb(lv_event_t *event)
+static void calculator_handle_key(const calculator_key_t *key_info)
 {
-  const calculator_key_t *key_info =
-    (const calculator_key_t *)lv_event_get_user_data(event);
   char key;
-
-  if (lv_event_get_code(event) != LV_EVENT_PRESSED)
-    {
-      return;
-    }
 
   if (key_info == NULL)
     {
@@ -307,6 +313,7 @@ static void calculator_cb(lv_event_t *event)
     }
 
   key = key_info->code;
+  printf("smart_band: calculator key %s\n", key_info->label);
   if (key >= '0' && key <= '9')
     {
       calculator_append_char(key);
@@ -337,6 +344,65 @@ static void calculator_cb(lv_event_t *event)
     }
 
   smart_band_calculator_app_update(NULL);
+}
+
+static void calculator_cb(lv_event_t *event)
+{
+  const calculator_key_t *key_info =
+    (const calculator_key_t *)lv_event_get_user_data(event);
+
+  if (lv_event_get_code(event) != LV_EVENT_PRESSED)
+    {
+      return;
+    }
+
+  calculator_handle_key(key_info);
+}
+
+static const calculator_key_t *calculator_key_at(lv_coord_t x, lv_coord_t y)
+{
+  for (size_t i = 0; i < g_key_hit_count; i++)
+    {
+      const calculator_key_hit_t *hit = &g_key_hits[i];
+
+      if (x >= hit->x && x < hit->x + hit->w &&
+          y >= hit->y && y < hit->y + hit->h)
+        {
+          return hit->key;
+        }
+    }
+
+  return NULL;
+}
+
+static void calculator_touch_layer_cb(lv_event_t *event)
+{
+  lv_obj_t *target = (lv_obj_t *)lv_event_get_target(event);
+  lv_indev_t *indev = lv_indev_get_act();
+  lv_area_t area;
+  lv_point_t point;
+  lv_coord_t x;
+  lv_coord_t y;
+  const calculator_key_t *key;
+
+  if (lv_event_get_code(event) != LV_EVENT_PRESSED ||
+      target == NULL || indev == NULL)
+    {
+      return;
+    }
+
+  lv_indev_get_point(indev, &point);
+  lv_obj_get_coords(target, &area);
+  x = point.x - area.x1;
+  y = point.y - area.y1;
+  key = calculator_key_at(x, y);
+  if (key == NULL)
+    {
+      printf("smart_band: calculator touch %d,%d no key\n", (int)x, (int)y);
+      return;
+    }
+
+  calculator_handle_key(key);
 }
 
 static lv_obj_t *calculator_create_key(lv_obj_t *parent,
@@ -387,6 +453,33 @@ static lv_obj_t *calculator_create_key(lv_obj_t *parent,
   return button;
 }
 
+static lv_obj_t *calculator_create_touch_layer(lv_obj_t *parent,
+                                               const smart_band_app_host_t *host)
+{
+  lv_coord_t h = lv_obj_get_height(parent);
+  lv_obj_t *touch = lv_obj_create(parent);
+
+  if (touch == NULL)
+    {
+      return NULL;
+    }
+
+  if (h <= 0)
+    {
+      h = host->screen_h;
+    }
+
+  lv_obj_remove_style_all(touch);
+  lv_obj_add_flag(touch, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(touch, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_pos(touch, 0, 0);
+  lv_obj_set_size(touch, host->screen_w, h);
+  lv_obj_set_style_bg_opa(touch, LV_OPA_TRANSP, 0);
+  lv_obj_add_event_cb(touch, calculator_touch_layer_cb,
+                      LV_EVENT_PRESSED, NULL);
+  return touch;
+}
+
 int smart_band_calculator_app_build(lv_obj_t *parent,
                                     const smart_band_app_host_t *host)
 {
@@ -424,6 +517,7 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
   calculator_clear_all();
   g_display = NULL;
   g_expression = NULL;
+  g_key_hit_count = 0;
 
   display_box = host->create_box(parent, margin, host->sy(4),
                                  host->screen_w - margin * 2, display_h,
@@ -468,6 +562,21 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
         {
           return -1;
         }
+
+      if (g_key_hit_count < CALCULATOR_KEY_COUNT)
+        {
+          g_key_hits[g_key_hit_count].key = key;
+          g_key_hits[g_key_hit_count].x = x;
+          g_key_hits[g_key_hit_count].y = y;
+          g_key_hits[g_key_hit_count].w = w;
+          g_key_hits[g_key_hit_count].h = h;
+          g_key_hit_count++;
+        }
+    }
+
+  if (calculator_create_touch_layer(parent, host) == NULL)
+    {
+      return -1;
     }
 
   smart_band_calculator_app_update(host);
