@@ -274,6 +274,5 @@ python3 tests/test_watch_model.py
 ## 相关文档
 
 - [openvela 复现说明](docs/openvela-runbook.md)
-- [演示录制建议](docs/demo-guide.md)
 - [实现过程说明](docs/implementation-notes.md)
 - [第三方依赖声明](THIRD_PARTY_NOTICES.md)
