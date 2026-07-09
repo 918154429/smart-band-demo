@@ -1,5 +1,6 @@
 #include "app_lvgl.h"
 
+#include "icon_assets.h"
 #include "sensor_bridge.h"
 #include "smart_band_apps.h"
 #include "watch_model.h"
@@ -244,6 +245,39 @@ static void set_label_text_fmt_int(lv_obj_t *label, const char *fmt, int value)
   set_label_text(label, buffer);
 }
 
+static lv_obj_t *create_icon_image(lv_obj_t *parent,
+                                   const lv_image_dsc_t *src,
+                                   lv_coord_t x, lv_coord_t y,
+                                   lv_coord_t size)
+{
+  lv_obj_t *image;
+  uint32_t scale;
+
+  if (src == NULL || size <= 0)
+    {
+      return NULL;
+    }
+
+  image = lv_image_create(parent);
+  if (image == NULL)
+    {
+      return NULL;
+    }
+
+  strip_obj(image);
+  lv_image_set_src(image, src);
+  scale = (uint32_t)((size * LV_SCALE_NONE) / 48);
+  if (scale == 0)
+    {
+      scale = 1;
+    }
+
+  lv_image_set_scale(image, scale);
+  lv_obj_set_pos(image, x, y);
+  lv_obj_set_size(image, size, size);
+  return image;
+}
+
 static void configure_local_time(void)
 {
 #if defined(__NuttX__)
@@ -393,7 +427,7 @@ static int create_ornament(lv_obj_t *parent, lv_coord_t y)
   lv_obj_t *left;
   lv_obj_t *right;
   lv_obj_t *badge;
-  lv_obj_t *label;
+  lv_obj_t *icon;
 
   left = create_box(parent, center - sx(70) - line_w, y + sy(16), line_w,
                     line_h, lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
@@ -401,55 +435,36 @@ static int create_ornament(lv_obj_t *parent, lv_coord_t y)
                      lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
   badge = create_box(parent, center - sx(22), y, sx(44), sy(34),
                      lv_color_hex(0xeff9f7), LV_RADIUS_CIRCLE);
-  label = create_label(badge, "HR", font_16(), lv_color_hex(0x79c5be),
-                       LV_TEXT_ALIGN_CENTER);
-
-  if (left == NULL || right == NULL || badge == NULL || label == NULL)
+  if (left == NULL || right == NULL || badge == NULL)
     {
       return -1;
     }
 
-  place_label(label, 0, sy(7), sx(44), sy(20));
+  icon = create_icon_image(badge, &smart_band_icon_heart, sx(7), sy(2),
+                           sx(30));
+
+  if (icon == NULL)
+    {
+      return -1;
+    }
+
   return 0;
 }
 
-static lv_obj_t *create_orb(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                            lv_coord_t size, lv_color_t color,
-                            const char *text)
-{
-  lv_obj_t *orb = create_box(parent, x, y, size, size, color,
-                             LV_RADIUS_CIRCLE);
-  lv_obj_t *label;
-
-  if (orb == NULL)
-    {
-      return NULL;
-    }
-
-  label = create_label(orb, text, font_16(), lv_color_hex(0xffffff),
-                       LV_TEXT_ALIGN_CENTER);
-  if (label == NULL)
-    {
-      return NULL;
-    }
-
-  lv_obj_set_style_text_font(label, font_20(), 0);
-  place_label(label, 0, (size - sy(24)) / 2, size, sy(26));
-  return orb;
-}
-
 static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
-                              lv_color_t bg_color, lv_color_t orb_color,
-                              const char *orb_text, const char *label_text,
+                              lv_color_t bg_color,
+                              const lv_image_dsc_t *icon_src,
+                              const char *label_text,
                               lv_color_t label_color, lv_obj_t **value_out)
 {
   lv_coord_t margin = sx(22);
   lv_coord_t card_w = g_ui.screen_w - margin * 2;
   lv_coord_t card_h = sy(72);
-  lv_coord_t orb_size = min_coord(sx(54), card_h - sy(18));
+  lv_coord_t icon_size = min_coord(sx(48), card_h - sy(16));
   lv_coord_t value_x = sx(112);
   lv_obj_t *card;
   lv_obj_t *divider;
+  lv_obj_t *icon;
   lv_obj_t *label;
 
   card = create_box(parent, margin, y, card_w, card_h, bg_color, sx(24));
@@ -463,8 +478,9 @@ static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
   lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
   lv_obj_set_style_shadow_offset_y(card, sy(6), 0);
 
-  if (create_orb(card, sx(16), (card_h - orb_size) / 2, orb_size,
-                 orb_color, orb_text) == NULL)
+  icon = create_icon_image(card, icon_src, sx(18),
+                           (card_h - icon_size) / 2, icon_size);
+  if (icon == NULL)
     {
       return -1;
     }
@@ -551,20 +567,20 @@ static int create_face_page(void)
   place_label(g_ui.face_minute, minute_x, 0, hour_w, time_h);
 
   if (create_metric_card(g_ui.face_page, cards_y,
-                         lv_color_hex(0xf2f5ff), lv_color_hex(0x9caddc),
-                         "Zz", "Sleep", lv_color_hex(0x8799cf),
+                         lv_color_hex(0xf2f5ff), &smart_band_icon_sleep,
+                         "Sleep", lv_color_hex(0x8799cf),
                          &g_ui.face_sleep_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + card_h + card_gap,
-                         lv_color_hex(0xfff0eb), lv_color_hex(0xf08d88),
-                         "HR", "Heart Rate", lv_color_hex(0xea7770),
+                         lv_color_hex(0xfff0eb), &smart_band_icon_heart,
+                         "Heart Rate", lv_color_hex(0xea7770),
                          &g_ui.face_heart_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 2,
-                         lv_color_hex(0xeefbf8), lv_color_hex(0x80cbc3),
-                         "OK", "Stress", lv_color_hex(0x43a79e),
+                         lv_color_hex(0xeefbf8), &smart_band_icon_stress,
+                         "Stress", lv_color_hex(0x43a79e),
                          &g_ui.face_stress_value) != 0 ||
       create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 3,
-                         lv_color_hex(0xfff6e2), lv_color_hex(0xf5c66e),
-                         "C", "Weather", lv_color_hex(0xe8ae46),
+                         lv_color_hex(0xfff6e2), &smart_band_icon_weather,
+                         "Weather", lv_color_hex(0xe8ae46),
                          &g_ui.face_weather_value) != 0)
     {
       return -1;
@@ -622,7 +638,7 @@ static int create_face_page(void)
 }
 
 static lv_obj_t *create_detail_hero(lv_obj_t *page, lv_color_t hero_bg,
-                                    lv_color_t orb_bg, const char *orb_text,
+                                    const lv_image_dsc_t *icon_src,
                                     lv_obj_t **value_out,
                                     lv_obj_t **progress_out)
 {
@@ -630,8 +646,9 @@ static lv_obj_t *create_detail_hero(lv_obj_t *page, lv_color_t hero_bg,
   lv_coord_t hero_y = sy(154);
   lv_coord_t hero_w = g_ui.screen_w - margin * 2;
   lv_coord_t hero_h = sy(190);
-  lv_coord_t orb_size = sx(82);
+  lv_coord_t icon_size = sx(68);
   lv_obj_t *hero;
+  lv_obj_t *icon;
 
   hero = create_box(page, margin, hero_y, hero_w, hero_h, hero_bg, sx(32));
   if (hero == NULL)
@@ -644,8 +661,9 @@ static lv_obj_t *create_detail_hero(lv_obj_t *page, lv_color_t hero_bg,
   lv_obj_set_style_shadow_opa(hero, LV_OPA_20, 0);
   lv_obj_set_style_shadow_offset_y(hero, sy(10), 0);
 
-  if (create_orb(hero, (hero_w - orb_size) / 2, sy(20), orb_size, orb_bg,
-                 orb_text) == NULL)
+  icon = create_icon_image(hero, icon_src, (hero_w - icon_size) / 2,
+                           sy(18), icon_size);
+  if (icon == NULL)
     {
       return NULL;
     }
@@ -730,7 +748,7 @@ static int create_heart_page(void)
   place_label(title, sx(22), sy(112), g_ui.screen_w - sx(44), sy(28));
 
   if (create_detail_hero(g_ui.heart_page, lv_color_hex(0xfff0eb),
-                         lv_color_hex(0xf08d88), "HR",
+                         &smart_band_icon_heart,
                          &g_ui.heart_value,
                          &g_ui.heart_progress) == NULL ||
       create_mini_card(g_ui.heart_page, 0, 0, "Resting",
@@ -770,7 +788,7 @@ static int create_steps_page(void)
   place_label(title, sx(22), sy(112), g_ui.screen_w - sx(44), sy(28));
 
   if (create_detail_hero(g_ui.steps_page, lv_color_hex(0xeefbf8),
-                         lv_color_hex(0x80cbc3), "ST",
+                         &smart_band_icon_steps,
                          &g_ui.steps_value,
                          &g_ui.steps_progress) == NULL ||
       create_mini_card(g_ui.steps_page, 0, 0, "Goal",
@@ -952,6 +970,31 @@ static void open_app(smart_band_app_id_t id)
   set_page_visible(g_ui.app_detail, true);
 }
 
+static const lv_image_dsc_t *app_icon_for_id(smart_band_app_id_t id)
+{
+  switch (id)
+    {
+      case SMART_BAND_APP_WEATHER:
+        return &smart_band_icon_weather;
+      case SMART_BAND_APP_CALCULATOR:
+        return &smart_band_icon_calculator;
+      case SMART_BAND_APP_TIMER:
+        return &smart_band_icon_timer;
+      case SMART_BAND_APP_MUSIC:
+        return &smart_band_icon_game2048;
+      case SMART_BAND_APP_STOPWATCH:
+        return &smart_band_icon_stopwatch;
+      case SMART_BAND_APP_MINES:
+        return &smart_band_icon_mines;
+      case SMART_BAND_APP_TETRIS:
+        return &smart_band_icon_tetris;
+      case SMART_BAND_APP_WOODEN_FISH:
+        return &smart_band_icon_wooden_fish;
+      default:
+        return NULL;
+    }
+}
+
 static int create_launcher_card(lv_obj_t *parent,
                                 const smart_band_app_def_t *def,
                                 lv_coord_t x, lv_coord_t y,
@@ -959,7 +1002,6 @@ static int create_launcher_card(lv_obj_t *parent,
 {
   lv_obj_t *card = lv_btn_create(parent);
   lv_obj_t *icon;
-  lv_obj_t *icon_text;
   lv_obj_t *title;
 
   if (card == NULL || def == NULL)
@@ -983,8 +1025,8 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_event_cb(card, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
 
-  icon = create_box(card, sx(11), sy(10), sx(38), sx(38),
-                    lv_color_hex(def->color), LV_RADIUS_CIRCLE);
+  icon = create_icon_image(card, app_icon_for_id(def->id), sx(8), sy(7),
+                           sx(48));
   if (icon == NULL)
     {
       return -1;
@@ -994,23 +1036,17 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_event_cb(icon, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
 
-  icon_text = create_label(icon, def->icon, font_16(), lv_color_hex(0xffffff),
-                           LV_TEXT_ALIGN_CENTER);
   title = create_label(card, def->title, font_12(), lv_color_hex(0x293b53),
                        LV_TEXT_ALIGN_CENTER);
-  if (icon_text == NULL || title == NULL)
+  if (title == NULL)
     {
       return -1;
     }
 
-  lv_obj_add_flag(icon_text, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(icon_text, app_icon_cb, LV_EVENT_CLICKED,
-                      (void *)(uintptr_t)def->id);
   lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(title, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
-  place_label(icon_text, 0, sy(9), sx(38), sy(22));
-  place_label(title, sx(56), sy(16), w - sx(62), sy(24));
+  place_label(title, sx(60), sy(16), w - sx(66), sy(24));
   return 0;
 }
 

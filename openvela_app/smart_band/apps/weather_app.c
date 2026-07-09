@@ -1,5 +1,7 @@
 #include "smart_band_apps.h"
 
+#include "icon_assets.h"
+
 #include <stdio.h>
 
 static lv_obj_t *g_temp;
@@ -33,6 +35,40 @@ static lv_obj_t *weather_label(lv_obj_t *parent, const char *text,
   lv_obj_set_pos(label, x, y);
   lv_obj_set_size(label, w, h);
   return label;
+}
+
+static lv_obj_t *weather_icon(lv_obj_t *parent,
+                              const smart_band_app_host_t *host,
+                              const lv_image_dsc_t *src, lv_coord_t x,
+                              lv_coord_t y, lv_coord_t size)
+{
+  lv_obj_t *image;
+  uint32_t scale;
+
+  if (src == NULL || size <= 0)
+    {
+      return NULL;
+    }
+
+  image = lv_image_create(parent);
+  if (image == NULL)
+    {
+      return NULL;
+    }
+
+  lv_obj_remove_style_all(image);
+  lv_obj_clear_flag(image, LV_OBJ_FLAG_SCROLLABLE);
+  lv_image_set_src(image, src);
+  scale = (uint32_t)((size * LV_SCALE_NONE) / 48);
+  if (scale == 0)
+    {
+      scale = 1;
+    }
+
+  lv_image_set_scale(image, scale);
+  lv_obj_set_pos(image, x, y);
+  lv_obj_set_size(image, size, size);
+  return image;
 }
 
 static int weather_metric(lv_obj_t *parent, const smart_band_app_host_t *host,
@@ -112,8 +148,7 @@ int smart_band_weather_app_build(lv_obj_t *parent,
                                  const smart_band_app_host_t *host)
 {
   lv_obj_t *hero;
-  lv_obj_t *orb;
-  lv_obj_t *orb_label;
+  lv_obj_t *hero_icon;
   lv_obj_t *caption;
   lv_obj_t *sensor_pill;
   lv_coord_t margin = host->sx(18);
@@ -141,12 +176,8 @@ int smart_band_weather_app_build(lv_obj_t *parent,
   lv_obj_set_style_border_width(hero, 1, 0);
   lv_obj_set_style_border_color(hero, lv_color_hex(0xd9efec), 0);
 
-  orb = host->create_box(hero, host->sx(18), host->sy(22),
-                         host->sx(56), host->sx(56),
-                         lv_color_hex(0xf5c66e), LV_RADIUS_CIRCLE);
-  orb_label = weather_label(orb, "WX", host, host->font_16(), 0xffffff,
-                            LV_TEXT_ALIGN_CENTER, 0, host->sy(17),
-                            host->sx(56), host->sy(22));
+  hero_icon = weather_icon(hero, host, &smart_band_icon_weather,
+                           host->sx(18), host->sy(22), host->sx(56));
   g_temp = weather_label(hero, "--", host, host->font_32(), 0x293b53,
                          LV_TEXT_ALIGN_LEFT, host->sx(88), host->sy(16),
                          hero_w - host->sx(108), host->sy(44));
@@ -164,7 +195,7 @@ int smart_band_weather_app_build(lv_obj_t *parent,
                            0xe4a840, LV_TEXT_ALIGN_RIGHT, host->sx(62),
                            host->sy(6), hero_w - host->sx(180),
                            host->sy(16));
-  if (orb == NULL || orb_label == NULL || g_temp == NULL ||
+  if (hero_icon == NULL || g_temp == NULL ||
       g_condition == NULL || sensor_pill == NULL || caption == NULL ||
       g_source == NULL)
     {

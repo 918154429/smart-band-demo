@@ -31,14 +31,14 @@ void smart_band_wooden_fish_app_tick(const smart_band_app_host_t *host);
 
 static const smart_band_app_def_t g_apps[SMART_BAND_APP_COUNT] =
 {
-  {SMART_BAND_APP_WEATHER, "Weather", "WX", 0xf5c66e},
-  {SMART_BAND_APP_CALCULATOR, "Calculator", "12", 0x80cbc3},
-  {SMART_BAND_APP_TIMER, "Timer", "TM", 0xa98bd6},
-  {SMART_BAND_APP_MUSIC, "2048", "2K", 0xf08d88},
-  {SMART_BAND_APP_STOPWATCH, "Stopwatch", "SW", 0x73a1d6},
-  {SMART_BAND_APP_MINES, "Mines", "MI", 0x8aa8d8},
-  {SMART_BAND_APP_TETRIS, "Tetris", "TE", 0x62bfb6},
-  {SMART_BAND_APP_WOODEN_FISH, "Wooden Fish", "WF", 0xd9a85f}
+  {SMART_BAND_APP_WEATHER, "Weather", 0xf5c66e},
+  {SMART_BAND_APP_CALCULATOR, "Calculator", 0x80cbc3},
+  {SMART_BAND_APP_TIMER, "Timer", 0xa98bd6},
+  {SMART_BAND_APP_MUSIC, "2048", 0xf08d88},
+  {SMART_BAND_APP_STOPWATCH, "Stopwatch", 0x73a1d6},
+  {SMART_BAND_APP_MINES, "Mines", 0x8aa8d8},
+  {SMART_BAND_APP_TETRIS, "Tetris", 0x62bfb6},
+  {SMART_BAND_APP_WOODEN_FISH, "Wooden Fish", 0xd9a85f}
 };
 
 const smart_band_app_def_t *smart_band_apps_catalog(void)

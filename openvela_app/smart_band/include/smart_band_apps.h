@@ -30,7 +30,6 @@ typedef struct
 {
   smart_band_app_id_t id;
   const char *title;
-  const char *icon;
   uint32_t color;
 } smart_band_app_def_t;
 

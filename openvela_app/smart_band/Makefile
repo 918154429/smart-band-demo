@@ -5,7 +5,7 @@ PRIORITY = $(CONFIG_LVX_DEMO_SMART_BAND_BASIC_PRIORITY)
 STACKSIZE = $(CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE)
 MODULE = $(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
 
-CSRCS = watch_model.c sensor_bridge.c app_lvgl.c smart_band_apps.c
+CSRCS = watch_model.c sensor_bridge.c app_lvgl.c icon_assets.c smart_band_apps.c
 CSRCS += apps/weather_app.c apps/calculator_app.c apps/timer_app.c
 CSRCS += apps/music_app.c apps/stopwatch_app.c
 CSRCS += apps/mines_app.c apps/tetris_app.c

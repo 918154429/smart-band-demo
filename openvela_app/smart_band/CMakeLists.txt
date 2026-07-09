@@ -15,6 +15,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     watch_model.c
     sensor_bridge.c
     app_lvgl.c
+    icon_assets.c
     smart_band_apps.c
     apps/weather_app.c
     apps/calculator_app.c
