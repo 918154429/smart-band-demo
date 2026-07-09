@@ -163,7 +163,7 @@ static void update_temperature(smart_band_sensor_bridge_t *bridge,
 
       rounded = sample.temperature >= 0.0f ? sample.temperature + 0.5f :
                 sample.temperature - 0.5f;
-      value_c = clamp_int((int)rounded, -40, 80);
+      value_c = (int)rounded;
       if (!bridge->have_temperature ||
           bridge->last_temperature_c != value_c)
         {
