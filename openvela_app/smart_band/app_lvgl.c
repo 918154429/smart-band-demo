@@ -34,6 +34,9 @@ typedef struct
   lv_obj_t *face_stress_value;
   lv_obj_t *face_weather_value;
   lv_obj_t *face_battery;
+  lv_obj_t *face_battery_bar;
+  lv_obj_t *face_battery_cap;
+  lv_obj_t *face_battery_charge;
 
   lv_obj_t *heart_date;
   lv_obj_t *heart_value;
@@ -498,6 +501,10 @@ static int create_face_page(void)
   lv_obj_t *time_row;
   lv_obj_t *colon_one;
   lv_obj_t *colon_two;
+  lv_coord_t battery_x;
+  lv_coord_t battery_y;
+  lv_coord_t battery_w;
+  lv_coord_t battery_h;
 
   g_ui.face_page = create_page(g_ui.screen);
   if (g_ui.face_page == NULL || create_leaf_mark(g_ui.face_page, sy(32)) != 0 ||
@@ -565,7 +572,12 @@ static int create_face_page(void)
   g_ui.face_battery = create_label(g_ui.face_page, "BAT --%", font_12(),
                                    lv_color_hex(0x6f8790),
                                    LV_TEXT_ALIGN_CENTER);
-  if (g_ui.face_battery == NULL)
+  g_ui.face_battery_bar = lv_bar_create(g_ui.face_page);
+  g_ui.face_battery_charge =
+    create_label(g_ui.face_page, LV_SYMBOL_CHARGE, font_14(),
+                 lv_color_hex(0xf0b84f), LV_TEXT_ALIGN_CENTER);
+  if (g_ui.face_battery == NULL || g_ui.face_battery_bar == NULL ||
+      g_ui.face_battery_charge == NULL)
     {
       return -1;
     }
@@ -574,6 +586,37 @@ static int create_face_page(void)
               g_ui.screen_w - sx(g_ui.compact_band ? 88 : 96),
               g_ui.compact_band ? sy(18) : sy(22),
               sx(g_ui.compact_band ? 68 : 74), sy(20));
+  place_label(g_ui.face_battery_charge, g_ui.screen_w - sx(24),
+              g_ui.compact_band ? sy(17) : sy(21), sx(16), sy(20));
+
+  battery_x = g_ui.screen_w - sx(g_ui.compact_band ? 82 : 90);
+  battery_y = g_ui.compact_band ? sy(39) : sy(44);
+  battery_w = sx(g_ui.compact_band ? 58 : 64);
+  battery_h = max_coord(sy(10), 8);
+  strip_obj(g_ui.face_battery_bar);
+  lv_obj_set_pos(g_ui.face_battery_bar, battery_x, battery_y);
+  lv_obj_set_size(g_ui.face_battery_bar, battery_w, battery_h);
+  lv_bar_set_range(g_ui.face_battery_bar, 0, 100);
+  lv_obj_set_style_radius(g_ui.face_battery_bar, sx(3), 0);
+  lv_obj_set_style_bg_color(g_ui.face_battery_bar, lv_color_hex(0xffffff), 0);
+  lv_obj_set_style_bg_opa(g_ui.face_battery_bar, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(g_ui.face_battery_bar, 1, 0);
+  lv_obj_set_style_border_color(g_ui.face_battery_bar,
+                                lv_color_hex(0x9cb1b8), 0);
+  lv_obj_set_style_bg_color(g_ui.face_battery_bar, lv_color_hex(0x79c5be),
+                            LV_PART_INDICATOR);
+  lv_obj_set_style_radius(g_ui.face_battery_bar, sx(2), LV_PART_INDICATOR);
+
+  g_ui.face_battery_cap =
+    create_box(g_ui.face_page, battery_x + battery_w + sx(2),
+               battery_y + (battery_h - sy(6)) / 2, sx(4), sy(6),
+               lv_color_hex(0x9cb1b8), sx(2));
+  if (g_ui.face_battery_cap == NULL)
+    {
+      return -1;
+    }
+
+  lv_obj_add_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
   return 0;
 }
 
@@ -1298,6 +1341,23 @@ static void update_face(void)
   snprintf(value, sizeof(value), "BAT %d%%%s", g_ui.model.battery_percent,
            g_ui.model.battery_sensor_active ? "" : " sim");
   set_label_text(g_ui.face_battery, value);
+  lv_bar_set_value(g_ui.face_battery_bar, g_ui.model.battery_percent,
+                   LV_ANIM_ON);
+  lv_obj_set_style_bg_color(g_ui.face_battery_bar,
+                            g_ui.model.battery_percent <= 20 ?
+                            lv_color_hex(0xea7770) :
+                            (g_ui.model.battery_charging ?
+                             lv_color_hex(0xf0b84f) :
+                             lv_color_hex(0x79c5be)),
+                            LV_PART_INDICATOR);
+  if (g_ui.model.battery_charging)
+    {
+      lv_obj_clear_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
+    }
+  else
+    {
+      lv_obj_add_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 static void update_heart_detail(void)

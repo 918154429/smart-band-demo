@@ -137,6 +137,7 @@ static void update_battery(smart_band_sensor_bridge_t *bridge,
                            smart_band_state_t *state)
 {
   int capacity = 0;
+  int battery_state = BATTERY_UNKNOWN;
 
   if (bridge->battery_fd < 0)
     {
@@ -147,6 +148,13 @@ static void update_battery(smart_band_sensor_bridge_t *bridge,
             (unsigned long)(uintptr_t)&capacity) == 0)
     {
       state->battery_percent = clamp_int(capacity, 0, 100);
+      state->battery_sensor_active = true;
+    }
+
+  if (ioctl(bridge->battery_fd, BATIOC_STATE,
+            (unsigned long)(uintptr_t)&battery_state) == 0)
+    {
+      state->battery_charging = battery_state == BATTERY_CHARGING;
       state->battery_sensor_active = true;
     }
 }
@@ -218,6 +226,7 @@ void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
   state->heart_sensor_active = false;
   state->step_sensor_active = false;
   state->battery_sensor_active = false;
+  state->battery_charging = false;
   state->temperature_sensor_active = false;
 
   update_heart_rate(bridge, state);
