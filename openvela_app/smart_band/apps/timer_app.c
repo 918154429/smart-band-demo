@@ -5,6 +5,7 @@
 
 static lv_obj_t *g_display;
 static lv_obj_t *g_status;
+static lv_obj_t *g_start_button;
 static int g_seconds = 5 * 60;
 static bool g_running;
 
@@ -16,6 +17,22 @@ static void format_timer(char *buffer, size_t size)
     }
 
   snprintf(buffer, size, "%02d:%02d", g_seconds / 60, g_seconds % 60);
+}
+
+static void set_button_text(lv_obj_t *button, const char *text)
+{
+  lv_obj_t *label;
+
+  if (button == NULL)
+    {
+      return;
+    }
+
+  label = lv_obj_get_child(button, 0);
+  if (label != NULL)
+    {
+      lv_label_set_text(label, text);
+    }
 }
 
 void smart_band_timer_app_update(const smart_band_app_host_t *host)
@@ -35,6 +52,8 @@ void smart_band_timer_app_update(const smart_band_app_host_t *host)
                         g_running ? "Running" :
                         (g_seconds == 0 ? "Done" : "Ready"));
     }
+
+  set_button_text(g_start_button, g_running ? "Pause" : "Start");
 }
 
 void smart_band_timer_app_tick(const smart_band_app_host_t *host)
@@ -64,13 +83,36 @@ static void timer_cb(lv_event_t *event)
 
   if (action == 1)
     {
+      if (g_running)
+        {
+          smart_band_timer_app_update(NULL);
+          return;
+        }
+
+      if (g_seconds >= 60)
+        {
+          g_seconds -= 60;
+        }
+      else
+        {
+          g_seconds = 0;
+        }
+    }
+  else if (action == 2)
+    {
+      if (g_running)
+        {
+          smart_band_timer_app_update(NULL);
+          return;
+        }
+
       g_seconds += 60;
       if (g_seconds > 99 * 60)
         {
           g_seconds = 99 * 60;
         }
     }
-  else if (action == 2)
+  else if (action == 3)
     {
       if (g_seconds <= 0)
         {
@@ -95,6 +137,7 @@ int smart_band_timer_app_build(lv_obj_t *parent,
 
   g_display = NULL;
   g_status = NULL;
+  g_start_button = NULL;
 
   panel = host->create_box(parent, host->sx(22), host->sy(14),
                            host->screen_w - host->sx(44), host->sy(180),
@@ -120,18 +163,28 @@ int smart_band_timer_app_build(lv_obj_t *parent,
   host->place_label(g_status, host->sx(12), host->sy(116),
                     host->screen_w - host->sx(68), host->sy(26));
 
-  if (host->create_action_button(parent, "+1m", host->sx(22), host->sy(220),
-                                 host->sx(84), host->sy(54),
-                                 lv_color_hex(0xa98bd6), timer_cb,
+  if (host->create_action_button(parent, "-1m", host->sx(20), host->sy(220),
+                                 host->sx(64), host->sy(54),
+                                 lv_color_hex(0x8aa8d8), timer_cb,
                                  1) == NULL ||
-      host->create_action_button(parent, "Start", host->sx(124),
-                                 host->sy(220), host->sx(84), host->sy(54),
-                                 lv_color_hex(0x80cbc3), timer_cb,
-                                 2) == NULL ||
-      host->create_action_button(parent, "Reset", host->sx(226),
-                                 host->sy(220), host->sx(82), host->sy(54),
+      host->create_action_button(parent, "+1m", host->sx(92), host->sy(220),
+                                 host->sx(64), host->sy(54),
+                                 lv_color_hex(0xa98bd6), timer_cb,
+                                 2) == NULL)
+    {
+      return -1;
+    }
+
+  g_start_button = host->create_action_button(parent, "Start",
+                                              host->sx(164), host->sy(220),
+                                              host->sx(64), host->sy(54),
+                                              lv_color_hex(0x80cbc3),
+                                              timer_cb, 3);
+  if (g_start_button == NULL ||
+      host->create_action_button(parent, "Reset", host->sx(236),
+                                 host->sy(220), host->sx(64), host->sy(54),
                                  lv_color_hex(0x6f8790), timer_cb,
-                                 3) == NULL)
+                                 4) == NULL)
     {
       return -1;
     }
