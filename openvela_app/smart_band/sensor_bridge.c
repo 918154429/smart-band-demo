@@ -19,6 +19,8 @@
 #define SMART_BAND_TEMP_FALLBACK_DEV "/dev/uorb/sensor_temp0"
 #define SMART_BAND_BATTERY_DEV "/dev/charge/goldfish_battery"
 #define SMART_BAND_SENSOR_INTERVAL_US 1000000
+#define SMART_BAND_HRATE_MIN_BPM 40
+#define SMART_BAND_HRATE_MAX_BPM 500
 
 static int clamp_int(int value, int min_value, int max_value)
 {
@@ -82,7 +84,9 @@ static void update_heart_rate(smart_band_sensor_bridge_t *bridge,
   if (read_latest(bridge->hrate_fd, &sample, sizeof(sample)) &&
       sample.bpm > 0.0f)
     {
-      state->heart_rate = clamp_int((int)(sample.bpm + 0.5f), 40, 220);
+      state->heart_rate = clamp_int((int)(sample.bpm + 0.5f),
+                                    SMART_BAND_HRATE_MIN_BPM,
+                                    SMART_BAND_HRATE_MAX_BPM);
       state->heart_sensor_active = true;
     }
 }
