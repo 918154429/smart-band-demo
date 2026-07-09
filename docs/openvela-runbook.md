@@ -50,7 +50,7 @@ cd /home/dhy/openvela
 - `SENSORS` 和 `UORB` 支持。
 - goldfish 模拟器或实际开发板。
 
-## 2.1 AI Skill 一键复现流程
+## 2.1 Skill 一键复现流程
 
 本仓库内置复现 skill：
 
@@ -58,7 +58,7 @@ cd /home/dhy/openvela
 skills/openvela-smart-band-reproduce/SKILL.md
 ```
 
-面向 AI 的完整流程如下：
+完整自动复现流程如下：
 
 1. 进入 openvela 根目录，准备 open-vela 官方 skill：
 
@@ -72,7 +72,7 @@ git clone https://github.com/open-vela/.claude.git .claude
 git -C .claude pull --ff-only
 ```
 
-2. 如果 openvela 开发环境还没有搭建好，告诉 AI：
+2. 如果 openvela 开发环境还没有搭建好，使用官方环境搭建提示：
 
 ```text
 帮我搭建 openvela 开发环境
@@ -97,7 +97,7 @@ bash scripts/reproduce_openvela_demo.sh --openvela-root /path/to/openvela
 - 启动本地 HTTP 服务并打开浏览器演示页。
 - 将本仓库的复现 skill 安装到
   `/path/to/openvela/.claude/skills/openvela-smart-band-reproduce`，方便后续
-  AI 在 openvela 根目录继续使用。
+  在 openvela 根目录继续使用。
 
 最终浏览器演示页通常是：
 

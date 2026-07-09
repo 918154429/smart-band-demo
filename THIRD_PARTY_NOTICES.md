@@ -52,19 +52,19 @@ or redistributed by this repository unless explicitly noted.
   project are included.
 - Third-party libraries: none. The demo uses only standard browser APIs.
 
-## Generated images and icons
+## Project images and icons
 
 - Role: health icons, app icons and the electronic wooden fish illustration.
 - Distribution in this repository: included under
   `openvela_app/smart_band/assets`.
 - License: distributed as part of this project under the repository `LICENSE`
   unless a downstream platform requires a different policy.
-- Compliance note: these are project-generated assets and do not intentionally
+- Compliance note: these are project-owned assets and do not intentionally
   reproduce third-party trademarks, brand marks or product logos.
 
 ## Summary
 
-The smart band demo source code and generated assets in this repository are
+The smart band demo source code and project assets in this repository are
 provided under the MIT License. Upstream operating system, UI, simulator and
 toolchain components are referenced as build/runtime dependencies only and
 must be accompanied by their own upstream notices when distributed together.

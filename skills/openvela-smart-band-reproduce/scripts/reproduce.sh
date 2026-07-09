@@ -123,7 +123,7 @@ openvela is not installed at:
 The official skills have been prepared at:
   $OPENVELA_ROOT/.claude
 
-Next handoff prompt for the AI/Claude environment:
+Next handoff prompt for the official quickstart flow:
   帮我搭建 openvela 开发环境
 
 After the official openvela-quickstart skill finishes, rerun:

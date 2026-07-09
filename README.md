@@ -30,7 +30,7 @@
 openvela_app/smart_band/        openvela 原生应用源码，可复制到 packages/demos
 openvela_app/smart_band/apps/   每个小应用的独立实现文件
 openvela_app/smart_band/include 公共头文件、模型和图标声明
-openvela_app/smart_band/assets  生成图标与演示图片资源
+openvela_app/smart_band/assets  项目图标与演示图片资源
 demo/                           浏览器静态演示页面，便于无模拟器时录屏
 docs/                           openvela 复现说明与演示说明
 scripts/                        模拟器传感器滚动验证脚本
@@ -73,7 +73,7 @@ THIRD_PARTY_NOTICES.md          第三方依赖声明
 skills/openvela-smart-band-reproduce/SKILL.md
 ```
 
-推荐 AI 复现流程：
+推荐复现流程：
 
 1. 在 openvela 根目录准备官方 skill：
 
@@ -81,7 +81,7 @@ skills/openvela-smart-band-reproduce/SKILL.md
 git clone https://github.com/open-vela/.claude.git .claude
 ```
 
-2. 如果 openvela 开发环境还没有安装完成，直接告诉 AI：
+2. 如果 openvela 开发环境还没有安装完成，使用官方环境搭建提示：
 
 ```text
 帮我搭建 openvela 开发环境
@@ -109,7 +109,7 @@ http://127.0.0.1:8765/demo/index.html
 $OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce
 ```
 
-因此后续在 openvela 根目录中，也可以让 AI 直接使用该 skill 继续复现或排查。
+因此后续在 openvela 根目录中，也可以直接使用该 skill 继续复现或排查。
 
 1. 复制应用到 openvela packages demos 目录：
 
@@ -259,15 +259,15 @@ python3 tests/test_watch_model.py
 
 本仓库已补充以下合规文件：
 
-- `LICENSE`：本项目原创代码和原创/生成资源使用 MIT License。
-- `NOTICE`：说明项目归属、提交边界、生成图标和未包含的上游系统部分。
+- `LICENSE`：本项目原创代码和项目资源使用 MIT License。
+- `NOTICE`：说明项目归属、提交边界、图标资源和未包含的上游系统部分。
 - `THIRD_PARTY_NOTICES.md`：列出运行或构建所依赖的第三方项目及其许可证口径。
 
 重要边界：
 
 - 本仓库不重新分发 openvela、NuttX、LVGL、libuv、Android Emulator/QEMU 等上游代码。
 - 本仓库中的图标资源位于 `openvela_app/smart_band/assets/generated_icons`，
-  为项目生成资产；没有复制第三方商标、品牌图标或示例仓库的图片。
+  为项目自有资源；没有复制第三方商标、品牌图标或示例仓库的图片。
 - 如果提交平台要求跟随上游工程统一许可证，请以提交平台规则为准；本目录自身
   以 `LICENSE` 和 `NOTICE` 为准。
 

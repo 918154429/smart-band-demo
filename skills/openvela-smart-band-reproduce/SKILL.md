@@ -1,6 +1,6 @@
 ---
 name: openvela-smart-band-reproduce
-description: Reproduce the smart-band-demo end to end on openvela. Use when the user asks for one-click reproduction, openvela environment setup, smart band demo build/run, or wants an AI/Claude skill flow that installs openvela first and then shows the final browser demo.
+description: Reproduce the smart-band-demo end to end on openvela. Use when the user asks for one-click reproduction, openvela environment setup, smart band demo build/run, or wants a skill flow that installs openvela first and then shows the final browser demo.
 ---
 
 # openvela Smart Band Reproduce
@@ -30,7 +30,7 @@ If `.claude` already exists, keep it and optionally update it with
 3. If openvela is not installed yet, hand off environment setup to the official
    skill by following `.claude/skills/openvela-quickstart/SKILL.md`.
 
-For Claude users, the prompt that should trigger that official skill is:
+Prompt that should trigger the official quickstart skill:
 
 ```text
 帮我搭建 openvela 开发环境

@@ -43,7 +43,7 @@ packages/demos/smart_band_basic
 - `sensor_bridge.c`：openvela/NuttX 传感器和电池设备接入。
 - `smart_band_apps.c`：应用中心目录和小应用分发。
 - `apps/*.c`：每个小应用单独文件实现，避免所有功能堆在一个文件中。
-- `icon_assets.c`：生成图标转换后的 LVGL 图片资源。
+- `icon_assets.c`：项目图标转换后的 LVGL 图片资源。
 
 构建入口：
 
@@ -136,7 +136,7 @@ UI 处理重点：
 
 ## 7. 资源与图标处理
 
-早期 UI 使用英文字母作为功能图标，识别度较弱。后续改为生成图片图标：
+早期 UI 使用英文字母作为功能图标，识别度较弱。后续改为图片图标：
 
 ```text
 openvela_app/smart_band/assets/generated_icons
