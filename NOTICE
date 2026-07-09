@@ -1,0 +1,33 @@
+openvela Smart Band Demo
+Copyright (c) 2026 dhy
+
+This project contains an original smart band demo application implemented in
+C and LVGL for openvela/NuttX. The submitted source tree is limited to the
+smart band demo workspace and does not include the openvela SDK, NuttX, LVGL,
+libuv, Android Emulator, QEMU, toolchains, board support packages, or other
+upstream system components.
+
+Project boundary:
+
+- Original application code: openvela_app/smart_band
+- Browser-only demonstration: demo
+- Reproducibility and demo documents: docs
+- Local test helper: tests
+- Sensor validation helper: scripts
+
+Generated visual assets:
+
+- openvela_app/smart_band/assets/generated_icons/*.png
+- openvela_app/smart_band/assets/capybara_lotus_reference.png
+
+These assets were generated for this project and are distributed with this
+project under the same MIT License unless a downstream submission platform
+requires a different policy. They are not copied from third-party product
+icons, trademarks, or the openvela example repositories.
+
+Third-party dependency notice:
+
+The application is designed to build against openvela/NuttX and LVGL APIs.
+Those upstream dependencies are not redistributed in this repository. Their
+licenses and notices remain governed by their own upstream projects. See
+THIRD_PARTY_NOTICES.md for the dependency list and compliance notes.
