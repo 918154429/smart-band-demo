@@ -85,7 +85,7 @@ static void simulate_health_data(smart_band_state_t *state)
 
   if (state->steps > 99999)
     {
-      state->steps = state->steps % SMART_BAND_STEP_GOAL;
+      state->steps = state->steps % state->step_goal;
     }
 
   state->battery_percent = clamp_int(96 - (int)(state->ticks / 180u), 5, 100);
@@ -94,7 +94,7 @@ static void simulate_health_data(smart_band_state_t *state)
     {
       snprintf(state->status_text, sizeof(state->status_text), "Active");
     }
-  else if (state->steps >= SMART_BAND_STEP_GOAL)
+  else if (state->steps >= state->step_goal)
     {
       snprintf(state->status_text, sizeof(state->status_text), "Goal Met");
     }
@@ -115,6 +115,7 @@ void smart_band_state_init(smart_band_state_t *state, time_t now)
   state->page = SMART_BAND_PAGE_FACE;
   state->heart_rate = 72;
   state->steps = 1260;
+  state->step_goal = SMART_BAND_STEP_GOAL_DEFAULT;
   state->battery_percent = 96;
   state->temperature_c = 24;
   snprintf(state->status_text, sizeof(state->status_text), "Stable");
@@ -154,6 +155,18 @@ void smart_band_prev_page(smart_band_state_t *state)
                                     SMART_BAND_PAGE_COUNT);
 }
 
+void smart_band_adjust_step_goal(smart_band_state_t *state, int delta)
+{
+  if (state == NULL)
+    {
+      return;
+    }
+
+  state->step_goal = clamp_int(state->step_goal + delta,
+                               SMART_BAND_STEP_GOAL_MIN,
+                               SMART_BAND_STEP_GOAL_MAX);
+}
+
 const char *smart_band_page_title(smart_band_page_t page)
 {
   switch (page)
@@ -173,10 +186,10 @@ const char *smart_band_page_title(smart_band_page_t page)
 
 int smart_band_step_progress(const smart_band_state_t *state)
 {
-  if (state == NULL || state->steps <= 0)
+  if (state == NULL || state->steps <= 0 || state->step_goal <= 0)
     {
       return 0;
     }
 
-  return clamp_int((state->steps * 100) / SMART_BAND_STEP_GOAL, 0, 100);
+  return clamp_int((state->steps * 100) / state->step_goal, 0, 100);
 }

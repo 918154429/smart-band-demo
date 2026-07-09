@@ -50,6 +50,8 @@ typedef struct
   lv_obj_t *steps_percent;
   lv_obj_t *steps_source;
   lv_obj_t *steps_weather;
+  lv_obj_t *steps_goal_down;
+  lv_obj_t *steps_goal_up;
 
   lv_obj_t *apps_page;
   lv_obj_t *apps_date;
@@ -80,6 +82,12 @@ static void enable_touch_navigation_tree(lv_obj_t *obj);
 static void set_page_visible(lv_obj_t *page, bool visible);
 static void app_icon_cb(lv_event_t *event);
 static void app_back_cb(lv_event_t *event);
+static void step_goal_cb(lv_event_t *event);
+static lv_obj_t *create_action_button(lv_obj_t *parent, const char *text,
+                                      lv_coord_t x, lv_coord_t y,
+                                      lv_coord_t w, lv_coord_t h,
+                                      lv_color_t color, lv_event_cb_t cb,
+                                      uintptr_t data);
 
 static const lv_font_t *font_12(void)
 {
@@ -733,6 +741,18 @@ static int create_steps_page(void)
       return -1;
     }
 
+  g_ui.steps_goal_down =
+    create_action_button(g_ui.steps_page, "-", sx(104), sy(346), sx(42),
+                         sy(24), lv_color_hex(0x8eb6d8), step_goal_cb, 0);
+  g_ui.steps_goal_up =
+    create_action_button(g_ui.steps_page, "+", g_ui.screen_w - sx(146),
+                         sy(346), sx(42), sy(24), lv_color_hex(0x80cbc3),
+                         step_goal_cb, 1);
+  if (g_ui.steps_goal_down == NULL || g_ui.steps_goal_up == NULL)
+    {
+      return -1;
+    }
+
   return 0;
 }
 
@@ -1317,7 +1337,7 @@ static void update_steps_detail(void)
   set_label_text(g_ui.steps_date, date_text);
   set_label_text(g_ui.steps_value, value);
   lv_bar_set_value(g_ui.steps_progress, progress, LV_ANIM_ON);
-  set_label_text(g_ui.steps_goal, "8000");
+  set_label_text_fmt_int(g_ui.steps_goal, "%d", g_ui.model.step_goal);
   set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
   set_label_text(g_ui.steps_source,
                  g_ui.model.step_sensor_active ? "Sensor" : "Model");
@@ -1363,6 +1383,16 @@ static void app_back_cb(lv_event_t *event)
   set_label_text(g_ui.app_title, "Apps");
   set_page_visible(g_ui.app_detail, false);
   set_page_visible(g_ui.apps_launcher, true);
+}
+
+static void step_goal_cb(lv_event_t *event)
+{
+  uintptr_t direction = (uintptr_t)lv_event_get_user_data(event);
+  int delta = direction == 0 ? -SMART_BAND_STEP_GOAL_DELTA :
+              SMART_BAND_STEP_GOAL_DELTA;
+
+  smart_band_adjust_step_goal(&g_ui.model, delta);
+  render_page();
 }
 
 static void timer_cb(lv_timer_t *timer)

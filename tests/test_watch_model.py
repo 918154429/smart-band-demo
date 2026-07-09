@@ -8,6 +8,9 @@ PAGE_STEPS = 2
 PAGE_APPS = 3
 PAGE_COUNT = 4
 STEP_GOAL = 8000
+STEP_GOAL_MIN = 1000
+STEP_GOAL_MAX = 50000
+STEP_GOAL_DELTA = 1000
 
 
 class SmartBandState:
@@ -16,6 +19,7 @@ class SmartBandState:
         self.ticks = 0
         self.heart_rate = 72
         self.steps = 1260
+        self.step_goal = STEP_GOAL
         self.battery = 96
         self.temperature_c = 24
         self.update_time(now)
@@ -33,7 +37,7 @@ class SmartBandState:
         self.steps += 4 + self.ticks % 6
         self.temperature_c = max(-40, min(80, 24 + self.ticks % 3 - 1))
         if self.steps > 99999:
-            self.steps %= STEP_GOAL
+            self.steps %= self.step_goal
         self.battery = max(5, min(100, 96 - self.ticks // 180))
 
     def next_page(self):
@@ -45,7 +49,11 @@ class SmartBandState:
     def step_progress(self):
         if self.steps <= 0:
             return 0
-        return max(0, min(100, (self.steps * 100) // STEP_GOAL))
+        return max(0, min(100, (self.steps * 100) // self.step_goal))
+
+    def adjust_step_goal(self, delta):
+        self.step_goal = max(STEP_GOAL_MIN, min(STEP_GOAL_MAX,
+                                                self.step_goal + delta))
 
 
 class WatchModelTest(unittest.TestCase):
@@ -76,6 +84,20 @@ class WatchModelTest(unittest.TestCase):
         self.assertGreater(state.steps, 1260)
         self.assertGreaterEqual(state.step_progress(), 0)
         self.assertLessEqual(state.step_progress(), 100)
+
+    def test_step_goal_adjusts_progress(self):
+        state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
+        state.steps = 4000
+        self.assertEqual(state.step_progress(), 50)
+        state.adjust_step_goal(STEP_GOAL_DELTA)
+        self.assertEqual(state.step_goal, 9000)
+        self.assertEqual(state.step_progress(), 44)
+        for _ in range(20):
+            state.adjust_step_goal(-STEP_GOAL_DELTA)
+        self.assertEqual(state.step_goal, STEP_GOAL_MIN)
+        for _ in range(100):
+            state.adjust_step_goal(STEP_GOAL_DELTA)
+        self.assertEqual(state.step_goal, STEP_GOAL_MAX)
 
 
 if __name__ == "__main__":
