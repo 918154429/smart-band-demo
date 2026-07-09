@@ -14,6 +14,7 @@
 #define DESIGN_H 626
 #define CARD_COUNT 4
 #define SMART_BAND_DEFAULT_TZ "CST-8"
+#define SMART_BAND_DISPLAY_ROTATION LV_DISPLAY_ROTATION_90
 
 typedef struct
 {
@@ -256,6 +257,17 @@ static void format_duration(char *buffer, size_t size, int seconds)
     }
 
   snprintf(buffer, size, "%02d:%02d", seconds / 60, seconds % 60);
+}
+
+static void configure_display_rotation(void)
+{
+  lv_display_t *display = lv_display_get_default();
+
+  if (display != NULL)
+    {
+      lv_display_set_matrix_rotation(display, true);
+      lv_display_set_rotation(display, SMART_BAND_DISPLAY_ROTATION);
+    }
 }
 
 static void set_temperature_label(lv_obj_t *label)
@@ -1476,7 +1488,10 @@ static void enable_touch_navigation_tree(lv_obj_t *obj)
 
 int smart_band_lvgl_create(lv_obj_t *parent)
 {
-  lv_obj_t *root = parent != NULL ? parent : lv_scr_act();
+  lv_obj_t *root;
+
+  configure_display_rotation();
+  root = parent != NULL ? parent : lv_scr_act();
 
   if (root == NULL)
     {
