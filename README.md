@@ -65,6 +65,52 @@ THIRD_PARTY_NOTICES.md          第三方依赖声明
 假设 openvela 根目录为 `$OPENVELA_ROOT`，本仓库目录为
 `$OPENVELA_ROOT/workspaces/smart-band-demo`。
 
+### 一键复现 Skill
+
+本仓库提供了一个复现 skill：
+
+```text
+skills/openvela-smart-band-reproduce/SKILL.md
+```
+
+推荐 AI 复现流程：
+
+1. 在 openvela 根目录准备官方 skill：
+
+```sh
+git clone https://github.com/open-vela/.claude.git .claude
+```
+
+2. 如果 openvela 开发环境还没有安装完成，直接告诉 AI：
+
+```text
+帮我搭建 openvela 开发环境
+```
+
+这会交给 open-vela 官方 `.claude/skills/openvela-quickstart` 流程处理依赖安装、
+仓库初始化、同步、编译和首次模拟器启动。
+
+3. 官方环境搭建完成后，在本仓库执行：
+
+```sh
+bash scripts/reproduce_openvela_demo.sh --openvela-root "$OPENVELA_ROOT"
+```
+
+这个脚本会同步 `smart_band` 到 openvela、启用配置、构建 goldfish arm64，并打开
+浏览器演示页：
+
+```text
+http://127.0.0.1:8765/demo/index.html
+```
+
+脚本还会把本仓库的复现 skill 安装到：
+
+```text
+$OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce
+```
+
+因此后续在 openvela 根目录中，也可以让 AI 直接使用该 skill 继续复现或排查。
+
 1. 复制应用到 openvela packages demos 目录：
 
 ```sh

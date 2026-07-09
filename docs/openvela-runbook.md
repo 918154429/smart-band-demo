@@ -50,6 +50,61 @@ cd /home/dhy/openvela
 - `SENSORS` 和 `UORB` 支持。
 - goldfish 模拟器或实际开发板。
 
+## 2.1 AI Skill 一键复现流程
+
+本仓库内置复现 skill：
+
+```text
+skills/openvela-smart-band-reproduce/SKILL.md
+```
+
+面向 AI 的完整流程如下：
+
+1. 进入 openvela 根目录，准备 open-vela 官方 skill：
+
+```sh
+git clone https://github.com/open-vela/.claude.git .claude
+```
+
+如果 `.claude` 已存在，可以执行：
+
+```sh
+git -C .claude pull --ff-only
+```
+
+2. 如果 openvela 开发环境还没有搭建好，告诉 AI：
+
+```text
+帮我搭建 openvela 开发环境
+```
+
+这一步应由 open-vela 官方 `.claude/skills/openvela-quickstart` 接管。该官方 skill
+负责检测环境、安装依赖、初始化仓库、同步代码、编译和首次运行模拟器。
+
+3. 官方 openvela 环境完成后，回到本仓库执行：
+
+```sh
+bash scripts/reproduce_openvela_demo.sh --openvela-root /path/to/openvela
+```
+
+该脚本会自动：
+
+- 确认或更新 `/path/to/openvela/.claude`。
+- 同步 `openvela_app/smart_band` 到 `packages/demos/smart_band_basic`。
+- 同步到 `apps/packages/demos/smart_band_basic` 镜像目录，如果该目录存在。
+- 在 goldfish arm64 `defconfig` 中启用智能手环 demo 配置。
+- 构建 openvela，优先尝试 CMake 构建，失败后尝试 legacy 构建。
+- 启动本地 HTTP 服务并打开浏览器演示页。
+- 将本仓库的复现 skill 安装到
+  `/path/to/openvela/.claude/skills/openvela-smart-band-reproduce`，方便后续
+  AI 在 openvela 根目录继续使用。
+
+最终浏览器演示页通常是：
+
+```text
+http://127.0.0.1:8765/demo/index.html
+```
+
 ## 3. 复制源码
 
 从仓库工作区复制到 openvela packages：
