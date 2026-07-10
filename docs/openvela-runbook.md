@@ -271,6 +271,7 @@ smart_band
 /dev/uorb/sensor_accel0
 /dev/uorb/sensor_ambient_temp0
 /dev/uorb/sensor_temp0
+/dev/uorb/sensor_humi0
 /dev/charge/goldfish_battery
 ```
 
@@ -286,6 +287,7 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 - 心率值跟随模拟器心率传感器变化。
 - 温度显示传感器温度整数摄氏度。
+- 天气应用湿度值跟随相对湿度传感器变化。
 - 电池百分比和图形进度随电池容量变化。
 - 充电状态为 charging 时，电池旁出现闪电标识。
 

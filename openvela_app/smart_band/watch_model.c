@@ -82,6 +82,7 @@ static void simulate_health_data(smart_band_state_t *state)
   state->steps += 4 + (int)(state->ticks % 6u);
   state->temperature_c = clamp_int(24 + (int)(state->ticks % 3u) - 1,
                                    -40, 80);
+  state->humidity_percent = clamp_int(56 + (int)(state->ticks % 8u), 0, 100);
 
   if (state->steps > 99999)
     {
@@ -118,6 +119,7 @@ void smart_band_state_init(smart_band_state_t *state, time_t now)
   state->step_goal = SMART_BAND_STEP_GOAL_DEFAULT;
   state->battery_percent = 96;
   state->temperature_c = 24;
+  state->humidity_percent = 60;
   snprintf(state->status_text, sizeof(state->status_text), "Stable");
   format_time(state, now);
 }

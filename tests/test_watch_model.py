@@ -22,6 +22,7 @@ class SmartBandState:
         self.step_goal = STEP_GOAL
         self.battery = 96
         self.temperature_c = 24
+        self.humidity_percent = 60
         self.update_time(now)
 
     def update_time(self, now):
@@ -36,6 +37,7 @@ class SmartBandState:
         self.heart_rate = max(55, min(135, 66 + pulse_wave + motion_wave // 3))
         self.steps += 4 + self.ticks % 6
         self.temperature_c = max(-40, min(80, 24 + self.ticks % 3 - 1))
+        self.humidity_percent = max(0, min(100, 56 + self.ticks % 8))
         if self.steps > 99999:
             self.steps %= self.step_goal
         self.battery = max(5, min(100, 96 - self.ticks // 180))
@@ -81,6 +83,8 @@ class WatchModelTest(unittest.TestCase):
             self.assertLessEqual(state.battery, 100)
             self.assertGreaterEqual(state.temperature_c, -40)
             self.assertLessEqual(state.temperature_c, 80)
+            self.assertGreaterEqual(state.humidity_percent, 0)
+            self.assertLessEqual(state.humidity_percent, 100)
         self.assertGreater(state.steps, 1260)
         self.assertGreaterEqual(state.step_progress(), 0)
         self.assertLessEqual(state.step_progress(), 100)

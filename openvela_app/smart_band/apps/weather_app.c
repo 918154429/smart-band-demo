@@ -129,7 +129,7 @@ void smart_band_weather_app_update(const smart_band_app_host_t *host)
            host->model->temperature_sensor_active ? "ambient_temp0" :
            "model fallback");
   snprintf(humidity, sizeof(humidity), "%d%%",
-           54 + (int)(host->model->ticks % 10u));
+           host->model->humidity_percent);
   snprintf(wind, sizeof(wind), "E%d", 2 + (int)(host->model->ticks % 3u));
   condition = host->model->temperature_c >= 30 ? "Sunny" : "Cloudy";
 

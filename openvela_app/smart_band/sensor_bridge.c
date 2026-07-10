@@ -17,6 +17,7 @@
 #define SMART_BAND_STEP_DEV "/dev/uorb/sensor_step_counter0"
 #define SMART_BAND_TEMP_DEV "/dev/uorb/sensor_ambient_temp0"
 #define SMART_BAND_TEMP_FALLBACK_DEV "/dev/uorb/sensor_temp0"
+#define SMART_BAND_HUMI_DEV "/dev/uorb/sensor_humi0"
 #define SMART_BAND_BATTERY_DEV "/dev/charge/goldfish_battery"
 #define SMART_BAND_SENSOR_INTERVAL_US 1000000
 #define SMART_BAND_HRATE_MIN_BPM 40
@@ -189,6 +190,32 @@ static void update_temperature(smart_band_sensor_bridge_t *bridge,
     }
 }
 
+static void update_humidity(smart_band_sensor_bridge_t *bridge,
+                            smart_band_state_t *state)
+{
+  struct sensor_humi sample;
+
+  if (read_latest(bridge->humi_fd, &sample, sizeof(sample)))
+    {
+      int value = clamp_int((int)(sample.humidity + 0.5f), 0, 100);
+
+      if (!bridge->have_humidity ||
+          bridge->last_humidity_percent != value)
+        {
+          printf("smart_band: humidity sensor %d%%\n", value);
+        }
+
+      bridge->last_humidity_percent = value;
+      bridge->have_humidity = true;
+    }
+
+  if (bridge->have_humidity)
+    {
+      state->humidity_percent = bridge->last_humidity_percent;
+      state->humidity_sensor_active = true;
+    }
+}
+
 void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
 {
   if (bridge == NULL)
@@ -202,7 +229,9 @@ void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
   bridge->step_fd = -1;
   bridge->battery_fd = -1;
   bridge->temp_fd = -1;
+  bridge->humi_fd = -1;
   bridge->last_temperature_c = 24;
+  bridge->last_humidity_percent = 60;
 
   bridge->hrate_fd = open_sensor(SMART_BAND_HRATE_DEV);
   bridge->accel_fd = open_sensor(SMART_BAND_ACCEL_DEV);
@@ -213,6 +242,8 @@ void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
     {
       bridge->temp_fd = open_sensor(SMART_BAND_TEMP_FALLBACK_DEV);
     }
+
+  bridge->humi_fd = open_sensor(SMART_BAND_HUMI_DEV);
 }
 
 void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
@@ -228,6 +259,7 @@ void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
   state->battery_sensor_active = false;
   state->battery_charging = false;
   state->temperature_sensor_active = false;
+  state->humidity_sensor_active = false;
 
   update_heart_rate(bridge, state);
   update_steps_from_counter(bridge, state);
@@ -238,6 +270,7 @@ void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
 
   update_battery(bridge, state);
   update_temperature(bridge, state);
+  update_humidity(bridge, state);
 }
 
 void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
@@ -272,10 +305,17 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
       close(bridge->temp_fd);
     }
 
+  if (bridge->humi_fd >= 0)
+    {
+      close(bridge->humi_fd);
+    }
+
   bridge->hrate_fd = -1;
   bridge->accel_fd = -1;
   bridge->step_fd = -1;
   bridge->battery_fd = -1;
   bridge->temp_fd = -1;
+  bridge->humi_fd = -1;
   bridge->have_temperature = false;
+  bridge->have_humidity = false;
 }

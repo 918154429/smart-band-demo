@@ -16,11 +16,14 @@ typedef struct
   int step_fd;
   int battery_fd;
   int temp_fd;
+  int humi_fd;
   int last_temperature_c;
+  int last_humidity_percent;
   int derived_steps;
   float last_accel_energy;
   bool have_last_accel;
   bool have_temperature;
+  bool have_humidity;
 } smart_band_sensor_bridge_t;
 
 void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge);

@@ -89,6 +89,7 @@ UI 处理重点：
 /dev/uorb/sensor_accel0
 /dev/uorb/sensor_ambient_temp0
 /dev/uorb/sensor_temp0
+/dev/uorb/sensor_humi0
 /dev/charge/goldfish_battery
 ```
 
@@ -100,6 +101,7 @@ UI 处理重点：
 - 心率读数有效时更新状态；无数据时保留模型兜底值。
 - step counter 可用时直接使用；不可用时从加速度变化推导步数。
 - 温度优先读 `sensor_ambient_temp0`，失败后尝试 `sensor_temp0`。
+- 湿度读取 `sensor_humi0`，更新天气应用中的 Humidity 数值。
 - 电池通过 `BATIOC_CAPACITY` 和 `BATIOC_STATE` 读取容量和充电状态。
 
 ## 5. 异常与边界保护
@@ -158,7 +160,7 @@ include/icon_assets.h
 - `python3 tests/test_watch_model.py` 验证模型规则。
 - openvela 目标配置下执行 `./build.sh ... -j2` 验证编译。
 - 启动 goldfish 模拟器，在 NSH 中运行 `smart_band`。
-- 使用模拟器传感器滚动脚本验证心率、温度、电池状态进入 UI。
+- 使用模拟器传感器滚动脚本验证心率、温度、湿度和电池状态进入 UI。
 - 手动点击和滑动验证页面切换、应用进入、返回和按钮操作。
 
 ## 9. 后续维护建议

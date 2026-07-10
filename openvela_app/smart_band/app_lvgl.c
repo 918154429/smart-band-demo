@@ -15,6 +15,7 @@
 #define DESIGN_H 626
 #define CARD_COUNT 4
 #define SMART_BAND_DEFAULT_TZ "CST-8"
+#define SMART_BAND_SWIPE_CLICK_GUARD_MS 300
 
 typedef struct
 {
@@ -75,6 +76,8 @@ typedef struct
   lv_coord_t screen_h;
   lv_point_t press_point;
   bool press_valid;
+  bool page_swipe_consumed;
+  uint32_t page_swipe_at;
   bool compact_band;
 } smart_band_ui_t;
 
@@ -1249,7 +1252,7 @@ static int create_ui_tree(lv_obj_t *root)
       enable_touch_navigation_tree(g_ui.face_page);
       enable_touch_navigation_tree(g_ui.heart_page);
       enable_touch_navigation_tree(g_ui.steps_page);
-      enable_touch_navigation(g_ui.apps_page);
+      enable_touch_navigation_tree(g_ui.apps_launcher);
       return 0;
     }
 
@@ -1304,7 +1307,7 @@ static int create_ui_tree(lv_obj_t *root)
   enable_touch_navigation_tree(g_ui.face_page);
   enable_touch_navigation_tree(g_ui.heart_page);
   enable_touch_navigation_tree(g_ui.steps_page);
-  enable_touch_navigation(g_ui.apps_page);
+  enable_touch_navigation_tree(g_ui.apps_launcher);
   return 0;
 }
 
@@ -1481,6 +1484,13 @@ static void app_icon_cb(lv_event_t *event)
   smart_band_app_id_t id =
     (smart_band_app_id_t)(uintptr_t)lv_event_get_user_data(event);
 
+  if (g_ui.page_swipe_consumed &&
+      lv_tick_elaps(g_ui.page_swipe_at) < SMART_BAND_SWIPE_CLICK_GUARD_MS)
+    {
+      return;
+    }
+
+  g_ui.page_swipe_consumed = false;
   open_app(id);
 }
 
@@ -1552,6 +1562,7 @@ static void page_drag_cb(lv_event_t *event)
     {
       lv_indev_get_point(indev, &g_ui.press_point);
       g_ui.press_valid = true;
+      g_ui.page_swipe_consumed = false;
       return;
     }
 
@@ -1570,6 +1581,8 @@ static void page_drag_cb(lv_event_t *event)
       return;
     }
 
+  g_ui.page_swipe_consumed = true;
+  g_ui.page_swipe_at = lv_tick_get();
   if (dx < 0)
     {
       next_page();
