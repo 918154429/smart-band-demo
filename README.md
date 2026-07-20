@@ -50,15 +50,17 @@ THIRD_PARTY_NOTICES.md          第三方依赖声明
   `vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap`。
 - openvela 工程中已安装对应交叉编译工具链、Python、make、CMake 等基础构建工具。
 
-需要启用的 openvela/NuttX 能力：
+基础 UI 运行需要启用的 openvela/NuttX 能力：
 
 - `GRAPHICS_LVGL`
 - `LV_USE_NUTTX`
 - `LV_USE_NUTTX_LIBUV`
-- `SENSORS`
-- `UORB`
 - `LVX_USE_DEMO_SMART_BAND_BASIC`
 - 目标板或模拟器对应的 framebuffer/display/input 配置
+
+真实传感器模式还需要启用 `SENSORS`、`UORB` 和
+`LVX_DEMO_SMART_BAND_USE_SENSORS`。若目标只需要演示数据，可关闭 provider；此时
+`sensor_bridge.c` 使用无设备依赖的空 provider，模型明确运行在 simulation 模式。
 
 ## 接入 openvela 工程
 
@@ -151,6 +153,7 @@ cd "$OPENVELA_ROOT"
 
 ```text
 LVX_USE_DEMO_SMART_BAND_BASIC=y
+LVX_DEMO_SMART_BAND_USE_SENSORS=y
 LVX_DEMO_SMART_BAND_BASIC_PRIORITY=100
 LVX_DEMO_SMART_BAND_BASIC_STACKSIZE=32768
 ```
@@ -230,6 +233,11 @@ smart_band
 - 电池：读取容量百分比和充电状态；充电时在电池图形旁显示闪电。
 - 时间：使用系统本地时间；在模拟器中按 Asia/Shanghai/UTC+8 口径显示。
 
+每项健康指标都会记录数据来源和新鲜度。真实样本短暂中断时，在 5 秒 TTL 内
+保留最近值并标记为 stale；超过 TTL 后，自动模式才回退到独立模拟值。加速度
+推导步数拥有独立累计基线，不再叠加模型模拟步数。若系统墙钟发生回拨，旧样本
+会立即视为过期，避免 stale 数据无限保留。
+
 可用脚本滚动模拟器传感器，验证 UI 是否随传感器变化：
 
 ```sh
@@ -248,15 +256,17 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含一个不依赖 openvela 的 host C 测试。Python 入口会寻找
-GCC、Clang 或 MSVC，直接编译生产文件 `openvela_app/smart_band/watch_model.c`，
+本仓库包含两组不依赖 openvela 的 host C 测试。Python 入口会寻找
+GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、Timer 和 Stopwatch，
 再执行测试二进制：
 
 ```sh
 python3 tests/test_watch_model.py
+python3 tests/test_time_apps.py
 ```
 
-该测试覆盖时间格式、页面切换、模拟数据范围和步数目标调整；测试不再维护一份
+测试覆盖时间格式、页面切换、数据来源/TTL/墙钟回拨、无传感器构建、模拟数据范围、
+步数目标，以及 Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
 与生产代码分离的 Python 模型副本。也可以通过 `CC` 环境变量指定编译器。
 
 ## 基本异常处理说明

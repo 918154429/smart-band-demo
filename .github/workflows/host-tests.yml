@@ -2,14 +2,25 @@ name: Host tests
 
 on:
   push:
+    branches: [master]
   pull_request:
 
 jobs:
   production-watch-model:
+    name: Model and provider (${{ matrix.os }}, ${{ matrix.compiler }})
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
     runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,6 +28,29 @@ jobs:
           python-version: "3.x"
       - name: Compile and run production watch model test
         run: python tests/test_watch_model.py
+
+  production-time-apps:
+    name: Time apps (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Compile and run production Timer and Stopwatch tests
+        run: python tests/test_time_apps.py
 
   shell-syntax:
     runs-on: ubuntu-latest

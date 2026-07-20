@@ -1,10 +1,14 @@
 #include "sensor_bridge.h"
 
+#include <string.h>
+#include <time.h>
+
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -20,6 +24,7 @@
 #define SMART_BAND_HUMI_DEV "/dev/uorb/sensor_humi0"
 #define SMART_BAND_BATTERY_DEV "/dev/charge/goldfish_battery"
 #define SMART_BAND_SENSOR_INTERVAL_US 1000000
+#define SMART_BAND_SENSOR_DRAIN_LIMIT 32
 #define SMART_BAND_HRATE_MIN_BPM 40
 #define SMART_BAND_HRATE_MAX_BPM 500
 
@@ -63,50 +68,61 @@ static int open_sensor(const char *path)
 static bool read_latest(int fd, void *sample, size_t sample_size)
 {
   bool updated = false;
+  unsigned int reads = 0;
 
   if (fd < 0)
     {
       return false;
     }
 
-  while (read(fd, sample, sample_size) == (ssize_t)sample_size)
+  while (reads < SMART_BAND_SENSOR_DRAIN_LIMIT &&
+         read(fd, sample, sample_size) == (ssize_t)sample_size)
     {
       updated = true;
+      reads++;
     }
 
   return updated;
 }
 
 static void update_heart_rate(smart_band_sensor_bridge_t *bridge,
-                              smart_band_state_t *state)
+                              smart_band_state_t *state, time_t now)
 {
   struct sensor_hrate sample;
 
   if (read_latest(bridge->hrate_fd, &sample, sizeof(sample)) &&
       sample.bpm > 0.0f)
     {
-      state->heart_rate = clamp_int((int)(sample.bpm + 0.5f),
-                                    SMART_BAND_HRATE_MIN_BPM,
-                                    SMART_BAND_HRATE_MAX_BPM);
-      state->heart_sensor_active = true;
+      smart_band_state_publish_metric(
+        state, SMART_BAND_METRIC_HEART_RATE,
+        clamp_int((int)(sample.bpm + 0.5f), SMART_BAND_HRATE_MIN_BPM,
+                  SMART_BAND_HRATE_MAX_BPM),
+        SMART_BAND_DATA_SOURCE_SENSOR, now);
     }
 }
 
-static void update_steps_from_counter(smart_band_sensor_bridge_t *bridge,
-                                      smart_band_state_t *state)
+static bool update_steps_from_counter(smart_band_sensor_bridge_t *bridge,
+                                      smart_band_state_t *state, time_t now)
 {
   struct sensor_step_counter sample;
+  int steps;
 
-  if (read_latest(bridge->step_fd, &sample, sizeof(sample)))
+  if (!read_latest(bridge->step_fd, &sample, sizeof(sample)))
     {
-      state->steps = clamp_int((int)(sample.steps % 100000u), 0, 99999);
-      state->step_sensor_active = true;
+      return false;
     }
+
+  steps = clamp_int((int)(sample.steps % 100000u), 0, 99999);
+  bridge->derived_steps = steps;
+  smart_band_state_publish_metric(state, SMART_BAND_METRIC_STEPS, steps,
+                                  SMART_BAND_DATA_SOURCE_SENSOR, now);
+  return true;
 }
 
 static void update_steps_from_accel(smart_band_sensor_bridge_t *bridge,
-                                    smart_band_state_t *state)
+                                    smart_band_state_t *state, time_t now)
 {
+  const smart_band_metric_info_t *step_info;
   struct sensor_accel sample;
   float energy;
   float delta;
@@ -123,20 +139,31 @@ static void update_steps_from_accel(smart_band_sensor_bridge_t *bridge,
       if (delta > 1.2f)
         {
           bridge->derived_steps += delta > 4.0f ? 2 : 1;
-          state->steps = clamp_int(state->steps + bridge->derived_steps,
-                                   0, 99999);
-          bridge->derived_steps = 0;
+          bridge->derived_steps = clamp_int(bridge->derived_steps, 0, 99999);
         }
     }
 
   bridge->last_accel_energy = energy;
   bridge->have_last_accel = true;
-  state->step_sensor_active = true;
+
+  step_info = smart_band_state_metric_info(state, SMART_BAND_METRIC_STEPS);
+  if (step_info != NULL &&
+      step_info->source == SMART_BAND_DATA_SOURCE_SENSOR)
+    {
+      /* Keep a recent hardware counter sample during its stale TTL. */
+
+      return;
+    }
+
+  smart_band_state_publish_metric(state, SMART_BAND_METRIC_STEPS,
+                                  bridge->derived_steps,
+                                  SMART_BAND_DATA_SOURCE_SENSOR_DERIVED, now);
 }
 
 static void update_battery(smart_band_sensor_bridge_t *bridge,
-                           smart_band_state_t *state)
+                           smart_band_state_t *state, time_t now)
 {
+  const smart_band_metric_info_t *info;
   int capacity = 0;
   int battery_state = BATTERY_UNKNOWN;
 
@@ -148,73 +175,70 @@ static void update_battery(smart_band_sensor_bridge_t *bridge,
   if (ioctl(bridge->battery_fd, BATIOC_CAPACITY,
             (unsigned long)(uintptr_t)&capacity) == 0)
     {
-      state->battery_percent = clamp_int(capacity, 0, 100);
-      state->battery_sensor_active = true;
+      smart_band_state_publish_metric(state, SMART_BAND_METRIC_BATTERY,
+                                      clamp_int(capacity, 0, 100),
+                                      SMART_BAND_DATA_SOURCE_SENSOR, now);
     }
 
-  if (ioctl(bridge->battery_fd, BATIOC_STATE,
+  info = smart_band_state_metric_info(state, SMART_BAND_METRIC_BATTERY);
+  if (info != NULL && info->source == SMART_BAND_DATA_SOURCE_SENSOR &&
+      ioctl(bridge->battery_fd, BATIOC_STATE,
             (unsigned long)(uintptr_t)&battery_state) == 0)
     {
       state->battery_charging = battery_state == BATTERY_CHARGING;
-      state->battery_sensor_active = true;
     }
 }
 
 static void update_temperature(smart_band_sensor_bridge_t *bridge,
-                               smart_band_state_t *state)
+                               smart_band_state_t *state, time_t now)
 {
   struct sensor_temp sample;
   float rounded;
+  int value_c;
 
-  if (read_latest(bridge->temp_fd, &sample, sizeof(sample)))
+  if (!read_latest(bridge->temp_fd, &sample, sizeof(sample)))
     {
-      int value_c;
-
-      rounded = sample.temperature >= 0.0f ? sample.temperature + 0.5f :
-                sample.temperature - 0.5f;
-      value_c = (int)rounded;
-      if (!bridge->have_temperature ||
-          bridge->last_temperature_c != value_c)
-        {
-          printf("smart_band: temperature sensor %dC\n", value_c);
-        }
-
-      bridge->last_temperature_c = value_c;
-      bridge->have_temperature = true;
+      return;
     }
 
-  if (bridge->have_temperature)
+  rounded = sample.temperature >= 0.0f ? sample.temperature + 0.5f :
+            sample.temperature - 0.5f;
+  value_c = (int)rounded;
+  if (!bridge->have_temperature || bridge->last_temperature_c != value_c)
     {
-      state->temperature_c = bridge->last_temperature_c;
-      state->temperature_sensor_active = true;
+      printf("smart_band: temperature sensor %dC\n", value_c);
     }
+
+  bridge->last_temperature_c = value_c;
+  bridge->have_temperature = true;
+  smart_band_state_publish_metric(state, SMART_BAND_METRIC_TEMPERATURE,
+                                  value_c, SMART_BAND_DATA_SOURCE_SENSOR, now);
 }
 
 static void update_humidity(smart_band_sensor_bridge_t *bridge,
-                            smart_band_state_t *state)
+                            smart_band_state_t *state, time_t now)
 {
   struct sensor_humi sample;
+  int value;
 
-  if (read_latest(bridge->humi_fd, &sample, sizeof(sample)))
+  if (!read_latest(bridge->humi_fd, &sample, sizeof(sample)))
     {
-      int value = clamp_int((int)(sample.humidity + 0.5f), 0, 100);
-
-      if (!bridge->have_humidity ||
-          bridge->last_humidity_percent != value)
-        {
-          printf("smart_band: humidity sensor %d%%\n", value);
-        }
-
-      bridge->last_humidity_percent = value;
-      bridge->have_humidity = true;
+      return;
     }
 
-  if (bridge->have_humidity)
+  value = clamp_int((int)(sample.humidity + 0.5f), 0, 100);
+  if (!bridge->have_humidity || bridge->last_humidity_percent != value)
     {
-      state->humidity_percent = bridge->last_humidity_percent;
-      state->humidity_sensor_active = true;
+      printf("smart_band: humidity sensor %d%%\n", value);
     }
+
+  bridge->last_humidity_percent = value;
+  bridge->have_humidity = true;
+  smart_band_state_publish_metric(state, SMART_BAND_METRIC_HUMIDITY, value,
+                                  SMART_BAND_DATA_SOURCE_SENSOR, now);
 }
+
+#endif /* CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS */
 
 void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
 {
@@ -233,6 +257,7 @@ void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
   bridge->last_temperature_c = 24;
   bridge->last_humidity_percent = 60;
 
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
   bridge->hrate_fd = open_sensor(SMART_BAND_HRATE_DEV);
   bridge->accel_fd = open_sensor(SMART_BAND_ACCEL_DEV);
   bridge->step_fd = open_sensor(SMART_BAND_STEP_DEV);
@@ -244,33 +269,42 @@ void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge)
     }
 
   bridge->humi_fd = open_sensor(SMART_BAND_HUMI_DEV);
+#endif
 }
 
 void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
                                      smart_band_state_t *state)
+{
+  smart_band_sensor_bridge_update_at(bridge, state, time(NULL));
+}
+
+void smart_band_sensor_bridge_update_at(smart_band_sensor_bridge_t *bridge,
+                                        smart_band_state_t *state,
+                                        time_t now)
 {
   if (bridge == NULL || state == NULL)
     {
       return;
     }
 
-  state->heart_sensor_active = false;
-  state->step_sensor_active = false;
-  state->battery_sensor_active = false;
-  state->battery_charging = false;
-  state->temperature_sensor_active = false;
-  state->humidity_sensor_active = false;
+  smart_band_state_begin_sensor_cycle(state, now);
 
-  update_heart_rate(bridge, state);
-  update_steps_from_counter(bridge, state);
-  if (!state->step_sensor_active)
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
+  if (state->data_mode == SMART_BAND_DATA_MODE_SIMULATION)
     {
-      update_steps_from_accel(bridge, state);
+      return;
     }
 
-  update_battery(bridge, state);
-  update_temperature(bridge, state);
-  update_humidity(bridge, state);
+  update_heart_rate(bridge, state, now);
+  if (!update_steps_from_counter(bridge, state, now))
+    {
+      update_steps_from_accel(bridge, state, now);
+    }
+
+  update_battery(bridge, state, now);
+  update_temperature(bridge, state, now);
+  update_humidity(bridge, state, now);
+#endif
 }
 
 void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
@@ -280,6 +314,7 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
       return;
     }
 
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
   if (bridge->hrate_fd >= 0)
     {
       close(bridge->hrate_fd);
@@ -309,6 +344,7 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
     {
       close(bridge->humi_fd);
     }
+#endif
 
   bridge->hrate_fd = -1;
   bridge->accel_fd = -1;
@@ -316,6 +352,7 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
   bridge->battery_fd = -1;
   bridge->temp_fd = -1;
   bridge->humi_fd = -1;
+  bridge->have_last_accel = false;
   bridge->have_temperature = false;
   bridge->have_humidity = false;
 }

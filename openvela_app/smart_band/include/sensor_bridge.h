@@ -29,6 +29,9 @@ typedef struct
 void smart_band_sensor_bridge_init(smart_band_sensor_bridge_t *bridge);
 void smart_band_sensor_bridge_update(smart_band_sensor_bridge_t *bridge,
                                      smart_band_state_t *state);
+void smart_band_sensor_bridge_update_at(smart_band_sensor_bridge_t *bridge,
+                                        smart_band_state_t *state,
+                                        time_t now);
 void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge);
 
 #ifdef __cplusplus

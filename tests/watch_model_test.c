@@ -1,4 +1,5 @@
 #include "watch_model.h"
+#include "sensor_bridge.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -139,12 +140,155 @@ static int test_step_goal_and_progress(void)
   return 0;
 }
 
+static int test_sensor_source_freshness_and_modes(void)
+{
+  smart_band_state_t state;
+  const smart_band_metric_info_t *info;
+  const time_t now = local_time_value(2026, 7, 6, 9, 5, 0);
+  int simulated_heart_rate;
+
+  CHECK(now != (time_t)-1);
+
+  smart_band_state_init_mode(&state, now, SMART_BAND_DATA_MODE_AUTO);
+  simulated_heart_rate = state.simulated_heart_rate;
+  CHECK(smart_band_state_publish_metric(
+    &state, SMART_BAND_METRIC_HEART_RATE, 88,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  info = smart_band_state_metric_info(&state,
+                                      SMART_BAND_METRIC_HEART_RATE);
+  CHECK(info != NULL);
+  CHECK(state.heart_rate == 88);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SENSOR);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_FRESH);
+  CHECK(info->last_update == now);
+
+  smart_band_state_begin_sensor_cycle(&state, now + 1);
+  CHECK(state.heart_rate == 88);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SENSOR);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_STALE);
+  CHECK(info->last_update == now);
+  CHECK(state.heart_sensor_active);
+
+  smart_band_state_begin_sensor_cycle(&state, now + 6);
+  CHECK(state.heart_rate == simulated_heart_rate);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SIMULATED);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_FRESH);
+  CHECK(info->last_update == now + 6);
+  CHECK(!state.heart_sensor_active);
+
+  smart_band_state_init_mode(&state, now, SMART_BAND_DATA_MODE_AUTO);
+  simulated_heart_rate = state.simulated_heart_rate;
+  CHECK(smart_band_state_publish_metric(
+    &state, SMART_BAND_METRIC_HEART_RATE, 91,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  smart_band_state_begin_sensor_cycle(&state, now - 1);
+  info = smart_band_state_metric_info(&state,
+                                      SMART_BAND_METRIC_HEART_RATE);
+  CHECK(info != NULL);
+  CHECK(state.heart_rate == simulated_heart_rate);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SIMULATED);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_FRESH);
+
+  smart_band_state_init_mode(&state, now,
+                             SMART_BAND_DATA_MODE_SENSORS_ONLY);
+  CHECK(smart_band_state_publish_metric(
+    &state, SMART_BAND_METRIC_TEMPERATURE, 31,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  info = smart_band_state_metric_info(&state,
+                                      SMART_BAND_METRIC_TEMPERATURE);
+  CHECK(info != NULL);
+  smart_band_state_begin_sensor_cycle(&state, now + 5);
+  CHECK(state.temperature_c == 31);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SENSOR);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_STALE);
+  smart_band_state_begin_sensor_cycle(&state, now + 6);
+  CHECK(state.temperature_c == 31);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_UNAVAILABLE);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE);
+  CHECK(!state.temperature_sensor_active);
+  CHECK(strcmp(state.status_text, "Unavailable") == 0);
+
+  smart_band_state_init_mode(&state, now,
+                             SMART_BAND_DATA_MODE_SIMULATION);
+  simulated_heart_rate = state.heart_rate;
+  CHECK(!smart_band_state_publish_metric(
+    &state, SMART_BAND_METRIC_HEART_RATE, 99,
+    SMART_BAND_DATA_SOURCE_SENSOR, now + 1));
+  info = smart_band_state_metric_info(&state,
+                                      SMART_BAND_METRIC_HEART_RATE);
+  CHECK(info != NULL);
+  CHECK(state.heart_rate == simulated_heart_rate);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_SIMULATED);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_FRESH);
+
+  return 0;
+}
+
+static int test_metric_api_rejects_invalid_inputs(void)
+{
+  smart_band_state_t state;
+  const time_t now = local_time_value(2026, 7, 6, 9, 5, 0);
+
+  smart_band_state_init_mode(&state, now, SMART_BAND_DATA_MODE_AUTO);
+  CHECK(!smart_band_state_publish_metric(
+    &state, SMART_BAND_METRIC_COUNT, 77,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  CHECK(!smart_band_state_publish_metric(
+    &state, (smart_band_metric_t)-1, 77,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  CHECK(!smart_band_state_publish_metric(
+    NULL, SMART_BAND_METRIC_HEART_RATE, 77,
+    SMART_BAND_DATA_SOURCE_SENSOR, now));
+  CHECK(smart_band_state_metric_info(&state,
+                                     SMART_BAND_METRIC_COUNT) == NULL);
+  CHECK(smart_band_state_metric_info(&state,
+                                     (smart_band_metric_t)-1) == NULL);
+  CHECK(smart_band_state_metric_info(NULL,
+                                     SMART_BAND_METRIC_HEART_RATE) == NULL);
+
+  smart_band_state_init_mode(&state, now, (smart_band_data_mode_t)99);
+  CHECK(state.data_mode == SMART_BAND_DATA_MODE_SIMULATION);
+  return 0;
+}
+
+static int test_no_sensor_provider(void)
+{
+  smart_band_sensor_bridge_t bridge;
+  smart_band_state_t state;
+  const time_t now = local_time_value(2026, 7, 6, 9, 5, 0);
+  const smart_band_metric_info_t *info;
+
+  smart_band_state_init_mode(&state, now,
+                             SMART_BAND_DATA_MODE_SENSORS_ONLY);
+  smart_band_sensor_bridge_init(&bridge);
+  CHECK(bridge.hrate_fd == -1);
+  CHECK(bridge.accel_fd == -1);
+  CHECK(bridge.step_fd == -1);
+  CHECK(bridge.battery_fd == -1);
+  CHECK(bridge.temp_fd == -1);
+  CHECK(bridge.humi_fd == -1);
+
+  smart_band_sensor_bridge_update_at(&bridge, &state, now + 10);
+  info = smart_band_state_metric_info(&state,
+                                      SMART_BAND_METRIC_HEART_RATE);
+  CHECK(info != NULL);
+  CHECK(info->source == SMART_BAND_DATA_SOURCE_UNAVAILABLE);
+  CHECK(info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE);
+
+  smart_band_sensor_bridge_deinit(&bridge);
+  CHECK(bridge.hrate_fd == -1);
+  return 0;
+}
+
 int main(void)
 {
   CHECK(test_time_and_initial_state() == 0);
   CHECK(test_page_navigation_and_titles() == 0);
   CHECK(test_tick_ranges() == 0);
   CHECK(test_step_goal_and_progress() == 0);
+  CHECK(test_sensor_source_freshness_and_modes() == 0);
+  CHECK(test_metric_api_rejects_invalid_inputs() == 0);
+  CHECK(test_no_sensor_provider() == 0);
   puts("watch_model production C tests passed");
   return 0;
 }
