@@ -83,7 +83,11 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", errors="replace")
 
 
-def run_diagnostic(command: list[str], destination: Path) -> subprocess.CompletedProcess[str]:
+def run_diagnostic(
+    command: list[str],
+    destination: Path,
+    environment: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         command,
         check=False,
@@ -92,12 +96,18 @@ def run_diagnostic(command: list[str], destination: Path) -> subprocess.Complete
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=environment,
     )
     write_text(destination, result.stdout)
     return result
 
 
-def verify_elf(binary: Path, evidence_dir: Path, label: str) -> None:
+def verify_elf(
+    binary: Path,
+    evidence_dir: Path,
+    label: str,
+    library_path: Path | None = None,
+) -> None:
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise SmokeFailure(f"{label} is missing or not executable: {binary}")
 
@@ -107,8 +117,17 @@ def verify_elf(binary: Path, evidence_dir: Path, label: str) -> None:
     if file_result.returncode != 0 or "ELF" not in file_result.stdout:
         raise SmokeFailure(f"{label} is not a readable ELF executable")
 
+    environment = None
+    if library_path is not None:
+        environment = os.environ.copy()
+        existing = environment.get("LD_LIBRARY_PATH")
+        environment["LD_LIBRARY_PATH"] = (
+            f"{library_path}:{existing}" if existing else str(library_path)
+        )
     ldd_result = run_diagnostic(
-        ["ldd", str(binary)], evidence_dir / f"{label}-ldd.txt"
+        ["ldd", str(binary)],
+        evidence_dir / f"{label}-ldd.txt",
+        environment,
     )
     if ldd_result.returncode != 0 or re.search(r"=>\s+not found(?:\s|$)", ldd_result.stdout):
         raise SmokeFailure(f"{label} has unresolved host libraries")
@@ -408,7 +427,12 @@ def main() -> int:
         raise SmokeFailure(f"headless aarch64 QEMU binary is missing: {qemu_headless}")
 
     verify_elf(emulator_binary, evidence_dir, "emulator")
-    verify_elf(qemu_headless, evidence_dir, "qemu-headless")
+    verify_elf(
+        qemu_headless,
+        evidence_dir,
+        "qemu-headless",
+        emulator_binary.parent / "lib64",
+    )
     prompt_text = config_value(config_path, "CONFIG_NSH_PROMPT_STRING")
     prompt = prompt_text.encode("utf-8")
 
