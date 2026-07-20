@@ -30,7 +30,7 @@ GitHub hosted runner 是一次性的。workflow 有意不缓存 `.repo`、源码
 - repo sync、openvela build 完整日志；
 - emulator/tools 固定提交、二进制 SHA-256、PTY/console runtime transcript；
 - runner 磁盘状态、repo dirty status、最终 `.config`；
-- 成功时的 NuttX ELF、文件类型与 SHA-256。
+- 成功时的 NuttX ELF、`.config`、`vela_system.bin`、`vela_data.bin` 与 SHA-256。
 
 超时、sync 失败、构建失败、配置未启用、找不到 NuttX ELF，或无法在 ELF 中确认
 `smart_band`，以及无法启动 emulator、到达 NSH、创建 UI 或保持应用进程存活，
@@ -80,6 +80,7 @@ cd /home/dhy/openvela
 - LVGL + NuttX + libuv UI 循环。
 - framebuffer/display/input 支持。
 - goldfish 模拟器或实际开发板。
+- headless Linux 主机提供 `libGL.so.1`；Ubuntu 最小环境可安装 `libgl1`。
 
 真实 provider 额外需要 `SENSORS`、`UORB` 和
 `LVX_DEMO_SMART_BAND_USE_SENSORS`；关闭 provider 时可仅运行模拟数据。
@@ -248,6 +249,10 @@ done
 
 本项目演示时使用智能屏皮肤，方便投屏展示：
 
+启动目录必须同时包含非空的 `.config`、`nuttx`、`vela_system.bin` 和
+`vela_data.bin`。Nightly artifact 会保留这四项；下载后将 `nuttx.config` 重命名为
+`.config` 即可组成独立运行目录。
+
 ```sh
 cd "$OPENVELA_ROOT"
 ./emulator.sh cmake_out/vela_goldfish-arm64-v8a-ap \
@@ -293,7 +298,8 @@ python3 "$DEMO_ROOT/scripts/smoke_openvela_emulator.py" \
 脚本使用 PTY 操作真实 NSH，而不是只检查 ELF 字符串。它要求 emulator console
 `ping` 成功、出现 `smart_band: UI ready`，并在两个时间点通过 `pidof` 确认应用仍
 在运行。固定 goldfish 配置没有启用 ADB shell，因此不能用 `adb shell smart_band`
-替代该检查。
+替代该检查。启动前脚本还会检查四项运行产物，以及 emulator、headless QEMU 和
+`libOpenglRender.so` 的宿主动态库；缺少 `libGL.so.1` 时会在启动前明确失败。
 
 ## 7. 开发板运行
 

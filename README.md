@@ -209,6 +209,13 @@ done
 
 ## 运行
 
+goldfish 启动目录必须同时包含非空的 `.config`、`nuttx`、`vela_system.bin` 和
+`vela_data.bin`。最小 Ubuntu headless 环境还需提供 `libGL.so.1`：
+
+```sh
+sudo apt-get install -y libgl1
+```
+
 启动 goldfish 模拟器：
 
 ```sh
@@ -224,7 +231,8 @@ smart_band
 ```
 
 Linux 环境可运行仓库提供的 headless runtime smoke。它通过 PTY 等待真实 NSH，
-验证 emulator console 可响应，启动 `smart_band`，并连续两次确认应用 PID 仍存活：
+先检查运行产物和 emulator 的宿主动态库，再验证 emulator console 可响应，启动
+`smart_band`，并连续两次确认应用 PID 仍存活：
 
 ```sh
 python3 scripts/smoke_openvela_emulator.py \

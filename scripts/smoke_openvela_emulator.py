@@ -107,9 +107,12 @@ def verify_elf(
     evidence_dir: Path,
     label: str,
     library_path: Path | None = None,
+    require_executable: bool = True,
 ) -> None:
-    if not binary.is_file() or not os.access(binary, os.X_OK):
-        raise SmokeFailure(f"{label} is missing or not executable: {binary}")
+    if not binary.is_file():
+        raise SmokeFailure(f"{label} is missing: {binary}")
+    if require_executable and not os.access(binary, os.X_OK):
+        raise SmokeFailure(f"{label} is not executable: {binary}")
 
     file_result = run_diagnostic(
         ["file", str(binary)], evidence_dir / f"{label}-file.txt"
@@ -131,6 +134,19 @@ def verify_elf(
     )
     if ldd_result.returncode != 0 or re.search(r"=>\s+not found(?:\s|$)", ldd_result.stdout):
         raise SmokeFailure(f"{label} has unresolved host libraries")
+
+
+def validate_runtime_inputs(emulator_script: Path, output_dir: Path) -> None:
+    required_inputs = (
+        emulator_script,
+        output_dir / ".config",
+        output_dir / "nuttx",
+        output_dir / "vela_system.bin",
+        output_dir / "vela_data.bin",
+    )
+    for required in required_inputs:
+        if not required.is_file() or required.stat().st_size == 0:
+            raise SmokeFailure(f"required emulator input is missing or empty: {required}")
 
 
 class PtyChild:
@@ -409,6 +425,8 @@ def main() -> int:
 
     emulator_script = root / "emulator.sh"
     emulator_binary = root / "prebuilts/emulator/linux-x86_64/emulator"
+    emulator_library_path = emulator_binary.parent / "lib64"
+    opengl_renderer = emulator_library_path / "libOpenglRender.so"
     qemu_headless = (
         root
         / "prebuilts/emulator/linux-x86_64/qemu/linux-x86_64/"
@@ -418,9 +436,7 @@ def main() -> int:
     config_path = output_dir / ".config"
     log_path = evidence_dir / "emulator-headless.log"
 
-    for required in (emulator_script, config_path):
-        if not required.is_file():
-            raise SmokeFailure(f"required emulator input is missing: {required}")
+    validate_runtime_inputs(emulator_script, output_dir)
     if not skin_dir.is_dir():
         raise SmokeFailure(f"emulator skin directory is missing: {skin_dir}")
     if not qemu_headless.is_file() or not os.access(qemu_headless, os.X_OK):
@@ -431,7 +447,14 @@ def main() -> int:
         qemu_headless,
         evidence_dir,
         "qemu-headless",
-        emulator_binary.parent / "lib64",
+        emulator_library_path,
+    )
+    verify_elf(
+        opengl_renderer,
+        evidence_dir,
+        "opengl-renderer",
+        emulator_library_path,
+        require_executable=False,
     )
     prompt_text = config_value(config_path, "CONFIG_NSH_PROMPT_STRING")
     prompt = prompt_text.encode("utf-8")
