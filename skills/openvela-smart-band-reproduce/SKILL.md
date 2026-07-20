@@ -17,15 +17,18 @@ page.
    - `OPENVELA_ROOT`: an existing openvela checkout, or the directory where
      openvela will be created.
 
-2. Ensure official open-vela skills exist in the openvela root:
+2. Let the repository script prepare the official open-vela skills. It checks
+   out the exact `.claude` commit recorded in `versions.env`; do not replace
+   this with an unpinned clone or `git pull`.
 
-```bash
-cd "$OPENVELA_ROOT"
-git clone https://github.com/open-vela/.claude.git .claude
-```
-
-If `.claude` already exists, keep it and optionally update it with
-`git -C .claude pull --ff-only`.
+The openvela checkout is also verified against the pinned `tags/trunk-5.4.xml`
+release manifest and manifest-repository commit in `versions.env`. Reviewed
+alternate full commits and manifest names may be supplied through
+`SMART_BAND_CLAUDE_REVISION` and
+`SMART_BAND_OPENVELA_MANIFEST_REVISION` plus
+`SMART_BAND_OPENVELA_MANIFEST_FILE`.
+Unreviewed `.repo/local_manifests/*.xml` files are rejected because they change
+the effective checkout outside the repository-owned pin.
 
 3. If openvela is not installed yet, hand off environment setup to the official
    skill by following `.claude/skills/openvela-quickstart/SKILL.md`.
@@ -68,6 +71,10 @@ The script refuses to overwrite dirty target paths by default. Use
 `--allow-dirty` only after the user has explicitly confirmed those changes may
 be replaced.
 
+Synchronization is overlay-only and never uses `rsync --delete`. The goldfish
+defconfig is backed up before editing and restored automatically if any later
+step fails or the script is interrupted.
+
 5. For simulator verification after build, use:
 
 ```bash
@@ -90,6 +97,7 @@ Run these checks before reporting success:
 ```bash
 git -C "$SMART_BAND_DEMO_ROOT" status --short
 python3 "$SMART_BAND_DEMO_ROOT/tests/test_watch_model.py"
+bash "$SMART_BAND_DEMO_ROOT/scripts/test_reproduce_failure.sh"
 ```
 
 The Python entry compiles and runs the production `watch_model.c`; it is not a

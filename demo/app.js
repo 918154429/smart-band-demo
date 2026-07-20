@@ -55,13 +55,96 @@ const state = {
   tetrisPiece: { x: 2, y: 0 },
 };
 
+const contentElement = document.getElementById("content");
+
+function currentViewKey() {
+  return state.activeApp ? `app:${state.activeApp}` : `page:${state.page}`;
+}
+
+function syncNode(current, next) {
+  if (!current || !next || current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
+    current?.replaceWith(next?.cloneNode(true));
+    return;
+  }
+
+  if (current.nodeType === Node.TEXT_NODE) {
+    if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+    return;
+  }
+
+  Array.from(current.attributes).forEach((attribute) => {
+    if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+  });
+  Array.from(next.attributes).forEach((attribute) => {
+    if (current.getAttribute(attribute.name) !== attribute.value) {
+      current.setAttribute(attribute.name, attribute.value);
+    }
+  });
+
+  const currentChildren = Array.from(current.childNodes);
+  const nextChildren = Array.from(next.childNodes);
+  const length = Math.max(currentChildren.length, nextChildren.length);
+  for (let index = length - 1; index >= 0; index -= 1) {
+    const currentChild = current.childNodes[index];
+    const nextChild = nextChildren[index];
+    if (!nextChild && currentChild) currentChild.remove();
+  }
+  nextChildren.forEach((nextChild, index) => {
+    const currentChild = current.childNodes[index];
+    if (!currentChild) current.append(nextChild.cloneNode(true));
+    else syncNode(currentChild, nextChild);
+  });
+}
+
+function patchContent(target, html) {
+  const viewKey = currentViewKey();
+  if (target.dataset.view !== viewKey) {
+    Reflect.set(target, "innerHTML", html, target);
+    target.dataset.view = viewKey;
+    return;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const nextChildren = Array.from(template.content.childNodes);
+  const currentChildren = Array.from(target.childNodes);
+  const length = Math.max(currentChildren.length, nextChildren.length);
+  for (let index = length - 1; index >= 0; index -= 1) {
+    if (!nextChildren[index] && target.childNodes[index]) target.childNodes[index].remove();
+  }
+  nextChildren.forEach((nextChild, index) => {
+    const currentChild = target.childNodes[index];
+    if (!currentChild) target.append(nextChild.cloneNode(true));
+    else syncNode(currentChild, nextChild);
+  });
+}
+
+const contentProxy = new Proxy(contentElement, {
+  get(target, property) {
+    const value = Reflect.get(target, property, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+  set(target, property, value) {
+    if (property === "innerHTML") {
+      patchContent(target, value);
+      return true;
+    }
+    return Reflect.set(target, property, value, target);
+  },
+});
+
 const el = {
   watch: document.getElementById("watch"),
-  content: document.getElementById("content"),
+  content: contentProxy,
   dots: Array.from(document.querySelectorAll(".dots span")),
   prevBtn: document.getElementById("prevBtn"),
   nextBtn: document.getElementById("nextBtn"),
+  statusLive: document.getElementById("statusLive"),
 };
+
+function announce(message) {
+  if (el.statusLive.textContent !== message) el.statusLive.textContent = message;
+}
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -186,9 +269,9 @@ function renderStepsPage() {
         <div class="progress"><span style="width:${progress}%"></span></div>
       </div>
       <div class="goal-row">
-        <button type="button" data-action="goalDown">-</button>
+        <button type="button" data-action="goalDown" aria-label="减少步数目标">-</button>
         <div><span>Goal</span><strong>${state.stepGoal.toLocaleString("zh-CN")}</strong></div>
-        <button type="button" data-action="goalUp">+</button>
+        <button type="button" data-action="goalUp" aria-label="增加步数目标">+</button>
       </div>
       <div class="mini-grid">
         <div class="mini-card"><span>Progress</span><strong>${progress}%</strong></div>
@@ -214,7 +297,7 @@ function renderAppsPage() {
 
 function appHeader(title) {
   return `
-    <button class="back-button" type="button" data-action="back">‹</button>
+    <button class="back-button" type="button" data-action="back" aria-label="返回应用列表">‹</button>
     ${batteryMarkup()}
     <h1 class="app-title">${title}</h1>`;
 }
@@ -342,10 +425,10 @@ function render2048App() {
         ${state.board2048.flat().map((value) => `<div class="tile tile-${value || 0}">${value || ""}</div>`).join("")}
       </div>
       <div class="pad">
-        <button type="button" data-action="move2048" data-dir="up">↑</button>
-        <button type="button" data-action="move2048" data-dir="left">←</button>
-        <button type="button" data-action="move2048" data-dir="down">↓</button>
-        <button type="button" data-action="move2048" data-dir="right">→</button>
+        <button type="button" data-action="move2048" data-dir="up" aria-label="2048 向上移动">↑</button>
+        <button type="button" data-action="move2048" data-dir="left" aria-label="2048 向左移动">←</button>
+        <button type="button" data-action="move2048" data-dir="down" aria-label="2048 向下移动">↓</button>
+        <button type="button" data-action="move2048" data-dir="right" aria-label="2048 向右移动">→</button>
       </div>
     </section>`;
 }
@@ -407,7 +490,7 @@ function renderMinesApp() {
     const open = state.minesOpen.has(index);
     const mine = state.minesMap.has(index);
     const label = open ? (mine ? "✹" : mineNeighborCount(index) || "") : "";
-    return `<button type="button" class="${open ? "open" : ""}" data-mine="${index}">${label}</button>`;
+    return `<button type="button" class="${open ? "open" : ""}" data-mine="${index}" aria-label="扫雷格 ${index + 1}${open ? `，${label || "空"}` : "，未打开"}">${label}</button>`;
   }).join("");
 
   el.content.innerHTML = `
@@ -444,9 +527,9 @@ function renderTetrisApp() {
     <section class="tetris-app">
       <div class="tetris-board">${cells.join("")}</div>
       <div class="pad">
-        <button type="button" data-action="tetrisMove" data-dir="left">←</button>
-        <button type="button" data-action="tetrisMove" data-dir="down">↓</button>
-        <button type="button" data-action="tetrisMove" data-dir="right">→</button>
+        <button type="button" data-action="tetrisMove" data-dir="left" aria-label="俄罗斯方块向左">←</button>
+        <button type="button" data-action="tetrisMove" data-dir="down" aria-label="俄罗斯方块向下">↓</button>
+        <button type="button" data-action="tetrisMove" data-dir="right" aria-label="俄罗斯方块向右">→</button>
         <button type="button" data-action="tetrisReset">New</button>
       </div>
     </section>`;
@@ -517,6 +600,7 @@ function switchPage(direction) {
   el.content.classList.add("switching");
   window.setTimeout(() => {
     render();
+    announce(["表盘页面", "心率页面", "活动页面", "应用列表"][state.page]);
     el.content.style.setProperty("--shift", direction > 0 ? "-16px" : "16px");
     window.requestAnimationFrame(() => el.content.classList.remove("switching"));
   }, 120);
@@ -603,6 +687,18 @@ function handleAction(action, target) {
     state.woodenMessage = "Merit becomes your luck";
   }
   render();
+  const actionSummary = {
+    back: "已返回应用列表",
+    goalDown: `步数目标 ${state.stepGoal}`,
+    goalUp: `步数目标 ${state.stepGoal}`,
+    timerToggle: state.timerRunning ? "计时器已开始" : "计时器已暂停",
+    timerReset: "计时器已重置",
+    stopwatchToggle: state.stopwatchRunning ? "秒表已开始" : "秒表已暂停",
+    stopwatchReset: "秒表已重置",
+    woodenTap: `功德 ${state.merits}`,
+    woodenReset: "功德已重置",
+  };
+  if (actionSummary[action]) announce(actionSummary[action]);
 }
 
 function tick() {
@@ -612,6 +708,7 @@ function tick() {
   if (state.timerRunning && state.timerSeconds <= 0) {
     state.timerSeconds = 0;
     state.timerRunning = false;
+    announce("计时器已完成");
   }
   if (state.stopwatchRunning) state.stopwatchSeconds += 1;
   if (state.activeApp === "tetris" && state.ticks % 2 === 0) {
@@ -651,6 +748,7 @@ el.content.addEventListener("click", (event) => {
   if (appButton) {
     state.activeApp = appButton.dataset.app;
     render();
+    announce(`已打开 ${apps.find((app) => app.id === state.activeApp)?.title || "应用"}`);
     return;
   }
 

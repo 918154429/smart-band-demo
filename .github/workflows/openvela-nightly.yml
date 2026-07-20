@@ -1,0 +1,320 @@
+name: Fixed openvela release build
+
+on:
+  schedule:
+    # 02:30 Asia/Shanghai. The upstream release is pinned by the repository
+    # versions file loaded below; the run validates the default branch against it.
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+    inputs:
+      build_jobs:
+        description: Parallel jobs for the openvela build
+        required: true
+        default: "2"
+        type: choice
+        options:
+          - "2"
+          - "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openvela-release-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  OPENVELA_MANIFEST_URL: https://github.com/open-vela/manifests.git
+  OPENVELA_MANIFEST_UPSTREAM: dev
+  REPO_VERSION: "2.54"
+  REPO_SHA256: 6cba294d6218bbd4a1500598207b3979c752c7a122aef9429e4d7fef688833b5
+  OPENVELA_ROOT: ${{ github.workspace }}/openvela
+  EVIDENCE_DIR: ${{ github.workspace }}/openvela-nightly-evidence
+  SMART_BAND_BUILD_JOBS: ${{ inputs.build_jobs || '2' }}
+
+jobs:
+  goldfish-arm64:
+    name: Goldfish arm64 release build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out smart-band source
+        uses: actions/checkout@v7
+        with:
+          path: smart-band-demo
+
+      - name: Load repository-owned openvela versions
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version_file="$GITHUB_WORKSPACE/smart-band-demo/skills/openvela-smart-band-reproduce/versions.env"
+          test -f "$version_file"
+          # shellcheck disable=SC1090
+          source "$version_file"
+
+          for name in \
+            SMART_BAND_DEFAULT_CLAUDE_REPOSITORY \
+            SMART_BAND_DEFAULT_CLAUDE_REVISION \
+            SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION \
+            SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE; do
+            test -n "${!name:-}"
+          done
+          [[ "$SMART_BAND_DEFAULT_CLAUDE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          case "$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE" in
+            ''|/*|*..*) exit 1 ;;
+          esac
+
+          {
+            echo "OPENVELA_CLAUDE_URL=$SMART_BAND_DEFAULT_CLAUDE_REPOSITORY"
+            echo "OPENVELA_CLAUDE_REVISION=$SMART_BAND_DEFAULT_CLAUDE_REVISION"
+            echo "OPENVELA_MANIFEST_REVISION=$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION"
+            echo "OPENVELA_MANIFEST_FILE=$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE"
+          } >> "$GITHUB_ENV"
+
+      - name: Record runner and reclaim build space
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            uname -a
+            lsb_release -a 2>/dev/null || true
+            df -h
+          } | tee "$EVIDENCE_DIR/runner-before.txt"
+
+          # Hosted runners are ephemeral. These SDKs are unrelated to the
+          # openvela build and removing them leaves enough room for repo sync.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          docker system prune --all --force >/dev/null 2>&1 || true
+          df -h | tee "$EVIDENCE_DIR/runner-after-cleanup.txt"
+
+      - name: Install deterministic checkout prerequisites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            bison build-essential ca-certificates ccache cmake curl file flex \
+            gawk git git-lfs gperf libncurses-dev make ninja-build python3 \
+            python3-pip rsync unzip xz-utils zip
+
+          mkdir -p "$HOME/bin"
+          curl --fail --location --retry 5 --retry-delay 2 \
+            --connect-timeout 10 --max-time 120 \
+            --output "$HOME/bin/repo" \
+            "https://storage.googleapis.com/git-repo-downloads/repo-$REPO_VERSION"
+          echo "$REPO_SHA256  $HOME/bin/repo" | sha256sum --check --strict
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Initialize pinned openvela release manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$OPENVELA_ROOT" "$EVIDENCE_DIR"
+          cd "$OPENVELA_ROOT"
+
+          repo init \
+            --manifest-url="$OPENVELA_MANIFEST_URL" \
+            --manifest-branch="$OPENVELA_MANIFEST_REVISION" \
+            --manifest-upstream-branch="$OPENVELA_MANIFEST_UPSTREAM" \
+            --manifest-name="$OPENVELA_MANIFEST_FILE" \
+            --repo-rev="v$REPO_VERSION" \
+            --manifest-depth=0 \
+            --depth=1 \
+            --partial-clone \
+            --clone-filter=blob:limit=10M \
+            --no-clone-bundle
+
+          test "$(git -C .repo/manifests rev-parse HEAD)" = \
+            "$OPENVELA_MANIFEST_REVISION"
+          python3 - ".repo/manifests/$OPENVELA_MANIFEST_FILE" <<'PY'
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          manifest = ET.parse(sys.argv[1]).getroot()
+          default_revision = manifest.find("default").get("revision", "")
+          if not default_revision.startswith("refs/tags/"):
+              raise SystemExit(
+                  f"manifest default is not a fixed tag: {default_revision!r}"
+              )
+          for project in manifest.findall("project"):
+              revision = project.get("revision")
+              if revision and not (
+                  revision.startswith("refs/tags/")
+                  or re.fullmatch(r"[0-9a-f]{40}", revision)
+              ):
+                  raise SystemExit(
+                      f"project {project.get('name')} has floating revision {revision!r}"
+                  )
+          print(f"manifest uses fixed release {default_revision}")
+          PY
+
+      - name: Sync pinned openvela projects
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd "$OPENVELA_ROOT"
+          timeout --signal=TERM --kill-after=5m 65m \
+            repo sync \
+              --current-branch \
+              --detach \
+              --fail-fast \
+              --force-sync \
+              --no-clone-bundle \
+              --optimized-fetch \
+              --prune \
+              -j4 2>&1 | tee "$EVIDENCE_DIR/repo-sync.log"
+
+          repo manifest -r -o "$EVIDENCE_DIR/openvela-resolved-manifest.xml"
+          repo version > "$EVIDENCE_DIR/repo-version.txt"
+          repo status > "$EVIDENCE_DIR/repo-status-after-sync.txt"
+
+          python3 - "$EVIDENCE_DIR/openvela-resolved-manifest.xml" <<'PY'
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          manifest = ET.parse(sys.argv[1]).getroot()
+          projects = manifest.findall("project")
+          if not projects:
+              raise SystemExit("resolved manifest contains no projects")
+
+          bad = [
+              (project.get("name"), project.get("revision"))
+              for project in projects
+              if not re.fullmatch(r"[0-9a-f]{40}", project.get("revision", ""))
+          ]
+          if bad:
+              raise SystemExit(f"resolved manifest has non-SHA revisions: {bad[:5]}")
+          print(f"verified {len(projects)} projects at immutable SHA revisions")
+          PY
+
+      - name: Install pinned official openvela skills
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          claude_root="$OPENVELA_ROOT/.claude"
+          if [ -e "$claude_root" ]; then
+            git -C "$claude_root" rev-parse --git-dir >/dev/null
+            test -z "$(git -C "$claude_root" status --porcelain)"
+
+            # reproduce.sh recognizes an installed official skill checkout by
+            # a directory/symlink at .claude/.git. If repo used a gitfile on a
+            # future version, replace only this ephemeral worktree with a
+            # normal clone so the script cannot attempt a second clone.
+            if [ ! -d "$claude_root/.git" ]; then
+              rm -rf "$claude_root"
+              git clone --filter=blob:none --no-checkout \
+                "$OPENVELA_CLAUDE_URL" "$claude_root"
+            fi
+          else
+            git clone --filter=blob:none --no-checkout \
+              "$OPENVELA_CLAUDE_URL" "$claude_root"
+          fi
+
+          claude_remote="$(git -C "$claude_root" remote | head -n 1)"
+          test -n "$claude_remote"
+          claude_remote_url="$(git -C "$claude_root" remote get-url \
+            "$claude_remote")"
+          case "$claude_remote_url" in
+            https://github.com/open-vela/.claude|\
+            https://github.com/open-vela/.claude.git|\
+            git@github.com:open-vela/.claude.git)
+              ;;
+            *)
+              echo "unexpected .claude remote: $claude_remote_url" >&2
+              exit 1
+              ;;
+          esac
+
+          git -C "$claude_root" fetch --depth=1 "$claude_remote" \
+            "$OPENVELA_CLAUDE_REVISION"
+          git -C "$OPENVELA_ROOT/.claude" checkout --detach \
+            "$OPENVELA_CLAUDE_REVISION"
+          test "$(git -C "$OPENVELA_ROOT/.claude" rev-parse HEAD)" = \
+            "$OPENVELA_CLAUDE_REVISION"
+
+      - name: Build smart band in pinned openvela release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd "$GITHUB_WORKSPACE/smart-band-demo"
+          timeout --signal=TERM --kill-after=5m 75m \
+            bash scripts/reproduce_openvela_demo.sh \
+              --openvela-root "$OPENVELA_ROOT" \
+              --no-browser \
+              --allow-dirty 2>&1 | tee "$EVIDENCE_DIR/openvela-build.log"
+
+      - name: Verify linked smart-band image
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image=""
+          for candidate in \
+            "$OPENVELA_ROOT/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx" \
+            "$OPENVELA_ROOT/nuttx/nuttx"; do
+            if [ -s "$candidate" ]; then
+              image="$candidate"
+              break
+            fi
+          done
+          test -n "$image"
+
+          config=""
+          for candidate in \
+            "$OPENVELA_ROOT/nuttx/.config" \
+            "$OPENVELA_ROOT/cmake_out/vela_goldfish-arm64-v8a-ap/.config"; do
+            if [ -f "$candidate" ]; then
+              config="$candidate"
+              break
+            fi
+          done
+          test -n "$config"
+          grep -Fq 'CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC=y' "$config"
+          if ! readelf --symbols --wide "$image" 2>/dev/null | \
+               grep -Eq 'smart_band(_main)?'; then
+            strings "$image" | grep -Fq 'smart_band'
+          fi
+
+          sha256sum "$image" | tee "$EVIDENCE_DIR/nuttx.sha256"
+          file "$image" | tee "$EVIDENCE_DIR/nuttx-file.txt"
+          cp "$image" "$EVIDENCE_DIR/nuttx"
+          cp "$config" "$EVIDENCE_DIR/nuttx.config"
+          find "$OPENVELA_ROOT/cmake_out" "$OPENVELA_ROOT/nuttx" \
+            -iname '*smart_band*' -print 2>/dev/null \
+            > "$EVIDENCE_DIR/smart-band-build-paths.txt"
+          test -s "$EVIDENCE_DIR/smart-band-build-paths.txt"
+
+      - name: Capture final diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$EVIDENCE_DIR"
+          df -h > "$EVIDENCE_DIR/runner-final-disk.txt"
+          if [ -d "$OPENVELA_ROOT/.repo" ]; then
+            cd "$OPENVELA_ROOT"
+            repo status > "$EVIDENCE_DIR/repo-status-final.txt" 2>&1
+            git -C .repo/manifests rev-parse HEAD \
+              > "$EVIDENCE_DIR/manifest-commit.txt" 2>&1
+          fi
+          if [ -d "$OPENVELA_ROOT/.claude/.git" ]; then
+            git -C "$OPENVELA_ROOT/.claude" rev-parse HEAD \
+              > "$EVIDENCE_DIR/claude-commit.txt" 2>&1
+          fi
+          if [ -f "$OPENVELA_ROOT/nuttx/.config" ]; then
+            cp "$OPENVELA_ROOT/nuttx/.config" "$EVIDENCE_DIR/nuttx.config"
+          fi
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openvela-fixed-release-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 14

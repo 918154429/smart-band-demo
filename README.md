@@ -79,10 +79,25 @@ skills/openvela-smart-band-reproduce/SKILL.md
 
 推荐复现流程：
 
-1. 在 openvela 根目录准备官方 skill：
+1. 由仓库脚本准备官方 skill。脚本会读取
+   `skills/openvela-smart-band-reproduce/versions.env`，把 `.claude` 固定到仓库默认
+   commit，并校验 openvela 使用清单中固定的 `tags/trunk-5.4.xml` release manifest 及
+   manifest 仓库 commit。不要用未固定版本的 `git clone` 或 `git pull` 替代：
 
 ```sh
-git clone https://github.com/open-vela/.claude.git .claude
+bash scripts/reproduce_openvela_demo.sh \
+  --openvela-root "$OPENVELA_ROOT" --dry-run --no-browser
+```
+
+为避免清单外漂移，脚本会拒绝存在未审阅 `.repo/local_manifests/*.xml` 的 checkout。
+
+需要复现经过审阅的其他版本时，可显式传入完整 40 位 commit：
+
+```sh
+SMART_BAND_CLAUDE_REVISION="$CLAUDE_COMMIT" \
+SMART_BAND_OPENVELA_MANIFEST_REVISION="$OPENVELA_MANIFEST_COMMIT" \
+SMART_BAND_OPENVELA_MANIFEST_FILE="$OPENVELA_MANIFEST_FILE" \
+  bash scripts/reproduce_openvela_demo.sh --openvela-root "$OPENVELA_ROOT"
 ```
 
 2. 如果 openvela 开发环境还没有安装完成，使用官方环境搭建提示：
@@ -115,8 +130,9 @@ $OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce
 
 因此后续在 openvela 根目录中，也可以直接使用该 skill 继续复现或排查。
 
-脚本默认拒绝覆盖 openvela 中已经变脏的目标配置或应用目录。正式执行前可先做
-无写入检查：
+脚本默认拒绝覆盖 openvela 中已经变脏的目标配置或应用目录。应用与 skill 使用
+overlay 同步，不删除目标目录中的额外文件；goldfish defconfig 会先备份，任一步骤
+失败或脚本被中断时自动恢复。正式执行前可先做无写入检查：
 
 ```sh
 bash scripts/reproduce_openvela_demo.sh \
@@ -130,7 +146,7 @@ bash scripts/reproduce_openvela_demo.sh \
 
 ```sh
 mkdir -p "$OPENVELA_ROOT/packages/demos/smart_band_basic"
-rsync -a --delete \
+rsync -a \
   "$OPENVELA_ROOT/workspaces/smart-band-demo/openvela_app/smart_band/" \
   "$OPENVELA_ROOT/packages/demos/smart_band_basic/"
 ```
@@ -139,7 +155,7 @@ rsync -a --delete \
 
 ```sh
 mkdir -p "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic"
-rsync -a --delete \
+rsync -a \
   "$OPENVELA_ROOT/workspaces/smart-band-demo/openvela_app/smart_band/" \
   "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic/"
 ```
@@ -258,22 +274,30 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含四组不依赖 openvela 的 host C 测试。Python 入口会寻找
-GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、应用 runtime、Timer
-和 Stopwatch，再执行测试二进制：
+本仓库包含五组不依赖 openvela 的 host C 门禁。Python 入口会寻找
+GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、应用 runtime、Timer、
+Stopwatch 以及完整 LVGL/UI 源集，再执行测试或编译链接 smoke：
 
 ```sh
 python3 tests/test_watch_model.py
 python3 tests/test_time_apps.py
 python3 tests/test_app_runtime.py
 python3 tests/test_app_logic.py
+python3 tests/test_ui_compile.py
+bash scripts/test_reproduce_failure.sh
+npm ci
+npx playwright install chromium
+npm run test:browser
 ```
 
 测试覆盖时间格式、页面切换、数据来源/TTL/墙钟回拨、无传感器构建、模拟数据范围、
 步数目标，以及应用 runtime 的 owned container、失败回滚、双实例隔离、1000 次
 mount/unmount，Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
 与生产代码分离的 Python 模型副本，并直接验证 Calculator、2048、Mines 的生产
-reducer、显式 seed 与边界条件。也可以通过 `CC` 环境变量指定编译器。
+reducer、显式 seed 与边界条件。浏览器门禁覆盖 320x568、667x375、焦点保留、
+ARIA live、对比度、触控尺寸和 reduced-motion。Linux CI 还使用
+`tests/test_core_coverage.py` 对完整 host-testable production C core 强制至少 85% 行
+覆盖率。也可以通过 `CC` 环境变量指定编译器。
 
 ## 基本异常处理说明
 
