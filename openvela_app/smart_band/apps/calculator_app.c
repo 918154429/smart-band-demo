@@ -1,9 +1,8 @@
 #include "smart_band_apps.h"
+#include "calculator_model.h"
 
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct
@@ -17,16 +16,48 @@ typedef struct
   uint8_t row_span;
 } calc_key_t;
 
-static lv_obj_t *g_display;
-static lv_obj_t *g_expression;
-static lv_obj_t *g_display_box;
-static char g_text[24] = "0";
-static char g_lhs_text[24];
-static double g_lhs;
-static char g_op;
-static bool g_has_lhs;
-static bool g_reset_next;
-static bool g_error;
+#define CALC_KEY_COUNT 19
+
+typedef struct
+{
+  lv_obj_t *display;
+  lv_obj_t *expression;
+  lv_obj_t *display_box;
+} calculator_view_t;
+
+typedef struct
+{
+  calculator_model_t model;
+  calculator_view_t view;
+  smart_band_app_event_binding_t key_bindings[CALC_KEY_COUNT];
+} calculator_context_t;
+
+static const calc_key_t g_keys[CALC_KEY_COUNT] =
+{
+  { "C",   'C', 0xee8582, 0, 0, 1, 1 },
+  { "DEL", 'B', 0x8298cb, 1, 0, 1, 1 },
+  { "/",   '/', 0x72c4bc, 2, 0, 1, 1 },
+  { "*",   '*', 0x72c4bc, 3, 0, 1, 1 },
+  { "7",   '7', 0x667f89, 0, 1, 1, 1 },
+  { "8",   '8', 0x667f89, 1, 1, 1, 1 },
+  { "9",   '9', 0x667f89, 2, 1, 1, 1 },
+  { "-",   '-', 0x72c4bc, 3, 1, 1, 1 },
+  { "4",   '4', 0x667f89, 0, 2, 1, 1 },
+  { "5",   '5', 0x667f89, 1, 2, 1, 1 },
+  { "6",   '6', 0x667f89, 2, 2, 1, 1 },
+  { "+",   '+', 0x72c4bc, 3, 2, 1, 1 },
+  { "1",   '1', 0x667f89, 0, 3, 1, 1 },
+  { "2",   '2', 0x667f89, 1, 3, 1, 1 },
+  { "3",   '3', 0x667f89, 2, 3, 1, 1 },
+  { "=",   '=', 0xf0bc62, 3, 3, 1, 2 },
+  { "+/-", 'S', 0x667f89, 0, 4, 1, 1 },
+  { "0",   '0', 0x667f89, 1, 4, 1, 1 },
+  { ".",   '.', 0x667f89, 2, 4, 1, 1 }
+};
+
+_Static_assert(sizeof(calculator_context_t) <=
+               SMART_BAND_APP_CONTEXT_CAPACITY,
+               "calculator app context exceeds runtime capacity");
 
 static lv_coord_t calc_min_coord(lv_coord_t a, lv_coord_t b)
 {
@@ -57,345 +88,79 @@ static lv_coord_t calc_content_height(lv_obj_t *parent,
   return parent_h;
 }
 
-static void calc_format_value(double value, char *buffer, size_t size)
+static void calculator_render(void *context,
+                              const smart_band_app_host_t *host)
 {
-  char *dot;
-  char *end;
-  double magnitude;
-
-  if (value > -0.0005 && value < 0.0005)
-    {
-      value = 0.0;
-    }
-
-  magnitude = value < 0.0 ? -value : value;
-  if (magnitude >= 10000000.0)
-    {
-      snprintf(buffer, size, "%.4g", value);
-      return;
-    }
-
-  if (value == (double)(long)value)
-    {
-      snprintf(buffer, size, "%ld", (long)value);
-      return;
-    }
-
-  snprintf(buffer, size, "%.4f", value);
-  dot = strchr(buffer, '.');
-  if (dot == NULL)
-    {
-      return;
-    }
-
-  end = buffer + strlen(buffer);
-  while (end > dot + 1 && end[-1] == '0')
-    {
-      end--;
-    }
-
-  if (end > dot && end[-1] == '.')
-    {
-      end--;
-    }
-
-  *end = '\0';
-}
-
-static void calc_clear(void)
-{
-  snprintf(g_text, sizeof(g_text), "0");
-  g_lhs_text[0] = '\0';
-  g_lhs = 0.0;
-  g_op = 0;
-  g_has_lhs = false;
-  g_reset_next = false;
-  g_error = false;
-}
-
-static double calc_current_value(void)
-{
-  return strtod(g_text, NULL);
-}
-
-static void calc_error(void)
-{
-  snprintf(g_text, sizeof(g_text), "Err");
-  g_lhs_text[0] = '\0';
-  g_has_lhs = false;
-  g_reset_next = true;
-  g_error = true;
-}
-
-static bool calc_compute(double rhs)
-{
-  double result;
-
-  switch (g_op)
-    {
-      case '+':
-        result = g_lhs + rhs;
-        break;
-
-      case '-':
-        result = g_lhs - rhs;
-        break;
-
-      case '*':
-        result = g_lhs * rhs;
-        break;
-
-      case '/':
-        if (rhs > -0.0000001 && rhs < 0.0000001)
-          {
-            calc_error();
-            return false;
-          }
-
-        result = g_lhs / rhs;
-        break;
-
-      default:
-        return false;
-    }
-
-  calc_format_value(result, g_text, sizeof(g_text));
-  g_lhs = result;
-  return true;
-}
-
-static void calc_append_digit(char digit)
-{
-  size_t len;
-
-  if (g_error || g_reset_next || strcmp(g_text, "0") == 0)
-    {
-      snprintf(g_text, sizeof(g_text), "%c", digit);
-      g_reset_next = false;
-      g_error = false;
-      return;
-    }
-
-  len = strlen(g_text);
-  if (len + 1 < sizeof(g_text))
-    {
-      g_text[len] = digit;
-      g_text[len + 1] = '\0';
-    }
-}
-
-static void calc_decimal(void)
-{
-  size_t len;
-
-  if (g_error || g_reset_next)
-    {
-      snprintf(g_text, sizeof(g_text), "0.");
-      g_reset_next = false;
-      g_error = false;
-      return;
-    }
-
-  if (strchr(g_text, '.') != NULL)
-    {
-      return;
-    }
-
-  len = strlen(g_text);
-  if (len + 1 < sizeof(g_text))
-    {
-      g_text[len] = '.';
-      g_text[len + 1] = '\0';
-    }
-}
-
-static void calc_toggle_sign(void)
-{
-  size_t len;
-
-  if (g_error || strcmp(g_text, "0") == 0)
-    {
-      return;
-    }
-
-  if (g_text[0] == '-')
-    {
-      memmove(g_text, g_text + 1, strlen(g_text));
-      return;
-    }
-
-  len = strlen(g_text);
-  if (len + 1 < sizeof(g_text))
-    {
-      memmove(g_text + 1, g_text, len + 1);
-      g_text[0] = '-';
-    }
-}
-
-static void calc_backspace(void)
-{
-  size_t len;
-
-  if (g_error || g_reset_next)
-    {
-      snprintf(g_text, sizeof(g_text), "0");
-      g_reset_next = false;
-      g_error = false;
-      return;
-    }
-
-  len = strlen(g_text);
-  if (len <= 1)
-    {
-      snprintf(g_text, sizeof(g_text), "0");
-      return;
-    }
-
-  g_text[len - 1] = '\0';
-  if (strcmp(g_text, "-") == 0)
-    {
-      snprintf(g_text, sizeof(g_text), "0");
-    }
-}
-
-static void calc_set_operator(char op)
-{
-  if (g_error)
-    {
-      return;
-    }
-
-  if (g_has_lhs && !g_reset_next)
-    {
-      if (!calc_compute(calc_current_value()))
-        {
-          return;
-        }
-    }
-
-  g_lhs = calc_current_value();
-  calc_format_value(g_lhs, g_lhs_text, sizeof(g_lhs_text));
-  g_op = op;
-  g_has_lhs = true;
-  g_reset_next = true;
-}
-
-static void calc_equals(void)
-{
-  if (!g_has_lhs || g_error)
-    {
-      return;
-    }
-
-  if (calc_compute(calc_current_value()))
-    {
-      g_lhs_text[0] = '\0';
-      g_has_lhs = false;
-      g_reset_next = true;
-    }
-}
-
-void smart_band_calculator_app_update(const smart_band_app_host_t *host)
-{
-  char expression[32];
+  calculator_context_t *ctx = context;
 
   (void)host;
-  if (g_display != NULL)
+  if (ctx == NULL)
     {
-      lv_label_set_text(g_display, g_text);
-      lv_obj_invalidate(g_display);
+      return;
     }
 
-  if (g_expression != NULL)
+  if (ctx->view.display != NULL)
     {
-      if (g_has_lhs)
-        {
-          snprintf(expression, sizeof(expression), "%s %c", g_lhs_text, g_op);
-          lv_label_set_text(g_expression, expression);
-        }
-      else
-        {
-          lv_label_set_text(g_expression, "");
-        }
-
-      lv_obj_invalidate(g_expression);
+      lv_label_set_text(ctx->view.display,
+                        calculator_model_display(&ctx->model));
+      lv_obj_invalidate(ctx->view.display);
     }
 
-  if (g_display_box != NULL)
+  if (ctx->view.expression != NULL)
     {
-      lv_obj_invalidate(g_display_box);
-      lv_obj_move_foreground(g_display_box);
+      lv_label_set_text(ctx->view.expression,
+                        calculator_model_expression(&ctx->model));
+      lv_obj_invalidate(ctx->view.expression);
     }
 
-  if (g_expression != NULL)
+  if (ctx->view.display_box != NULL)
     {
-      lv_obj_move_foreground(g_expression);
+      lv_obj_invalidate(ctx->view.display_box);
+      lv_obj_move_foreground(ctx->view.display_box);
     }
 
-  if (g_display != NULL)
+  if (ctx->view.expression != NULL)
     {
-      lv_obj_move_foreground(g_display);
+      lv_obj_move_foreground(ctx->view.expression);
+    }
+
+  if (ctx->view.display != NULL)
+    {
+      lv_obj_move_foreground(ctx->view.display);
     }
 
   lv_refr_now(NULL);
 }
 
-static void calc_press(char key)
+static void calc_press(calculator_context_t *ctx, char key)
 {
   printf("smart_band: calculator key %c\n", key);
-
-  if (key >= '0' && key <= '9')
-    {
-      calc_append_digit(key);
-    }
-  else if (key == '.')
-    {
-      calc_decimal();
-    }
-  else if (key == '+' || key == '-' || key == '*' || key == '/')
-    {
-      calc_set_operator(key);
-    }
-  else if (key == '=')
-    {
-      calc_equals();
-    }
-  else if (key == 'B')
-    {
-      calc_backspace();
-    }
-  else if (key == 'S')
-    {
-      calc_toggle_sign();
-    }
-  else
-    {
-      calc_clear();
-    }
-
-  smart_band_calculator_app_update(NULL);
+  (void)calculator_model_press(&ctx->model, key);
+  calculator_render(ctx, NULL);
 }
 
 static void calc_key_cb(lv_event_t *event)
 {
-  uintptr_t code = (uintptr_t)lv_event_get_user_data(event);
+  smart_band_app_event_binding_t *binding = lv_event_get_user_data(event);
 
-  if (lv_event_get_code(event) == LV_EVENT_CLICKED)
+  if (lv_event_get_code(event) == LV_EVENT_CLICKED && binding != NULL &&
+      binding->context != NULL)
     {
-      calc_press((char)code);
+      calc_press(binding->context, (char)binding->action);
     }
 }
 
 static lv_obj_t *calc_make_key(lv_obj_t *parent,
                                const smart_band_app_host_t *host,
                                const calc_key_t *key,
+                               smart_band_app_event_binding_t *binding,
                                lv_coord_t x, lv_coord_t y,
                                lv_coord_t w, lv_coord_t h)
 {
   lv_obj_t *button = lv_btn_create(parent);
   lv_obj_t *label;
 
-  if (button == NULL || key == NULL)
+  if (button == NULL || key == NULL || binding == NULL)
     {
       return NULL;
     }
@@ -415,7 +180,7 @@ static lv_obj_t *calc_make_key(lv_obj_t *parent,
   lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0);
   lv_obj_set_style_shadow_offset_y(button, 2, 0);
   lv_obj_add_event_cb(button, calc_key_cb, LV_EVENT_CLICKED,
-                      (void *)(uintptr_t)key->code);
+                      binding);
 
   label = lv_label_create(button);
   if (label == NULL)
@@ -433,35 +198,28 @@ static lv_obj_t *calc_make_key(lv_obj_t *parent,
   lv_obj_set_pos(label, 2, (h - host->sy(20)) / 2);
   lv_obj_set_size(label, w - 4, host->sy(22));
   lv_obj_add_event_cb(label, calc_key_cb, LV_EVENT_CLICKED,
-                      (void *)(uintptr_t)key->code);
+                      binding);
   return button;
 }
 
-int smart_band_calculator_app_build(lv_obj_t *parent,
-                                    const smart_band_app_host_t *host)
+static void calculator_unmount(void *context)
 {
-  static const calc_key_t keys[] =
-  {
-    { "C",   'C', 0xee8582, 0, 0, 1, 1 },
-    { "DEL", 'B', 0x8298cb, 1, 0, 1, 1 },
-    { "/",   '/', 0x72c4bc, 2, 0, 1, 1 },
-    { "*",   '*', 0x72c4bc, 3, 0, 1, 1 },
-    { "7",   '7', 0x667f89, 0, 1, 1, 1 },
-    { "8",   '8', 0x667f89, 1, 1, 1, 1 },
-    { "9",   '9', 0x667f89, 2, 1, 1, 1 },
-    { "-",   '-', 0x72c4bc, 3, 1, 1, 1 },
-    { "4",   '4', 0x667f89, 0, 2, 1, 1 },
-    { "5",   '5', 0x667f89, 1, 2, 1, 1 },
-    { "6",   '6', 0x667f89, 2, 2, 1, 1 },
-    { "+",   '+', 0x72c4bc, 3, 2, 1, 1 },
-    { "1",   '1', 0x667f89, 0, 3, 1, 1 },
-    { "2",   '2', 0x667f89, 1, 3, 1, 1 },
-    { "3",   '3', 0x667f89, 2, 3, 1, 1 },
-    { "=",   '=', 0xf0bc62, 3, 3, 1, 2 },
-    { "+/-", 'S', 0x667f89, 0, 4, 1, 1 },
-    { "0",   '0', 0x667f89, 1, 4, 1, 1 },
-    { ".",   '.', 0x667f89, 2, 4, 1, 1 }
-  };
+  calculator_context_t *ctx = context;
+
+  if (ctx == NULL)
+    {
+      return;
+    }
+
+  ctx->view.display = NULL;
+  ctx->view.expression = NULL;
+  ctx->view.display_box = NULL;
+}
+
+static int calculator_mount(void *context, lv_obj_t *parent,
+                            const smart_band_app_host_t *host)
+{
+  calculator_context_t *ctx = context;
   lv_coord_t page_h = calc_content_height(parent, host);
   lv_coord_t margin = calc_max_coord(host->sx(10), 8);
   lv_coord_t gap_x = calc_max_coord(host->sx(6), 5);
@@ -487,10 +245,13 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
       key_h = 28;
     }
 
-  calc_clear();
-  g_display = NULL;
-  g_expression = NULL;
-  g_display_box = NULL;
+  if (ctx == NULL)
+    {
+      return -1;
+    }
+
+  calculator_unmount(ctx);
+  calculator_model_init(&ctx->model);
 
   display_box = host->create_box(parent, margin, 0,
                                  host->screen_w - margin * 2, display_h,
@@ -502,53 +263,83 @@ int smart_band_calculator_app_build(lv_obj_t *parent,
 
   lv_obj_set_style_border_width(display_box, 1, 0);
   lv_obj_set_style_border_color(display_box, lv_color_hex(0xe1edf1), 0);
-  g_display_box = display_box;
+  ctx->view.display_box = display_box;
 
-  g_expression = lv_label_create(parent);
-  g_display = lv_label_create(parent);
-  if (g_expression == NULL || g_display == NULL)
+  ctx->view.expression = lv_label_create(parent);
+  ctx->view.display = lv_label_create(parent);
+  if (ctx->view.expression == NULL || ctx->view.display == NULL)
     {
       return -1;
     }
 
-  lv_obj_remove_style_all(g_expression);
-  lv_obj_remove_style_all(g_display);
-  lv_obj_clear_flag(g_expression, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(g_display, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(g_expression, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_display, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_remove_style_all(ctx->view.expression);
+  lv_obj_remove_style_all(ctx->view.display);
+  lv_obj_clear_flag(ctx->view.expression, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(ctx->view.display, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(ctx->view.expression, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(ctx->view.display, LV_OBJ_FLAG_SCROLLABLE);
 
-  lv_label_set_text(g_expression, "");
-  lv_label_set_text(g_display, g_text);
-  lv_label_set_long_mode(g_expression, LV_LABEL_LONG_CLIP);
-  lv_label_set_long_mode(g_display, LV_LABEL_LONG_CLIP);
-  lv_obj_set_style_text_font(g_expression, host->font_12(), 0);
-  lv_obj_set_style_text_font(g_display, host->font_20(), 0);
-  lv_obj_set_style_text_color(g_expression, lv_color_hex(0x6f8790), 0);
-  lv_obj_set_style_text_color(g_display, lv_color_hex(0x102a3a), 0);
-  lv_obj_set_style_text_align(g_expression, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_align(g_display, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_pos(g_expression, margin + host->sx(8), 3);
-  lv_obj_set_size(g_expression, host->screen_w - margin * 2 - host->sx(16),
+  lv_label_set_text(ctx->view.expression, "");
+  lv_label_set_text(ctx->view.display,
+                    calculator_model_display(&ctx->model));
+  lv_label_set_long_mode(ctx->view.expression, LV_LABEL_LONG_CLIP);
+  lv_label_set_long_mode(ctx->view.display, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(ctx->view.expression, host->font_12(), 0);
+  lv_obj_set_style_text_font(ctx->view.display, host->font_20(), 0);
+  lv_obj_set_style_text_color(ctx->view.expression, lv_color_hex(0x6f8790), 0);
+  lv_obj_set_style_text_color(ctx->view.display, lv_color_hex(0x102a3a), 0);
+  lv_obj_set_style_text_align(ctx->view.expression, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(ctx->view.display, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(ctx->view.expression, margin + host->sx(8), 3);
+  lv_obj_set_size(ctx->view.expression,
+                  host->screen_w - margin * 2 - host->sx(16),
                   calc_min_coord(host->sy(17), display_h / 3));
-  lv_obj_set_pos(g_display, margin + host->sx(8), display_h / 3);
-  lv_obj_set_size(g_display, host->screen_w - margin * 2 - host->sx(16),
+  lv_obj_set_pos(ctx->view.display, margin + host->sx(8), display_h / 3);
+  lv_obj_set_size(ctx->view.display,
+                  host->screen_w - margin * 2 - host->sx(16),
                   display_h - display_h / 3 - 3);
 
-  for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
+  for (size_t i = 0; i < CALC_KEY_COUNT; i++)
     {
-      const calc_key_t *key = &keys[i];
+      const calc_key_t *key = &g_keys[i];
       lv_coord_t x = margin + key->col * (key_w + gap_x);
       lv_coord_t y = grid_y + key->row * (key_h + gap_y);
       lv_coord_t w = key_w * key->col_span + gap_x * (key->col_span - 1);
       lv_coord_t h = key_h * key->row_span + gap_y * (key->row_span - 1);
 
-      if (calc_make_key(parent, host, key, x, y, w, h) == NULL)
+      ctx->key_bindings[i].context = ctx;
+      ctx->key_bindings[i].action = (uintptr_t)key->code;
+      if (calc_make_key(parent, host, key, &ctx->key_bindings[i],
+                        x, y, w, h) == NULL)
         {
           return -1;
         }
     }
 
-  smart_band_calculator_app_update(host);
+  calculator_render(ctx, host);
   return 0;
 }
+
+static int calculator_init(void *context)
+{
+  calculator_context_t *ctx = context;
+
+  if (ctx == NULL)
+    {
+      return -1;
+    }
+
+  memset(ctx, 0, sizeof(*ctx));
+  calculator_model_init(&ctx->model);
+  return 0;
+}
+
+const smart_band_app_ops_t smart_band_calculator_app_ops =
+{
+  .context_size = sizeof(calculator_context_t),
+  .init = calculator_init,
+  .mount = calculator_mount,
+  .unmount = calculator_unmount,
+  .tick = NULL,
+  .render = calculator_render
+};

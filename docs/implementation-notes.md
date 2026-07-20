@@ -38,11 +38,16 @@ packages/demos/smart_band_basic
 核心文件职责：
 
 - `smart_band_main.c`：应用入口，初始化 LVGL、NuttX LVGL 适配和 libuv UI 循环。
-- `app_lvgl.c`：主页面、表盘、心率页、计步页、应用中心和公共 UI helper。
+- `app_lvgl.c`：根对象生命周期、页面导航、模型/传感器 timer 和应用 runtime 调度。
+- `ui/lvgl/components.c`：缩放、字体、标签、卡片、图标和格式化等通用 helper。
+- `ui/lvgl/watch_pages.c`：表盘、心率和计步页面的 view 创建与按需渲染。
 - `watch_model.c`：基础模型、时间、模拟数据、步数目标等逻辑。
 - `sensor_bridge.c`：openvela/NuttX 传感器和电池设备接入。
-- `smart_band_apps.c`：应用中心目录和小应用分发。
-- `apps/*.c`：每个小应用单独文件实现，避免所有功能堆在一个文件中。
+- `smart_band_apps.c`：单一 descriptor registry、静态 context runtime 和 owned container 生命周期。
+- `apps/*.c`：每个小应用使用显式 context，分离持久 state、LVGL view、event binding
+  和 `init/mount/unmount/tick/render` lifecycle。
+- `logic/*.c`：Calculator、2048 和 Mines 的无 LVGL 生产状态机，随机逻辑使用显式
+  seed，可由 host test 直接编译验证。
 - `icon_assets.c`：项目图标转换后的 LVGL 图片资源。
 
 构建入口：
@@ -131,14 +136,16 @@ UI 处理重点：
 | Weather | `apps/weather_app.c` | 显示温度、范围、风力、湿度等天气信息 |
 | Calculator | `apps/calculator_app.c` | 可点击计算器，支持基础四则运算 |
 | Timer | `apps/timer_app.c` | 可调倒计时，支持 `-1m`、`+1m`、开始/暂停、重置 |
-| 2048 | `apps/music_app.c` | 原音乐入口已改为 2048 游戏，核心为滑动合并逻辑 |
+| 2048 | `apps/game_2048_app.c` | 滑动合并游戏，文件、枚举和 lifecycle 均使用 2048 语义 |
 | Stopwatch | `apps/stopwatch_app.c` | 秒表计时、开始/暂停、重置 |
 | Mines | `apps/mines_app.c` | 扫雷游戏，支持难度调整 |
 | Tetris | `apps/tetris_app.c` | 小屏俄罗斯方块 |
 | Wooden Fish | `apps/wooden_fish_app.c` | 电子木鱼，包含功德统计、速度提示和归零提示 |
 
 每个应用独立文件实现，公共能力通过 `smart_band_app_host_t` 注入，例如创建按钮、
-创建文本、尺寸缩放、格式化温度等。
+创建文本、尺寸缩放、格式化温度等。registry 同时保存标题、颜色、图标、tick 策略
+和 ops，不再维护多组按 ID 分派的 switch。runtime 为每次 mount 创建自己的 owned
+container，并在失败、返回和销毁时统一回收。
 
 ## 7. 资源与图标处理
 
@@ -163,8 +170,12 @@ include/icon_assets.h
 
 - `python3 tests/test_watch_model.py` 使用 host C 编译器直接编译并执行生产
   `watch_model.c` 和无传感器分支的 `sensor_bridge.c`，验证模型与 provider 规则。
-- `python3 tests/test_time_apps.py` 直接编译生产 Timer/Stopwatch，验证后台计时、
-  卸载重挂载和 tick 回绕。
+- `python3 tests/test_time_apps.py` 直接组合生产 runtime、Timer 和 Stopwatch，验证
+  双实例隔离、后台计时、卸载重挂载和 tick 回绕。
+- `python3 tests/test_app_runtime.py` 直接编译生产 registry/runtime，验证 8 个应用
+  反复 mount/unmount、owned container、失败回滚和 tick policy。
+- `python3 tests/test_app_logic.py` 直接编译 Calculator、2048、Mines 的生产 model，
+  验证 reducer、合并规则、确定性随机数、邻居计数、连锁展开和非法输入不变性。
 - openvela 目标配置下执行 `./build.sh ... -j2` 验证编译。
 - 启动 goldfish 模拟器，在 NSH 中运行 `smart_band`。
 - 使用模拟器传感器滚动脚本验证心率、温度、湿度和电池状态进入 UI。

@@ -6,8 +6,10 @@ STACKSIZE = $(CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE)
 MODULE = $(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
 
 CSRCS = watch_model.c sensor_bridge.c app_lvgl.c icon_assets.c smart_band_apps.c
+CSRCS += logic/calculator_model.c logic/game_2048_model.c logic/mines_model.c
+CSRCS += ui/lvgl/components.c ui/lvgl/watch_pages.c
 CSRCS += apps/weather_app.c apps/calculator_app.c apps/timer_app.c
-CSRCS += apps/music_app.c apps/stopwatch_app.c
+CSRCS += apps/game_2048_app.c apps/stopwatch_app.c
 CSRCS += apps/mines_app.c apps/tetris_app.c
 CSRCS += apps/wooden_fish_app.c
 MAINSRC = smart_band_main.c
