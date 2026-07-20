@@ -1,0 +1,31 @@
+name: Host tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  production-watch-model:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Compile and run production watch model test
+        run: python tests/test_watch_model.py
+
+  shell-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell executable bits
+        run: |
+          test "$(git ls-files -s scripts/reproduce_openvela_demo.sh | awk '{print $1}')" = 100755
+          test "$(git ls-files -s scripts/roll_emulator_sensors.sh | awk '{print $1}')" = 100755
+          test "$(git ls-files -s skills/openvela-smart-band-reproduce/scripts/reproduce.sh | awk '{print $1}')" = 100755
+      - name: Validate shell syntax
+        run: bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh

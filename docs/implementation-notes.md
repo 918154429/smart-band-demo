@@ -157,7 +157,8 @@ include/icon_assets.h
 
 开发过程中使用了以下验证方式：
 
-- `python3 tests/test_watch_model.py` 验证模型规则。
+- `python3 tests/test_watch_model.py` 使用 host C 编译器直接编译并执行生产
+  `watch_model.c`，验证模型规则。
 - openvela 目标配置下执行 `./build.sh ... -j2` 验证编译。
 - 启动 goldfish 模拟器，在 NSH 中运行 `smart_band`。
 - 使用模拟器传感器滚动脚本验证心率、温度、湿度和电池状态进入 UI。

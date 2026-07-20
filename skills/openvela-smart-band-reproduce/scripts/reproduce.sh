@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -u
+set -Eeuo pipefail
 
 CONFIG_PATH="vendor/openvela/boards/vela/configs/goldfish-arm64-v8a-ap"
 OUTPUT_DIR="cmake_out/vela_goldfish-arm64-v8a-ap"
@@ -7,6 +7,8 @@ PORT="${SMART_BAND_DEMO_PORT:-8765}"
 JOBS="${SMART_BAND_BUILD_JOBS:-$(nproc 2>/dev/null || echo 2)}"
 SKIP_BUILD=0
 NO_BROWSER=0
+DRY_RUN=0
+ALLOW_DIRTY=0
 OPENVELA_ROOT=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,6 +18,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   reproduce.sh [--openvela-root PATH] [--skip-build] [--no-browser]
+               [--dry-run] [--allow-dirty]
 
 What it does:
   1. Ensures open-vela official .claude skills are present.
@@ -27,6 +30,10 @@ What it does:
 Environment:
   SMART_BAND_BUILD_JOBS    build parallelism, default nproc
   SMART_BAND_DEMO_PORT     browser demo port, default 8765
+
+Safety:
+  --dry-run       Validate prerequisites and print planned mutations only.
+  --allow-dirty   Permit overwriting dirty target paths in openvela.
 USAGE
 }
 
@@ -38,6 +45,8 @@ die() {
   printf '[smart-band-reproduce] ERROR: %s\n' "$*" >&2
   exit 1
 }
+
+trap 'status=$?; printf "[smart-band-reproduce] ERROR: command failed at line %s (exit %s)\n" "$LINENO" "$status" >&2; exit "$status"' ERR
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -52,6 +61,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-browser)
       NO_BROWSER=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1
       shift
       ;;
     -h|--help)
@@ -83,18 +100,120 @@ guess_openvela_root() {
   pwd
 }
 
-OPENVELA_ROOT="$(cd "$(guess_openvela_root)" 2>/dev/null && pwd || printf '%s\n' "$(guess_openvela_root)")"
+OPENVELA_CANDIDATE="$(guess_openvela_root)"
+if [ -d "$OPENVELA_CANDIDATE" ]; then
+  OPENVELA_ROOT="$(cd "$OPENVELA_CANDIDATE" && pwd)"
+else
+  OPENVELA_ROOT="$OPENVELA_CANDIDATE"
+fi
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+preflight() {
+  local value
+
+  for value in git rsync grep sed; do
+    require_command "$value"
+  done
+
+  case "$JOBS" in
+    ''|*[!0-9]*) die "SMART_BAND_BUILD_JOBS must be a positive integer: $JOBS" ;;
+  esac
+  [ "$JOBS" -gt 0 ] || die "SMART_BAND_BUILD_JOBS must be greater than zero"
+
+  case "$PORT" in
+    ''|*[!0-9]*) die "SMART_BAND_DEMO_PORT must be an integer: $PORT" ;;
+  esac
+  [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || \
+    die "SMART_BAND_DEMO_PORT must be between 1 and 65535"
+
+  [ -d "$DEMO_ROOT/openvela_app/smart_band" ] || \
+    die "smart band app source not found: $DEMO_ROOT/openvela_app/smart_band"
+  [ -d "$DEMO_ROOT/skills/openvela-smart-band-reproduce" ] || \
+    die "local reproduce skill not found"
+
+  if [ "$NO_BROWSER" -eq 0 ]; then
+    require_command curl
+  fi
+
+  log "preflight passed"
+}
+
+existing_parent() {
+  local path="$1"
+
+  while [ ! -e "$path" ] && [ "$path" != "/" ]; do
+    path="$(dirname "$path")"
+  done
+  printf '%s\n' "$path"
+}
+
+check_target_clean() {
+  local target="$1"
+  local probe
+  local repo_root
+  local relative
+  local dirty
+
+  probe="$(existing_parent "$target")"
+  repo_root="$(git -C "$probe" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$repo_root" ]; then
+    return 1
+  fi
+
+  case "$target" in
+    "$repo_root") relative="." ;;
+    "$repo_root"/*) relative="${target#"$repo_root"/}" ;;
+    *) return 1 ;;
+  esac
+
+  dirty="$(git -C "$repo_root" status --porcelain --untracked-files=all -- "$relative")"
+  if [ -n "$dirty" ]; then
+    printf '%s\n' "$dirty" >&2
+    die "refusing to overwrite dirty target: $target (use --allow-dirty to override)"
+  fi
+  return 0
+}
+
+protect_mutation_targets() {
+  local found_git=0
+  local target
+
+  if [ "$ALLOW_DIRTY" -eq 1 ]; then
+    log "dirty target protection disabled by --allow-dirty"
+    return 0
+  fi
+
+  for target in \
+    "$OPENVELA_ROOT/$CONFIG_PATH/defconfig" \
+    "$OPENVELA_ROOT/packages/demos/smart_band_basic" \
+    "$OPENVELA_ROOT/apps/packages/demos/smart_band_basic" \
+    "$OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce"; do
+    if check_target_clean "$target"; then
+      found_git=1
+    fi
+  done
+
+  if [ "$found_git" -eq 0 ]; then
+    log "warning: no Git worktree found for mutable targets; dirty check skipped"
+  else
+    log "mutable target paths are clean"
+  fi
+}
 
 ensure_claude_skills() {
-  mkdir -p "$OPENVELA_ROOT"
   if [ ! -d "$OPENVELA_ROOT/.claude/.git" ]; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+      log "dry-run: would clone official .claude skills into $OPENVELA_ROOT/.claude"
+      return 0
+    fi
+    mkdir -p "$OPENVELA_ROOT"
     log "cloning official open-vela .claude skills"
-    git clone https://github.com/open-vela/.claude.git "$OPENVELA_ROOT/.claude" || \
-      die "failed to clone https://github.com/open-vela/.claude.git"
+    git clone https://github.com/open-vela/.claude.git "$OPENVELA_ROOT/.claude"
   else
     log "official .claude skills already exist"
-    git -C "$OPENVELA_ROOT/.claude" pull --ff-only || \
-      log "warning: .claude update failed; continuing with existing copy"
   fi
 }
 
@@ -102,14 +221,18 @@ install_local_skill() {
   local src="$DEMO_ROOT/skills/openvela-smart-band-reproduce/"
   local dst="$OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce/"
 
-  [ -d "$src" ] || die "local reproduce skill not found: $src"
-
-  if [ "$(cd "$src" && pwd)" = "$(mkdir -p "$dst" && cd "$dst" && pwd)" ]; then
+  if [ -d "$dst" ] && [ "$(cd "$src" && pwd)" = "$(cd "$dst" && pwd)" ]; then
     log "local reproduce skill is already installed in .claude"
     return 0
   fi
 
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would mirror local reproduce skill to $dst"
+    return 0
+  fi
+
   log "installing smart-band reproduce skill into .claude/skills"
+  mkdir -p "$dst"
   rsync -a --delete "$src" "$dst"
 }
 
@@ -139,7 +262,13 @@ sync_demo_app() {
   local dst="$OPENVELA_ROOT/packages/demos/smart_band_basic/"
   local mirror="$OPENVELA_ROOT/apps/packages/demos/smart_band_basic/"
 
-  [ -d "$src" ] || die "smart band app source not found: $src"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would mirror $src to $dst"
+    if [ -d "$OPENVELA_ROOT/apps/packages/demos" ]; then
+      log "dry-run: would mirror $src to $mirror"
+    fi
+    return 0
+  fi
 
   log "syncing smart_band app into packages/demos"
   mkdir -p "$dst"
@@ -170,6 +299,11 @@ enable_config() {
 
   [ -f "$defconfig" ] || die "defconfig not found: $defconfig"
 
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would enable smart_band options in $defconfig"
+    return 0
+  fi
+
   log "enabling smart_band config in $CONFIG_PATH/defconfig"
   append_unique_config "$defconfig" "CONFIG_GRAPHICS_LVGL" "y"
   append_unique_config "$defconfig" "CONFIG_LV_USE_NUTTX" "y"
@@ -187,6 +321,11 @@ build_openvela() {
     return 0
   fi
 
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would build openvela goldfish arm64 with $JOBS jobs"
+    return 0
+  fi
+
   cd "$OPENVELA_ROOT" || die "cannot cd to $OPENVELA_ROOT"
   log "building openvela goldfish arm64 with $JOBS jobs"
 
@@ -196,14 +335,16 @@ build_openvela() {
   fi
 
   log "cmake build failed; trying legacy build command"
-  ./build.sh "$CONFIG_PATH" -j"$JOBS" || die "openvela build failed"
+  ./build.sh "$CONFIG_PATH" -j"$JOBS"
 
   if [ -f "$OPENVELA_ROOT/nuttx/nuttx" ]; then
     log "copying legacy build outputs into $OUTPUT_DIR"
     mkdir -p "$OPENVELA_ROOT/$OUTPUT_DIR"
     cp "$OPENVELA_ROOT/nuttx/nuttx" "$OPENVELA_ROOT/$OUTPUT_DIR/nuttx"
     for f in vela_system.bin vela_data.bin vela_ap.bin nuttx.bin nuttx.hex; do
-      [ -f "$OPENVELA_ROOT/nuttx/$f" ] && cp "$OPENVELA_ROOT/nuttx/$f" "$OPENVELA_ROOT/$OUTPUT_DIR/$f"
+      if [ -f "$OPENVELA_ROOT/nuttx/$f" ]; then
+        cp "$OPENVELA_ROOT/nuttx/$f" "$OPENVELA_ROOT/$OUTPUT_DIR/$f"
+      fi
     done
   fi
 }
@@ -217,11 +358,22 @@ serve_browser_demo() {
     return 0
   fi
 
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would serve browser demo at $url"
+    return 0
+  fi
+
   if command -v python3 >/dev/null 2>&1; then
     if ! curl --noproxy 127.0.0.1 -fsS "$url" >/dev/null 2>&1; then
+      local server_pid
       log "serving browser demo at $url"
       nohup python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$DEMO_ROOT" > "$log_file" 2>&1 &
+      server_pid=$!
       sleep 1
+      if ! curl --noproxy 127.0.0.1 -fsS "$url" >/dev/null 2>&1; then
+        kill "$server_pid" >/dev/null 2>&1 || true
+        die "browser demo server did not become ready; see $log_file"
+      fi
     else
       log "browser demo server already responds at $url"
     fi
@@ -253,6 +405,8 @@ EOF
 main() {
   log "demo root: $DEMO_ROOT"
   log "openvela root: $OPENVELA_ROOT"
+  preflight
+  protect_mutation_targets
   ensure_claude_skills
   install_local_skill
   require_openvela_checkout

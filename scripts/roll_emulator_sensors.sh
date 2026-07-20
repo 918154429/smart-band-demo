@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 HOST="${EMULATOR_CONSOLE_HOST:-127.0.0.1}"
 PORT="${EMULATOR_CONSOLE_PORT:-5554}"

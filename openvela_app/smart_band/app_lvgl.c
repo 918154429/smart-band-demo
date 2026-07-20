@@ -72,6 +72,7 @@ typedef struct
   lv_timer_t *timer;
   smart_band_state_t model;
   smart_band_sensor_bridge_t sensors;
+  bool sensors_initialized;
   lv_coord_t screen_w;
   lv_coord_t screen_h;
   lv_point_t press_point;
@@ -959,13 +960,16 @@ static void open_app(smart_band_app_id_t id)
     }
 
   host = make_app_host();
+  smart_band_app_unmount(g_ui.active_app);
   lv_obj_clean(g_ui.app_content);
   g_ui.active_app = id;
   set_label_text(g_ui.app_title, def->title);
 
   if (smart_band_app_build(id, g_ui.app_content, &host) != 0)
     {
+      smart_band_app_unmount(id);
       lv_obj_clean(g_ui.app_content);
+      g_ui.active_app = SMART_BAND_APP_NONE;
       set_label_text(g_ui.app_title, "App failed");
     }
 
@@ -1498,12 +1502,13 @@ static void app_back_cb(lv_event_t *event)
 {
   (void)event;
 
+  smart_band_app_unmount(g_ui.active_app);
+  g_ui.active_app = SMART_BAND_APP_NONE;
   if (g_ui.app_content != NULL)
     {
       lv_obj_clean(g_ui.app_content);
     }
 
-  g_ui.active_app = SMART_BAND_APP_NONE;
   set_label_text(g_ui.app_title, "Apps");
   set_page_visible(g_ui.app_detail, false);
   set_page_visible(g_ui.apps_launcher, true);
@@ -1633,23 +1638,53 @@ static void enable_touch_navigation_tree(lv_obj_t *obj)
 
 int smart_band_lvgl_create(lv_obj_t *parent)
 {
-  lv_obj_t *root = parent != NULL ? parent : lv_scr_act();
+  lv_obj_t *parent_root = parent != NULL ? parent : lv_scr_act();
+  lv_obj_t *owned_root;
+  lv_coord_t root_w;
+  lv_coord_t root_h;
 
-  if (root == NULL)
+  if (parent_root == NULL)
     {
       return -1;
     }
 
+  if (g_ui.root != NULL || g_ui.timer != NULL || g_ui.sensors_initialized)
+    {
+      smart_band_lvgl_destroy();
+    }
+
   memset(&g_ui, 0, sizeof(g_ui));
-  g_ui.root = root;
+  lv_obj_update_layout(parent_root);
+  root_w = lv_obj_get_width(parent_root);
+  root_h = lv_obj_get_height(parent_root);
+  if (root_w <= 0 || root_h <= 0)
+    {
+      return -1;
+    }
+
+  owned_root = lv_obj_create(parent_root);
+  if (owned_root == NULL)
+    {
+      return -1;
+    }
+
+  strip_obj(owned_root);
+  lv_obj_set_pos(owned_root, 0, 0);
+  lv_obj_set_size(owned_root, root_w, root_h);
+
+  g_ui.root = owned_root;
   g_ui.active_app = SMART_BAND_APP_NONE;
   configure_local_time();
   smart_band_state_init(&g_ui.model, time(NULL));
   smart_band_sensor_bridge_init(&g_ui.sensors);
+  g_ui.sensors_initialized = true;
 
-  if (create_ui_tree(root) != 0)
+  if (create_ui_tree(owned_root) != 0)
     {
       smart_band_sensor_bridge_deinit(&g_ui.sensors);
+      g_ui.sensors_initialized = false;
+      lv_obj_del(owned_root);
+      g_ui.root = NULL;
       return -1;
     }
 
@@ -1657,6 +1692,9 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   if (g_ui.timer == NULL)
     {
       smart_band_sensor_bridge_deinit(&g_ui.sensors);
+      g_ui.sensors_initialized = false;
+      lv_obj_del(owned_root);
+      g_ui.root = NULL;
       return -1;
     }
 
@@ -1673,11 +1711,24 @@ void smart_band_lvgl_destroy(void)
       g_ui.timer = NULL;
     }
 
-  smart_band_sensor_bridge_deinit(&g_ui.sensors);
+  if (g_ui.sensors_initialized)
+    {
+      smart_band_sensor_bridge_deinit(&g_ui.sensors);
+      g_ui.sensors_initialized = false;
+    }
 
   if (g_ui.root != NULL)
     {
-      lv_obj_clean(g_ui.root);
+      smart_band_app_unmount(g_ui.active_app);
+      if (lv_obj_is_valid(g_ui.root))
+        {
+          lv_obj_del(g_ui.root);
+        }
+
       g_ui.root = NULL;
     }
+
+  g_ui.watch = NULL;
+  g_ui.screen = NULL;
+  g_ui.active_app = SMART_BAND_APP_NONE;
 }

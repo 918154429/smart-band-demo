@@ -111,6 +111,17 @@ $OPENVELA_ROOT/.claude/skills/openvela-smart-band-reproduce
 
 因此后续在 openvela 根目录中，也可以直接使用该 skill 继续复现或排查。
 
+脚本默认拒绝覆盖 openvela 中已经变脏的目标配置或应用目录。正式执行前可先做
+无写入检查：
+
+```sh
+bash scripts/reproduce_openvela_demo.sh \
+  --openvela-root "$OPENVELA_ROOT" --dry-run --no-browser
+```
+
+如果已经审阅并确认目标目录中的本地改动可以被覆盖，必须显式增加
+`--allow-dirty`。任一同步、配置或构建步骤失败时脚本都会以非零状态退出。
+
 1. 复制应用到 openvela packages demos 目录：
 
 ```sh
@@ -237,13 +248,16 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含一个不依赖 openvela 的 Python 基础测试，用于验证模型规则：
+本仓库包含一个不依赖 openvela 的 host C 测试。Python 入口会寻找
+GCC、Clang 或 MSVC，直接编译生产文件 `openvela_app/smart_band/watch_model.c`，
+再执行测试二进制：
 
 ```sh
 python3 tests/test_watch_model.py
 ```
 
-该测试覆盖时间格式、页面切换、模拟数据范围和步数目标调整。
+该测试覆盖时间格式、页面切换、模拟数据范围和步数目标调整；测试不再维护一份
+与生产代码分离的 Python 模型副本。也可以通过 `CC` 环境变量指定编译器。
 
 ## 基本异常处理说明
 
