@@ -12,6 +12,7 @@ out/
 docs/*.mp4
 docs/*.mov
 docs/*.webm
+demo/browser-demo.log
 
 # Python
 __pycache__/

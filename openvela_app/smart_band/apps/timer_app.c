@@ -9,6 +9,13 @@ static lv_obj_t *g_start_button;
 static int g_seconds = 5 * 60;
 static bool g_running;
 
+void smart_band_timer_app_unmount(void)
+{
+  g_display = NULL;
+  g_status = NULL;
+  g_start_button = NULL;
+}
+
 static void format_timer(char *buffer, size_t size)
 {
   if (g_seconds < 0)
@@ -135,9 +142,7 @@ int smart_band_timer_app_build(lv_obj_t *parent,
 {
   lv_obj_t *panel;
 
-  g_display = NULL;
-  g_status = NULL;
-  g_start_button = NULL;
+  smart_band_timer_app_unmount();
 
   panel = host->create_box(parent, host->sx(22), host->sy(14),
                            host->screen_w - host->sx(44), host->sy(180),

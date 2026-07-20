@@ -1,108 +1,125 @@
-import datetime as dt
-import unittest
+"""Compile and execute the production watch model host test."""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
 
-PAGE_FACE = 0
-PAGE_HEART = 1
-PAGE_STEPS = 2
-PAGE_APPS = 3
-PAGE_COUNT = 4
-STEP_GOAL = 8000
-STEP_GOAL_MIN = 1000
-STEP_GOAL_MAX = 50000
-STEP_GOAL_DELTA = 1000
+ROOT = Path(__file__).resolve().parents[1]
+MODEL_SOURCE = ROOT / "openvela_app" / "smart_band" / "watch_model.c"
+INCLUDE_DIR = ROOT / "openvela_app" / "smart_band" / "include"
+TEST_SOURCE = Path(__file__).with_name("watch_model_test.c")
 
 
-class SmartBandState:
-    def __init__(self, now):
-        self.page = PAGE_FACE
-        self.ticks = 0
-        self.heart_rate = 72
-        self.steps = 1260
-        self.step_goal = STEP_GOAL
-        self.battery = 96
-        self.temperature_c = 24
-        self.humidity_percent = 60
-        self.update_time(now)
+def find_visual_studio_environment() -> Path | None:
+    if os.name != "nt":
+        return None
 
-    def update_time(self, now):
-        self.time_text = f"{now.hour:02d}:{now.minute:02d}"
-        self.date_text = f"{now.year:04d}/{now.month:02d}/{now.day:02d}"
+    program_files = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    vswhere = Path(program_files) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+    if not vswhere.is_file():
+        return None
 
-    def tick(self, now):
-        self.ticks += 1
-        self.update_time(now)
-        pulse_wave = (self.ticks * 7 + 11) % 23
-        motion_wave = (self.ticks * 5 + 3) % 9
-        self.heart_rate = max(55, min(135, 66 + pulse_wave + motion_wave // 3))
-        self.steps += 4 + self.ticks % 6
-        self.temperature_c = max(-40, min(80, 24 + self.ticks % 3 - 1))
-        self.humidity_percent = max(0, min(100, 56 + self.ticks % 8))
-        if self.steps > 99999:
-            self.steps %= self.step_goal
-        self.battery = max(5, min(100, 96 - self.ticks // 180))
+    result = subprocess.run(
+        [
+            str(vswhere),
+            "-latest",
+            "-products",
+            "*",
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-property",
+            "installationPath",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    installation = result.stdout.strip()
+    if not installation:
+        return None
 
-    def next_page(self):
-        self.page = (self.page + 1) % PAGE_COUNT
-
-    def prev_page(self):
-        self.page = (self.page + PAGE_COUNT - 1) % PAGE_COUNT
-
-    def step_progress(self):
-        if self.steps <= 0:
-            return 0
-        return max(0, min(100, (self.steps * 100) // self.step_goal))
-
-    def adjust_step_goal(self, delta):
-        self.step_goal = max(STEP_GOAL_MIN, min(STEP_GOAL_MAX,
-                                                self.step_goal + delta))
+    environment = Path(installation) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat"
+    return environment if environment.is_file() else None
 
 
-class WatchModelTest(unittest.TestCase):
-    def test_formats_time_and_date(self):
-        state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
-        self.assertEqual(state.time_text, "09:05")
-        self.assertEqual(state.date_text, "2026/07/06")
+def find_compiler() -> tuple[str, str, Path | None]:
+    requested = os.environ.get("CC")
+    candidates = [requested] if requested else []
+    candidates.extend(["cc", "gcc", "clang", "cl"])
 
-    def test_page_wraps_in_both_directions(self):
-        state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
-        state.prev_page()
-        self.assertEqual(state.page, PAGE_APPS)
-        state.next_page()
-        self.assertEqual(state.page, PAGE_FACE)
-        state.next_page()
-        self.assertEqual(state.page, PAGE_HEART)
+    for candidate in candidates:
+        if candidate and shutil.which(candidate):
+            name = Path(candidate).name.lower()
+            family = "msvc" if name in {"cl", "cl.exe"} else "unix"
+            return candidate, family, None
 
-    def test_simulated_data_stays_readable(self):
-        state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
-        for second in range(1, 600):
-            state.tick(dt.datetime(2026, 7, 6, 9, 5) + dt.timedelta(seconds=second))
-            self.assertGreaterEqual(state.heart_rate, 55)
-            self.assertLessEqual(state.heart_rate, 135)
-            self.assertGreaterEqual(state.battery, 5)
-            self.assertLessEqual(state.battery, 100)
-            self.assertGreaterEqual(state.temperature_c, -40)
-            self.assertLessEqual(state.temperature_c, 80)
-            self.assertGreaterEqual(state.humidity_percent, 0)
-            self.assertLessEqual(state.humidity_percent, 100)
-        self.assertGreater(state.steps, 1260)
-        self.assertGreaterEqual(state.step_progress(), 0)
-        self.assertLessEqual(state.step_progress(), 100)
+    visual_studio_environment = find_visual_studio_environment()
+    if visual_studio_environment is not None:
+        return "cl", "msvc", visual_studio_environment
 
-    def test_step_goal_adjusts_progress(self):
-        state = SmartBandState(dt.datetime(2026, 7, 6, 9, 5))
-        state.steps = 4000
-        self.assertEqual(state.step_progress(), 50)
-        state.adjust_step_goal(STEP_GOAL_DELTA)
-        self.assertEqual(state.step_goal, 9000)
-        self.assertEqual(state.step_progress(), 44)
-        for _ in range(20):
-            state.adjust_step_goal(-STEP_GOAL_DELTA)
-        self.assertEqual(state.step_goal, STEP_GOAL_MIN)
-        for _ in range(100):
-            state.adjust_step_goal(STEP_GOAL_DELTA)
-        self.assertEqual(state.step_goal, STEP_GOAL_MAX)
+    raise RuntimeError(
+        "no C compiler found; install GCC/Clang/MSVC or set CC to its executable"
+    )
+
+
+def compile_and_run() -> None:
+    compiler, family, compiler_environment = find_compiler()
+
+    with tempfile.TemporaryDirectory(prefix="smart-band-watch-model-") as temp:
+        output = Path(temp) / ("watch_model_test.exe" if os.name == "nt" else "watch_model_test")
+        if family == "msvc":
+            command = [
+                compiler,
+                "/nologo",
+                "/std:c11",
+                "/W4",
+                "/WX",
+                "/D_CRT_SECURE_NO_WARNINGS",
+                f"/I{INCLUDE_DIR}",
+                str(TEST_SOURCE),
+                str(MODEL_SOURCE),
+                f"/Fo{temp}{os.sep}",
+                f"/Fe:{output}",
+            ]
+        else:
+            command = [
+                compiler,
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-pedantic",
+                f"-I{INCLUDE_DIR}",
+                str(TEST_SOURCE),
+                str(MODEL_SOURCE),
+                "-o",
+                str(output),
+            ]
+
+        print("compiling production watch_model.c:", " ".join(command))
+        if compiler_environment is None:
+            subprocess.run(command, cwd=ROOT, check=True)
+        else:
+            batch = Path(temp) / "compile_watch_model_test.bat"
+            batch.write_text(
+                "@echo off\r\n"
+                f'call "{compiler_environment}" >nul || exit /b 1\r\n'
+                f"{subprocess.list2cmdline(command)}\r\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["cmd.exe", "/d", "/c", str(batch)], cwd=ROOT, check=True)
+        subprocess.run([str(output)], cwd=ROOT, check=True)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    try:
+        compile_and_run()
+    except (RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"watch model host test failed: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

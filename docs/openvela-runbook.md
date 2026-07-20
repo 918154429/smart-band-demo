@@ -87,9 +87,18 @@ git -C .claude pull --ff-only
 bash scripts/reproduce_openvela_demo.sh --openvela-root /path/to/openvela
 ```
 
+首次写入前建议先运行无写入预检；脚本也会拒绝覆盖目标路径中的未提交改动：
+
+```sh
+bash scripts/reproduce_openvela_demo.sh \
+  --openvela-root /path/to/openvela --dry-run --no-browser
+```
+
+只有在确认目标改动可以被覆盖后才使用 `--allow-dirty`。
+
 该脚本会自动：
 
-- 确认或更新 `/path/to/openvela/.claude`。
+- 确认 `/path/to/openvela/.claude`，缺失时首次克隆。
 - 同步 `openvela_app/smart_band` 到 `packages/demos/smart_band_basic`。
 - 同步到 `apps/packages/demos/smart_band_basic` 镜像目录，如果该目录存在。
 - 在 goldfish arm64 `defconfig` 中启用智能手环 demo 配置。

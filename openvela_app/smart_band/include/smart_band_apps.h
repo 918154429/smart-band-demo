@@ -73,6 +73,7 @@ const smart_band_app_def_t *smart_band_apps_catalog(void);
 const smart_band_app_def_t *smart_band_app_find(smart_band_app_id_t id);
 int smart_band_app_build(smart_band_app_id_t id, lv_obj_t *parent,
                          const smart_band_app_host_t *host);
+void smart_band_app_unmount(smart_band_app_id_t id);
 void smart_band_app_update(smart_band_app_id_t id,
                            const smart_band_app_host_t *host);
 void smart_band_apps_tick(smart_band_app_id_t active_id,

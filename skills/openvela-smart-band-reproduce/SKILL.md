@@ -49,12 +49,23 @@ bash "$SMART_BAND_DEMO_ROOT/skills/openvela-smart-band-reproduce/scripts/reprodu
 ```
 
 The script will:
-   - clone or update `$OPENVELA_ROOT/.claude`;
+   - clone `$OPENVELA_ROOT/.claude` when it is absent;
    - copy `openvela_app/smart_band` into `packages/demos/smart_band_basic`;
    - copy it into `apps/packages/demos/smart_band_basic` when that mirror exists;
    - enable `CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC` in the goldfish defconfig;
    - build goldfish arm64, trying CMake first and legacy build as fallback;
    - serve and open `demo/index.html` so the final browser demo is visible.
+
+Before mutating an existing checkout, first run a read-only preflight:
+
+```bash
+bash "$SMART_BAND_DEMO_ROOT/scripts/reproduce_openvela_demo.sh" \
+  --openvela-root "$OPENVELA_ROOT" --dry-run --no-browser
+```
+
+The script refuses to overwrite dirty target paths by default. Use
+`--allow-dirty` only after the user has explicitly confirmed those changes may
+be replaced.
 
 5. For simulator verification after build, use:
 
@@ -79,6 +90,9 @@ Run these checks before reporting success:
 git -C "$SMART_BAND_DEMO_ROOT" status --short
 python3 "$SMART_BAND_DEMO_ROOT/tests/test_watch_model.py"
 ```
+
+The Python entry compiles and runs the production `watch_model.c`; it is not a
+separate model implementation.
 
 Confirm the browser demo URL printed by the script returns HTTP 200, usually:
 

@@ -8,6 +8,12 @@ static lv_obj_t *g_status;
 static int g_seconds;
 static bool g_running;
 
+void smart_band_stopwatch_app_unmount(void)
+{
+  g_display = NULL;
+  g_status = NULL;
+}
+
 static void format_stopwatch(char *buffer, size_t size)
 {
   snprintf(buffer, size, "%02d:%02d", g_seconds / 60, g_seconds % 60);
@@ -63,8 +69,7 @@ int smart_band_stopwatch_app_build(lv_obj_t *parent,
 {
   lv_obj_t *panel;
 
-  g_display = NULL;
-  g_status = NULL;
+  smart_band_stopwatch_app_unmount();
 
   panel = host->create_box(parent, host->sx(22), host->sy(18),
                            host->screen_w - host->sx(44), host->sy(174),
