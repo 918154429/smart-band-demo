@@ -52,6 +52,21 @@ class EmulatorSmokeHelpersTest(unittest.TestCase):
                 "goldfish-armv8a-ap> ",
             )
 
+    def test_runtime_inputs_require_goldfish_partition_images(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            emulator_script = base / "emulator.sh"
+            output = base / "output"
+            output.mkdir()
+            emulator_script.write_text("#!/bin/sh\n", encoding="utf-8")
+            for name in (".config", "nuttx", "vela_system.bin"):
+                output.joinpath(name).write_bytes(b"test")
+
+            with self.assertRaisesRegex(
+                EMULATOR_SMOKE.SmokeFailure, "vela_data.bin"
+            ):
+                EMULATOR_SMOKE.validate_runtime_inputs(emulator_script, output)
+
 
 @unittest.skipUnless(
     os.name == "posix" and hasattr(os, "openpty"),
@@ -64,18 +79,29 @@ class EmulatorSmokeHarnessTest(unittest.TestCase):
             openvela = base / "openvela"
             output = openvela / "cmake_out/vela_goldfish-arm64-v8a-ap"
             emulator_root = openvela / "prebuilts/emulator/linux-x86_64"
+            renderer_root = emulator_root / "lib64"
             qemu_root = emulator_root / "qemu/linux-x86_64"
             skin_root = openvela / "prebuilts/emulator/skins"
             evidence = base / "evidence"
             home = base / "home"
-            for path in (output, qemu_root, skin_root, evidence, home):
+            for path in (
+                output,
+                renderer_root,
+                qemu_root,
+                skin_root,
+                evidence,
+                home,
+            ):
                 path.mkdir(parents=True, exist_ok=True)
 
             output.joinpath(".config").write_text(
                 'CONFIG_NSH_PROMPT_STRING="goldfish-armv8a-ap> "\n',
                 encoding="utf-8",
             )
+            for name in ("nuttx", "vela_system.bin", "vela_data.bin"):
+                output.joinpath(name).write_bytes(b"fake runtime input")
             shutil.copy2("/bin/true", emulator_root / "emulator")
+            shutil.copy2("/bin/true", renderer_root / "libOpenglRender.so")
             shutil.copy2(
                 "/bin/true", qemu_root / "qemu-system-aarch64-headless"
             )
@@ -203,6 +229,7 @@ class EmulatorSmokeHarnessTest(unittest.TestCase):
             )
             self.assertTrue(evidence.joinpath("emulator-console-ping.txt").is_file())
             self.assertTrue(evidence.joinpath("emulator-cleanup.txt").is_file())
+            self.assertTrue(evidence.joinpath("opengl-renderer-ldd.txt").is_file())
 
 
 if __name__ == "__main__":

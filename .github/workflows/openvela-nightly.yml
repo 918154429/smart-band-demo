@@ -345,6 +345,15 @@ jobs:
           file "$image" | tee "$EVIDENCE_DIR/nuttx-file.txt"
           cp "$image" "$EVIDENCE_DIR/nuttx"
           cp "$config" "$EVIDENCE_DIR/nuttx.config"
+          runtime_dir="$OPENVELA_ROOT/cmake_out/vela_goldfish-arm64-v8a-ap"
+          for runtime_image in vela_system.bin vela_data.bin; do
+            test -s "$runtime_dir/$runtime_image"
+            cp "$runtime_dir/$runtime_image" "$EVIDENCE_DIR/$runtime_image"
+          done
+          (
+            cd "$runtime_dir"
+            sha256sum vela_system.bin vela_data.bin
+          ) | tee "$EVIDENCE_DIR/runtime-images.sha256"
           find "$OPENVELA_ROOT/cmake_out" "$OPENVELA_ROOT/nuttx" \
             -iname '*smart_band*' -print 2>/dev/null \
             > "$EVIDENCE_DIR/smart-band-build-paths.txt"
