@@ -8,7 +8,8 @@ SDK、NuttX、LVGL、模拟器和工具链请按各自官方文档准备。
 
 仓库的 `.github/workflows/openvela-nightly.yml` 每天定时运行，也支持从 GitHub
 Actions 页面手动触发。它不是只检查脚本语法，而是同步固定的 openvela release、
-执行 goldfish arm64 真实构建，并验证最终 NuttX ELF 中包含 `smart_band`。
+执行 goldfish arm64 真实构建、验证最终 NuttX ELF 中包含 `smart_band`，随后启动
+固定版本的 headless emulator 并运行 native 应用 smoke。
 
 openvela manifest 提交、manifest 文件、官方 `.claude` URL 和提交的唯一版本清单是
 `skills/openvela-smart-band-reproduce/versions.env`。Nightly 和本地复现脚本都读取该
@@ -27,11 +28,13 @@ GitHub hosted runner 是一次性的。workflow 有意不缓存 `.repo`、源码
 
 - resolved SHA manifest 与 manifest/.claude 实际提交；
 - repo sync、openvela build 完整日志；
+- emulator/tools 固定提交、二进制 SHA-256、PTY/console runtime transcript；
 - runner 磁盘状态、repo dirty status、最终 `.config`；
 - 成功时的 NuttX ELF、文件类型与 SHA-256。
 
 超时、sync 失败、构建失败、配置未启用、找不到 NuttX ELF，或无法在 ELF 中确认
-`smart_band`，都会让 job 失败，不会用占位步骤报告成功。
+`smart_band`，以及无法启动 emulator、到达 NSH、创建 UI 或保持应用进程存活，
+都会让 job 失败，不会用占位步骤报告成功。
 
 ## 1. 工程边界
 
@@ -235,6 +238,7 @@ Generating: vela_ap.bin
 ```sh
 mkdir -p cmake_out/vela_goldfish-arm64-v8a-ap
 cp nuttx/nuttx cmake_out/vela_goldfish-arm64-v8a-ap/nuttx
+cp nuttx/.config cmake_out/vela_goldfish-arm64-v8a-ap/.config
 for f in vela_system.bin vela_data.bin vela_ap.bin nuttx.bin nuttx.hex; do
   [ -f "nuttx/$f" ] && cp "nuttx/$f" "cmake_out/vela_goldfish-arm64-v8a-ap/$f"
 done
@@ -264,13 +268,32 @@ goldfish-armv8a-ap>
 smart_band
 ```
 
-启动成功后控制台可能输出：
+启动成功后控制台会先输出：
+
+```text
+smart_band: UI ready
+```
+
+传感器就绪后还可能输出：
 
 ```text
 smart_band: temperature sensor 29C
 ```
 
 这是温度传感器读数日志，不是错误。
+
+CI 或无图形 Linux 环境可自动执行同一条 native 路径：
+
+```sh
+python3 "$DEMO_ROOT/scripts/smoke_openvela_emulator.py" \
+  --openvela-root "$OPENVELA_ROOT" \
+  --evidence-dir /tmp/smart-band-emulator-smoke
+```
+
+脚本使用 PTY 操作真实 NSH，而不是只检查 ELF 字符串。它要求 emulator console
+`ping` 成功、出现 `smart_band: UI ready`，并在两个时间点通过 `pidof` 确认应用仍
+在运行。固定 goldfish 配置没有启用 ADB shell，因此不能用 `adb shell smart_band`
+替代该检查。
 
 ## 7. 开发板运行
 

@@ -35,7 +35,7 @@ openvela_app/smart_band/include 公共头文件、模型和图标声明
 openvela_app/smart_band/assets  项目图标与演示图片资源
 demo/                           浏览器静态演示页面，便于无模拟器时录屏
 docs/                           openvela 复现说明与演示说明
-scripts/                        模拟器传感器滚动验证脚本
+scripts/                        复现、headless runtime 与模拟器传感器验证脚本
 tests/                          本机基础逻辑测试
 LICENSE                         本仓库原创代码和资源的开源许可证
 NOTICE                          项目声明、资产声明和上游边界说明
@@ -201,6 +201,7 @@ LVX_DEMO_SMART_BAND_BASIC_STACKSIZE=32768
 ```sh
 mkdir -p cmake_out/vela_goldfish-arm64-v8a-ap
 cp nuttx/nuttx cmake_out/vela_goldfish-arm64-v8a-ap/nuttx
+cp nuttx/.config cmake_out/vela_goldfish-arm64-v8a-ap/.config
 for f in vela_system.bin vela_data.bin vela_ap.bin nuttx.bin nuttx.hex; do
   [ -f "nuttx/$f" ] && cp "nuttx/$f" "cmake_out/vela_goldfish-arm64-v8a-ap/$f"
 done
@@ -221,6 +222,18 @@ done
 ```sh
 smart_band
 ```
+
+Linux 环境可运行仓库提供的 headless runtime smoke。它通过 PTY 等待真实 NSH，
+验证 emulator console 可响应，启动 `smart_band`，并连续两次确认应用 PID 仍存活：
+
+```sh
+python3 scripts/smoke_openvela_emulator.py \
+  --openvela-root "$OPENVELA_ROOT" \
+  --evidence-dir /tmp/smart-band-emulator-smoke
+```
+
+通过时还必须看到原生应用输出 `smart_band: UI ready`。该检查证明 native LVGL
+初始化和应用主循环已运行；像素、触摸和布局仍由浏览器视觉测试及人工模拟器验收覆盖。
 
 如果使用开发板，完成烧录后在串口 shell 中执行同样的命令：
 

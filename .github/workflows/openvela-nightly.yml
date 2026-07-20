@@ -57,11 +57,16 @@ jobs:
             SMART_BAND_DEFAULT_CLAUDE_REPOSITORY \
             SMART_BAND_DEFAULT_CLAUDE_REVISION \
             SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION \
-            SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE; do
+            SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE \
+            SMART_BAND_DEFAULT_OPENVELA_EMULATOR_REPOSITORY \
+            SMART_BAND_DEFAULT_OPENVELA_EMULATOR_REVISION \
+            SMART_BAND_DEFAULT_OPENVELA_EMULATOR_TOOLS_REVISION; do
             test -n "${!name:-}"
           done
           [[ "$SMART_BAND_DEFAULT_CLAUDE_REVISION" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SMART_BAND_DEFAULT_OPENVELA_EMULATOR_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SMART_BAND_DEFAULT_OPENVELA_EMULATOR_TOOLS_REVISION" =~ ^[0-9a-f]{40}$ ]]
           case "$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE" in
             ''|/*|*..*) exit 1 ;;
           esac
@@ -71,6 +76,9 @@ jobs:
             echo "OPENVELA_CLAUDE_REVISION=$SMART_BAND_DEFAULT_CLAUDE_REVISION"
             echo "OPENVELA_MANIFEST_REVISION=$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION"
             echo "OPENVELA_MANIFEST_FILE=$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE"
+            echo "OPENVELA_EMULATOR_URL=$SMART_BAND_DEFAULT_OPENVELA_EMULATOR_REPOSITORY"
+            echo "OPENVELA_EMULATOR_REVISION=$SMART_BAND_DEFAULT_OPENVELA_EMULATOR_REVISION"
+            echo "OPENVELA_EMULATOR_TOOLS_REVISION=$SMART_BAND_DEFAULT_OPENVELA_EMULATOR_TOOLS_REVISION"
           } >> "$GITHUB_ENV"
 
       - name: Record runner and reclaim build space
@@ -193,6 +201,59 @@ jobs:
           print(f"verified {len(projects)} projects at immutable SHA revisions")
           PY
 
+      - name: Sync pinned Linux emulator runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd "$OPENVELA_ROOT"
+
+          timeout --signal=TERM --kill-after=2m 15m \
+            repo sync \
+              --current-branch \
+              --detach \
+              --fail-fast \
+              --force-sync \
+              --no-clone-bundle \
+              --optimized-fetch \
+              --prune \
+              -j2 \
+              prebuilts/emulator/linux-x86_64 2>&1 | \
+            tee "$EVIDENCE_DIR/emulator-sync.log"
+
+          emulator_root="$OPENVELA_ROOT/prebuilts/emulator/linux-x86_64"
+          tools_root="$OPENVELA_ROOT/prebuilts/emulator/tools"
+          test "$(git -C "$emulator_root" rev-parse HEAD)" = \
+            "$OPENVELA_EMULATOR_REVISION"
+          test "$(git -C "$tools_root" rev-parse HEAD)" = \
+            "$OPENVELA_EMULATOR_TOOLS_REVISION"
+
+          emulator_remote="$(git -C "$emulator_root" remote | head -n 1)"
+          test -n "$emulator_remote"
+          emulator_remote_url="$(git -C "$emulator_root" remote get-url \
+            "$emulator_remote")"
+          emulator_https_base="${OPENVELA_EMULATOR_URL%.git}"
+          case "$emulator_remote_url" in
+            "$OPENVELA_EMULATOR_URL"|"$emulator_https_base"|\
+            git@github.com:open-vela/prebuilts_emulator_linux-x86_64.git)
+              ;;
+            *)
+              echo "unexpected emulator remote: $emulator_remote_url" >&2
+              exit 1
+              ;;
+          esac
+
+          test -x "$emulator_root/emulator"
+          test -x \
+            "$emulator_root/qemu/linux-x86_64/qemu-system-aarch64-headless"
+          git -C "$emulator_root" rev-parse HEAD \
+            > "$EVIDENCE_DIR/emulator-commit.txt"
+          git -C "$tools_root" rev-parse HEAD \
+            > "$EVIDENCE_DIR/emulator-tools-commit.txt"
+          sha256sum \
+            "$emulator_root/emulator" \
+            "$emulator_root/qemu/linux-x86_64/qemu-system-aarch64-headless" \
+            > "$EVIDENCE_DIR/emulator-binaries.sha256"
+
       - name: Install pinned official openvela skills
         shell: bash
         run: |
@@ -288,6 +349,54 @@ jobs:
             -iname '*smart_band*' -print 2>/dev/null \
             > "$EVIDENCE_DIR/smart-band-build-paths.txt"
           test -s "$EVIDENCE_DIR/smart-band-build-paths.txt"
+
+      - name: Boot emulator and run native smart-band smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          timeout --signal=TERM --kill-after=30s 8m \
+            python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/smoke_openvela_emulator.py" \
+              --openvela-root "$OPENVELA_ROOT" \
+              --evidence-dir "$EVIDENCE_DIR"
+
+      - name: Ensure emulator process group is stopped
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cleanup_log="$EVIDENCE_DIR/workflow-emulator-cleanup.txt"
+          process_file="$EVIDENCE_DIR/emulator-process.json"
+          mkdir -p "$EVIDENCE_DIR"
+
+          if [ ! -f "$process_file" ]; then
+            echo "no emulator process metadata was recorded" > "$cleanup_log"
+            exit 0
+          fi
+
+          pgid="$(python3 -c \
+            'import json, sys; print(json.load(open(sys.argv[1]))["pgid"])' \
+            "$process_file" 2>>"$cleanup_log")"
+          case "$pgid" in
+            ''|*[!0-9]*)
+              echo "invalid emulator process group: $pgid" >> "$cleanup_log"
+              exit 0
+              ;;
+          esac
+
+          ps -eo pid=,pgid=,args= | \
+            awk -v pgid="$pgid" '$2 == pgid { print }' >> "$cleanup_log"
+          if kill -0 -- "-$pgid" 2>/dev/null; then
+            echo "sending SIGTERM to emulator process group $pgid" >> "$cleanup_log"
+            kill -TERM -- "-$pgid" 2>>"$cleanup_log"
+            for _ in 1 2 3 4 5; do
+              kill -0 -- "-$pgid" 2>/dev/null || break
+              sleep 1
+            done
+          fi
+          if kill -0 -- "-$pgid" 2>/dev/null; then
+            echo "sending SIGKILL to emulator process group $pgid" >> "$cleanup_log"
+            kill -KILL -- "-$pgid" 2>>"$cleanup_log"
+          fi
 
       - name: Capture final diagnostics
         if: always()

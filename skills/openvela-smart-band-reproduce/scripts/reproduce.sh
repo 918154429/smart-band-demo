@@ -501,6 +501,9 @@ build_openvela() {
     log "copying legacy build outputs into $OUTPUT_DIR"
     mkdir -p "$OPENVELA_ROOT/$OUTPUT_DIR"
     cp "$OPENVELA_ROOT/nuttx/nuttx" "$OPENVELA_ROOT/$OUTPUT_DIR/nuttx"
+    [ -f "$OPENVELA_ROOT/nuttx/.config" ] || \
+      die "legacy build did not produce nuttx/.config for emulator startup"
+    cp "$OPENVELA_ROOT/nuttx/.config" "$OPENVELA_ROOT/$OUTPUT_DIR/.config"
     for f in vela_system.bin vela_data.bin vela_ap.bin nuttx.bin nuttx.hex; do
       if [ -f "$OPENVELA_ROOT/nuttx/$f" ]; then
         cp "$OPENVELA_ROOT/nuttx/$f" "$OPENVELA_ROOT/$OUTPUT_DIR/$f"
