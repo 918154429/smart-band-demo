@@ -188,7 +188,7 @@ maybe_fail() {
 preflight() {
   local value
 
-  for value in cmp git rsync grep sed; do
+  for value in cmp git rsync grep python3 sed; do
     require_command "$value"
   done
 
@@ -390,8 +390,24 @@ verify_openvela_revision() {
   pinned_manifest="$revision_root/$OPENVELA_MANIFEST_FILE"
   [ -f "$pinned_manifest" ] || die "pinned openvela manifest not found: $pinned_manifest"
   [ -e "$selected_manifest" ] || die "selected openvela manifest not found: $selected_manifest"
-  cmp -s "$selected_manifest" "$pinned_manifest" || die \
-    "openvela checkout does not use pinned manifest $OPENVELA_MANIFEST_FILE"
+  if ! cmp -s "$selected_manifest" "$pinned_manifest"; then
+    python3 - "$selected_manifest" "$OPENVELA_MANIFEST_FILE" <<'PY' || die \
+      "openvela checkout does not use pinned manifest $OPENVELA_MANIFEST_FILE"
+import sys
+import xml.etree.ElementTree as ET
+
+selected_manifest, expected_include = sys.argv[1:]
+root = ET.parse(selected_manifest).getroot()
+includes = [node.get("name") for node in root.findall("include")]
+direct_mutations = [
+    *root.findall("project"),
+    *root.findall("extend-project"),
+    *root.findall("remove-project"),
+]
+if includes != [expected_include] or direct_mutations:
+    raise SystemExit(1)
+PY
+  fi
   log "openvela manifest: $OPENVELA_MANIFEST_FILE at $OPENVELA_MANIFEST_REVISION"
 }
 

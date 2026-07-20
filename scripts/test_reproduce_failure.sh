@@ -47,8 +47,12 @@ chmod +x "$FAKE_BIN/rsync"
 
 CLAUDE_REVISION="$(make_commit "$OPENVELA_ROOT/.claude" "claude pin")"
 OPENVELA_REVISION="$(make_commit "$OPENVELA_ROOT/.repo/manifests" "openvela pin")"
-cp "$OPENVELA_ROOT/.repo/manifests/marker.txt" \
-  "$OPENVELA_ROOT/.repo/manifest.xml"
+cat > "$OPENVELA_ROOT/.repo/manifest.xml" <<'MANIFEST'
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <include name="marker.txt" />
+</manifest>
+MANIFEST
 printf '#!/usr/bin/env bash\nexit 0\n' > "$OPENVELA_ROOT/build.sh"
 chmod +x "$OPENVELA_ROOT/build.sh"
 
