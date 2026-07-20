@@ -1,0 +1,106 @@
+{
+  "artifact_source_revision": "82c066cce36b5b05f5a8e90d3093aaaefbb1e04f",
+  "baseline_revision": "1ddc533cb3096e541fe5cadaed810df39029ebc1",
+  "evidence_file_count": 543,
+  "evidence_manifest": "evidence.sha256",
+  "fixed_output_integrity": "fixed-output-integrity.json",
+  "fixed_output_integrity_gate_passed": true,
+  "gate_receipt": "gate-receipt.json",
+  "gate_receipt_passed": true,
+  "host_snapshot_after": {
+    "disk": {
+      "available": true,
+      "command": [
+        "df",
+        "-h",
+        "/",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela"
+      ],
+      "returncode": 0
+    },
+    "ports": {
+      "available": true,
+      "command": [
+        "ss",
+        "-ltnp"
+      ],
+      "returncode": 0
+    },
+    "processes": {
+      "available": true,
+      "command": [
+        "ps",
+        "-eo",
+        "pid=,ppid=,pgid=,args="
+      ],
+      "returncode": 0
+    },
+    "usage": {
+      "available": true,
+      "command": [
+        "du",
+        "-sh",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela",
+        "/home/ubuntu/smart-band-sim-20260720-v1/tools/audit-final-20260720T2025CST/source-snapshot",
+        "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q0-final-audited-20260720T2034CST"
+      ],
+      "returncode": 0
+    }
+  },
+  "host_snapshot_before": {
+    "disk": {
+      "available": true,
+      "command": [
+        "df",
+        "-h",
+        "/",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela"
+      ],
+      "returncode": 0
+    },
+    "ports": {
+      "available": true,
+      "command": [
+        "ss",
+        "-ltnp"
+      ],
+      "returncode": 0
+    },
+    "processes": {
+      "available": true,
+      "command": [
+        "ps",
+        "-eo",
+        "pid=,ppid=,pgid=,args="
+      ],
+      "returncode": 0
+    },
+    "usage": {
+      "available": true,
+      "command": [
+        "du",
+        "-sh",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela",
+        "/home/ubuntu/smart-band-sim-20260720-v1/tools/audit-final-20260720T2025CST/source-snapshot",
+        "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q0-final-audited-20260720T2034CST"
+      ],
+      "returncode": 0
+    }
+  },
+  "required_checks": {
+    "fixed_output_integrity": true,
+    "gate_receipt": true,
+    "host_snapshots": true,
+    "provenance": true,
+    "resource": true,
+    "source_tree_matches": true,
+    "startup": true
+  },
+  "resource_gate_passed": true,
+  "resource_snapshot": "resource-snapshot.json",
+  "smart_band_tree": "smart-band-tree.json",
+  "source_tree_gate_passed": true,
+  "startup_gate_passed": true,
+  "startup_summary": "startup-summary.json",
+  "status": "passed"
+}

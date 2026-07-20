@@ -1,0 +1,61 @@
+{
+  "after": {
+    ".config": {
+      "bytes": 103932,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+      "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+    },
+    "nuttx": {
+      "bytes": 65913280,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+      "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+    },
+    "vela_data.bin": {
+      "bytes": 268435456,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+      "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+    },
+    "vela_system.bin": {
+      "bytes": 1024,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+      "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+    }
+  },
+  "before": {
+    ".config": {
+      "bytes": 103932,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+      "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+    },
+    "nuttx": {
+      "bytes": 65913280,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+      "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+    },
+    "vela_data.bin": {
+      "bytes": 268435456,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+      "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+    },
+    "vela_system.bin": {
+      "bytes": 1024,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+      "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+    }
+  },
+  "files": {
+    ".config": {
+      "unchanged": true
+    },
+    "nuttx": {
+      "unchanged": true
+    },
+    "vela_data.bin": {
+      "unchanged": true
+    },
+    "vela_system.bin": {
+      "unchanged": true
+    }
+  },
+  "gate_passed": true
+}

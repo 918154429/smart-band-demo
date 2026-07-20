@@ -1,0 +1,238 @@
+{
+  "file_count": 46,
+  "files": [
+    {
+      "bytes": 1293,
+      "path": "CMakeLists.txt",
+      "sha256": "a2f45b2be018f8c52edf2fc4357df77b5d4cd40a5286fd995c8018d7d2cd1eef"
+    },
+    {
+      "bytes": 959,
+      "path": "Kconfig",
+      "sha256": "126bb987d930563a9791ba91150b1f3cff7cbca05e0316f6e4b43bd58fe34b22"
+    },
+    {
+      "bytes": 405,
+      "path": "Make.defs",
+      "sha256": "6a75eec81460024738c82c6c8cc6f164869bf24799ba1e8fc95e80cfaf3ea372"
+    },
+    {
+      "bytes": 778,
+      "path": "Makefile",
+      "sha256": "61818ecf37552b3bd2bd5456505f84e6c09a456e4685e77cfe718abe34ec2c0b"
+    },
+    {
+      "bytes": 29424,
+      "path": "app_lvgl.c",
+      "sha256": "e26f733b02bf6e0c8630d259459af429d5183bbf9b107345d3500f53040e0db4"
+    },
+    {
+      "bytes": 10538,
+      "path": "apps/calculator_app.c",
+      "sha256": "0d465cce2399e61ac2d628d05babe8dc6712d77fc537ae97f66fd88ac52f4cc9"
+    },
+    {
+      "bytes": 13820,
+      "path": "apps/game_2048_app.c",
+      "sha256": "07bc330cb9e449a9f53862bc56b00a79563280ca027c279fd02912dc2fde3f65"
+    },
+    {
+      "bytes": 10177,
+      "path": "apps/mines_app.c",
+      "sha256": "830109ed77b0cb43429a7ddf8224edc00a878df0cf5c91fa93b04dc5b5ddd33e"
+    },
+    {
+      "bytes": 6198,
+      "path": "apps/stopwatch_app.c",
+      "sha256": "b56ffeaab54a14c574c4307b6b36243baa049c50efe3dfc23c964b13b717306d"
+    },
+    {
+      "bytes": 9835,
+      "path": "apps/tetris_app.c",
+      "sha256": "50d53c40f79d374895af21ea2ad58842dca44404046fbf8e95affdbc3e948c5b"
+    },
+    {
+      "bytes": 7722,
+      "path": "apps/timer_app.c",
+      "sha256": "53a0195cd0da90da3abe73c57391f3318f50d8fb2fb1bd1c9cbac09d8a081f29"
+    },
+    {
+      "bytes": 10699,
+      "path": "apps/weather_app.c",
+      "sha256": "85432bca9c1a83b8c94199430de27724cb6057c51ef0fe7ef13437d8be40a67b"
+    },
+    {
+      "bytes": 15439,
+      "path": "apps/wooden_fish_app.c",
+      "sha256": "b1360ad80828da06b911eddeb64bca4798f435f86f50e79527a563bb77bb8485"
+    },
+    {
+      "bytes": 1281317,
+      "path": "assets/capybara_lotus_reference.png",
+      "sha256": "ad3d515684c9a9d685b2400198e4c4ae27d140e3e243883d7b05da6637541dff"
+    },
+    {
+      "bytes": 4144,
+      "path": "assets/generated_icons/calculator.png",
+      "sha256": "82e294db24b716693ebdfedbd09e754b402bf9833146014c1c22ed339f5d8a86"
+    },
+    {
+      "bytes": 4367,
+      "path": "assets/generated_icons/game2048.png",
+      "sha256": "8a6b65da870807fd670c3d3de03abb1ca48b42615ad13d19160e1709377b46fe"
+    },
+    {
+      "bytes": 4233,
+      "path": "assets/generated_icons/heart.png",
+      "sha256": "7a2f71a83af0a91a7aef7b521c40bb422eae8e59f8efde07e56956afc7e7b95c"
+    },
+    {
+      "bytes": 4893,
+      "path": "assets/generated_icons/mines.png",
+      "sha256": "31994183c525accfd060bf1424398211a44dbae8b0f5af65fc6e7014f6cd9ad6"
+    },
+    {
+      "bytes": 4610,
+      "path": "assets/generated_icons/sleep.png",
+      "sha256": "d38804582951d06b74335efecb1490e17765e454ac500139a80a418e87219251"
+    },
+    {
+      "bytes": 5732,
+      "path": "assets/generated_icons/steps.png",
+      "sha256": "407306029e3184fef2600a59a1c43e6211216f88725fe800e1042f5a338dab5a"
+    },
+    {
+      "bytes": 4950,
+      "path": "assets/generated_icons/stopwatch.png",
+      "sha256": "093b05f98e940a916c5f55c7ab31ed160f1ebc4cafd688a16401b0f36330492e"
+    },
+    {
+      "bytes": 4574,
+      "path": "assets/generated_icons/stress.png",
+      "sha256": "67a66c4feffae37d25a5d4319e611ee040c7f81105adead1cc95a2ad975f610f"
+    },
+    {
+      "bytes": 4395,
+      "path": "assets/generated_icons/tetris.png",
+      "sha256": "255c576bc3794585287fae5eaf206701e6775eb3d6b46a3e80e848ca84ad26d7"
+    },
+    {
+      "bytes": 4857,
+      "path": "assets/generated_icons/timer.png",
+      "sha256": "5b8adb4e8238097fc944eae7c42bc50cb30793852b5e92cbecad409404fac44e"
+    },
+    {
+      "bytes": 4259,
+      "path": "assets/generated_icons/weather.png",
+      "sha256": "8d9c9bb1d93b45a54b5e63c21ee267b185f0f600b2dd8cb5ffb1da5b5b9631d5"
+    },
+    {
+      "bytes": 5070,
+      "path": "assets/generated_icons/wooden_fish.png",
+      "sha256": "cf65e7714b1d7001f4e0364e9782c9584f4d2bebaf4a8b4accee3e040edd22a4"
+    },
+    {
+      "bytes": 689642,
+      "path": "icon_assets.c",
+      "sha256": "aae7f65582d7620a8cc5d33b41fa90d3ce9dd38b66361c7c39dc5376c20b865c"
+    },
+    {
+      "bytes": 261,
+      "path": "include/app_lvgl.h",
+      "sha256": "1bca53175f4046e5d49a1827ac667f6127bc6380adc0d786245349a8717cc999"
+    },
+    {
+      "bytes": 840,
+      "path": "include/calculator_model.h",
+      "sha256": "a7acd305e31c8cf2b9612f2e109d00a8d0898bc7cd462654c568947f66676423"
+    },
+    {
+      "bytes": 1131,
+      "path": "include/game_2048_model.h",
+      "sha256": "9b887c39be7029c590aea3582e4376bba27e8aa5451991c963f61a9bbd003594"
+    },
+    {
+      "bytes": 829,
+      "path": "include/icon_assets.h",
+      "sha256": "935be45067cbef7a518957dc0df82d2628b8ac6808854fda468a814804c36b48"
+    },
+    {
+      "bytes": 1599,
+      "path": "include/mines_model.h",
+      "sha256": "28a3747a7f057ca5a72b0265e953301761db90fe2378ca33ad223683eb227e59"
+    },
+    {
+      "bytes": 1034,
+      "path": "include/sensor_bridge.h",
+      "sha256": "e7fb25a454826ed748b2dd9075f31a1b0fd6ed6d69789f96c52fa8ff5b4a056e"
+    },
+    {
+      "bytes": 4386,
+      "path": "include/smart_band_apps.h",
+      "sha256": "c15de69af4b1b77f3d780ab72d09f9f65bb509ab981b88f70459e07bef64aab9"
+    },
+    {
+      "bytes": 4010,
+      "path": "include/watch_model.h",
+      "sha256": "980199dee947fbe213a2307e0870d45c4e1044cbb25b5a731933beb1e5286485"
+    },
+    {
+      "bytes": 8075,
+      "path": "logic/calculator_model.c",
+      "sha256": "6614e5da912126bfee7d6a89ef303207ca6d11273e59cf44bcbdec1bb914bdbc"
+    },
+    {
+      "bytes": 6787,
+      "path": "logic/game_2048_model.c",
+      "sha256": "70d2de95e687bc4b6cc4b2f29110233470ccc4db3eb9d953dc2739394cb81b0d"
+    },
+    {
+      "bytes": 6040,
+      "path": "logic/mines_model.c",
+      "sha256": "474a4b3e6e877634aab677ae9b29c3aa4ad5518e8444366abc079d4f7ac77e43"
+    },
+    {
+      "bytes": 9784,
+      "path": "sensor_bridge.c",
+      "sha256": "3cfb097f3312b70c6fdcaba0d476c025b0b2f48ea215ac4da1a0b2dd7deee6ea"
+    },
+    {
+      "bytes": 7249,
+      "path": "smart_band_apps.c",
+      "sha256": "1c331e970dbc239b40fa9b8cfc71fdf2218a090d36475f89396273bc54f081bc"
+    },
+    {
+      "bytes": 1564,
+      "path": "smart_band_main.c",
+      "sha256": "ab98dcd097224437730bf5e7c10a7bc148e68a2670c79718736f44b4a07f6149"
+    },
+    {
+      "bytes": 9917,
+      "path": "ui/lvgl/components.c",
+      "sha256": "d81fcec2ad9df526c2b5dfe07495786f9a4c11218471ba3573be09c66737d2af"
+    },
+    {
+      "bytes": 3464,
+      "path": "ui/lvgl/components.h",
+      "sha256": "5fa6a4d77e8ce57291389d9cfe38895bb9335212f84e4029193df8230ad91644"
+    },
+    {
+      "bytes": 24455,
+      "path": "ui/lvgl/watch_pages.c",
+      "sha256": "572b09207a71080d769aacaaaa3b47d829db2ad45cf743e52018c523d586ffbb"
+    },
+    {
+      "bytes": 2699,
+      "path": "ui/lvgl/watch_pages.h",
+      "sha256": "68ff3787f01d307e704f657138b124f31b83372803e2243bc31b2ada49f985bd"
+    },
+    {
+      "bytes": 14675,
+      "path": "watch_model.c",
+      "sha256": "9137872123b99f6a9daac57530ecf35e022bb851a13d0c137c90921c735729c4"
+    }
+  ],
+  "root": "/home/ubuntu/smart-band-sim-20260720-v1/tools/audit-final-20260720T2025CST/source-snapshot/openvela_app/smart_band",
+  "sha256": "9a3499266fa3caf85b5f0687eb053c79d934fc3080b7d932bb02a7f59960cfdf",
+  "total_bytes": 2253129
+}

@@ -217,15 +217,20 @@ void smart_band_app_render(smart_band_apps_runtime_t *runtime,
     }
 }
 
-void smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
+bool smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
                              bool active_visible, uint32_t now_ms)
 {
   size_t index;
+  bool changed;
 
   if (runtime == NULL || !runtime->initialized)
     {
-      return;
+      return false;
     }
+
+  /* Existing app views may derive text directly from model ticks. Keep an
+   * active mounted view on the established one-second render cadence. */
+  changed = active_visible && runtime->mounted;
 
   if (runtime->mounted && active_visible != runtime->active_visible)
     {
@@ -239,6 +244,7 @@ void smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
         }
 
       runtime->active_visible = active_visible;
+      changed = true;
     }
 
   for (index = 0; index < SMART_BAND_APP_COUNT; index++)
@@ -253,8 +259,11 @@ void smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
           continue;
         }
 
-      (void)def->ops->tick(app_context(runtime, (int)index), now_ms);
+      changed = def->ops->tick(app_context(runtime, (int)index), now_ms) ||
+                changed;
     }
+
+  return changed;
 }
 
 smart_band_app_id_t

@@ -1,0 +1,14 @@
+#ifndef SMART_BAND_PLATFORM_RESULT_H
+#define SMART_BAND_PLATFORM_RESULT_H
+
+typedef int smart_band_platform_result_t;
+
+enum
+{
+  SMART_BAND_PLATFORM_OK = 0,
+  SMART_BAND_PLATFORM_UNAVAILABLE = -1,
+  SMART_BAND_PLATFORM_INVALID = -2,
+  SMART_BAND_PLATFORM_BUSY = -3
+};
+
+#endif

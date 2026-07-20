@@ -525,13 +525,22 @@ def main() -> int:
             raise SmokeFailure("emulator console ping did not report liveness")
 
         app_transcript_start = len(child.transcript)
+        app_started_at = time.monotonic()
         child.send_command(
             "smart_band &",
             prompt,
             args.command_timeout,
             evidence_dir / "smart-band-launch.txt",
         )
-        child.pump(args.settle_seconds)
+        settle_started_at = time.monotonic()
+        child.wait_for(
+            b"smart_band: UI ready",
+            app_transcript_start,
+            args.command_timeout,
+        )
+        app_ui_ready_seconds = time.monotonic() - app_started_at
+        settle_elapsed = time.monotonic() - settle_started_at
+        child.pump(max(0.0, args.settle_seconds - settle_elapsed))
 
         app_output = bytes(child.transcript[app_transcript_start:]).decode(
             "utf-8", errors="replace"
@@ -581,6 +590,7 @@ def main() -> int:
         result = {
             "status": "passed",
             "boot_seconds": round(boot_seconds, 3),
+            "app_ui_ready_seconds": round(app_ui_ready_seconds, 3),
             "console_port": args.console_port,
             "nsh_prompt": prompt_text,
             "initial_pids": pids_1,

@@ -26,6 +26,8 @@ typedef struct
   mines_model_t model;
   mines_view_t view;
   mines_bindings_t bindings;
+  smart_band_app_monotonic_now_fn monotonic_now;
+  void *clock_context;
 } mines_context_t;
 
 _Static_assert(sizeof(mines_context_t) <= SMART_BAND_APP_CONTEXT_CAPACITY,
@@ -158,6 +160,12 @@ static void mine_start_game(mines_context_t *ctx,
   (void)mines_model_new_game(&ctx->model, difficulty, seed);
 }
 
+static uint32_t mines_now(const mines_context_t *ctx)
+{
+  return ctx->monotonic_now == NULL ? lv_tick_get() :
+         ctx->monotonic_now(ctx->clock_context);
+}
+
 static void mine_cell_cb(lv_event_t *event)
 {
   smart_band_app_event_binding_t *binding = lv_event_get_user_data(event);
@@ -184,7 +192,7 @@ static void mine_new_cb(lv_event_t *event)
       mines_context_t *ctx = binding->context;
 
       mine_start_game(ctx, mines_model_difficulty(&ctx->model),
-                      lv_tick_get() + 17u);
+                      mines_now(ctx) + 17u);
       mines_render(ctx, NULL);
     }
 }
@@ -205,7 +213,8 @@ static void mine_difficulty_cb(lv_event_t *event)
   if (difficulty >= 0 && difficulty < MINES_DIFFICULTY_COUNT)
     {
       mine_start_game(ctx, (mines_difficulty_t)difficulty,
-                      lv_tick_get() + 31u + (uint32_t)difficulty * 97u);
+                      mines_now(ctx) + 31u +
+                      (uint32_t)difficulty * 97u);
       mines_render(ctx, NULL);
     }
 }
@@ -252,6 +261,8 @@ static int mines_mount(void *context, lv_obj_t *parent,
     }
 
   mines_unmount(ctx);
+  ctx->monotonic_now = host->monotonic_now;
+  ctx->clock_context = host->clock_context;
   if (cell > max_cell)
     {
       cell = max_cell;
@@ -263,7 +274,7 @@ static int mines_mount(void *context, lv_obj_t *parent,
   controls_y = start_y + grid_w + host->sy(14);
 
   mine_start_game(ctx, mines_model_difficulty(&ctx->model),
-                  lv_tick_get() + 7u);
+                  mines_now(ctx) + 7u);
 
   ctx->view.status = host->create_label(parent, "Med  28 left",
                                         host->font_16(),

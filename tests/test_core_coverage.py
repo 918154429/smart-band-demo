@@ -25,11 +25,28 @@ CORE_SOURCES = [
     APP_DIR / "watch_model.c",
     APP_DIR / "sensor_bridge.c",
     APP_DIR / "smart_band_apps.c",
+    APP_DIR / "services" / "event_queue.c",
+    APP_DIR / "services" / "event_inbox.c",
+    APP_DIR / "services" / "clock.c",
+    APP_DIR / "services" / "capabilities.c",
+    APP_DIR / "services" / "runtime.c",
+    APP_DIR / "platform" / "platform_noop.c",
+    APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "logic" / "calculator_model.c",
     APP_DIR / "logic" / "game_2048_model.c",
     APP_DIR / "logic" / "mines_model.c",
     APP_DIR / "apps" / "timer_app.c",
     APP_DIR / "apps" / "stopwatch_app.c",
+]
+
+NEW_RUNTIME_SOURCES = [
+    APP_DIR / "services" / "event_queue.c",
+    APP_DIR / "services" / "event_inbox.c",
+    APP_DIR / "services" / "clock.c",
+    APP_DIR / "services" / "capabilities.c",
+    APP_DIR / "services" / "runtime.c",
+    APP_DIR / "platform" / "platform_noop.c",
+    APP_DIR / "platform" / "loopback" / "sync_loopback.c",
 ]
 
 
@@ -42,6 +59,17 @@ class CoverageTarget:
 
 
 TARGETS = [
+    CoverageTarget(
+        "runtime_core",
+        Path(__file__).with_name("runtime_core_test.c"),
+        (
+            APP_DIR / "watch_model.c",
+            APP_DIR / "sensor_bridge.c",
+            APP_DIR / "smart_band_apps.c",
+            *NEW_RUNTIME_SOURCES,
+        ),
+        (FAKE_LVGL_DIR,),
+    ),
     CoverageTarget(
         "watch_model",
         Path(__file__).with_name("watch_model_test.c"),
@@ -149,6 +177,37 @@ def run_gcovr(build_root: Path) -> None:
     ]
     print("coverage report:", " ".join(command), flush=True)
     subprocess.run(command, cwd=ROOT, check=True)
+
+    runtime_base_command = [
+        sys.executable,
+        "-m",
+        "gcovr",
+        "--root",
+        str(ROOT),
+        "--object-directory",
+        str(build_root),
+        "--gcov-executable",
+        require_tool("gcov"),
+    ]
+    for source in NEW_RUNTIME_SOURCES:
+        relative = source.relative_to(ROOT).as_posix()
+        runtime_command = [
+            *runtime_base_command,
+            "--filter",
+            f"^{re.escape(relative)}$",
+            "--exclude",
+            "^tests/",
+            "--txt",
+            "--print-summary",
+            "--fail-under-line",
+            "90",
+        ]
+        print(
+            f"new runtime coverage report [{relative}]:",
+            " ".join(runtime_command),
+            flush=True,
+        )
+        subprocess.run(runtime_command, cwd=ROOT, check=True)
 
 
 def main() -> None:

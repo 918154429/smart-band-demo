@@ -159,6 +159,7 @@ class EmulatorSmokeHarnessTest(unittest.TestCase):
                             print(command[5:])
                         elif command == "smart_band &":
                             running = True
+                            time.sleep(0.05)
                             print("smart_band: UI ready")
                         elif command == "pidof smart_band":
                             print("42 " if running else "pidof: task smart_band not found")
@@ -220,6 +221,8 @@ class EmulatorSmokeHarnessTest(unittest.TestCase):
                 evidence.joinpath("runtime-smoke.json").read_text(encoding="utf-8")
             )
             self.assertEqual(runtime["status"], "passed")
+            self.assertGreater(runtime["app_ui_ready_seconds"], 0.0)
+            self.assertLess(runtime["app_ui_ready_seconds"], 1.0)
             self.assertEqual(runtime["stable_pids"], [42])
             self.assertIn(
                 "smart_band: UI ready",

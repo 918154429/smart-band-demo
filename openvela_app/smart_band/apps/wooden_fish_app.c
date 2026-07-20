@@ -35,6 +35,8 @@ typedef struct
   const lv_font_t *float_font;
   lv_coord_t float_start_y;
   bool mounted;
+  smart_band_app_monotonic_now_fn monotonic_now;
+  void *clock_context;
   smart_band_app_event_binding_t bindings[WOODEN_FISH_ACTION_COUNT];
 } wooden_fish_context_t;
 
@@ -212,7 +214,8 @@ static void fish_cb(lv_event_t *event)
   context = binding->context;
   if (binding->action == WOODEN_FISH_ACTION_KNOCK)
     {
-      now_ms = lv_tick_get();
+      now_ms = context->monotonic_now == NULL ? lv_tick_get() :
+               context->monotonic_now(context->clock_context);
       context->merit++;
       wooden_fish_update_speed(context, now_ms);
       context->last_tap_ms = now_ms;
@@ -323,6 +326,8 @@ static int wooden_fish_mount(void *opaque, lv_obj_t *parent,
   wooden_fish_unmount(context);
   center = host->screen_w / 2;
   context->stage = parent;
+  context->monotonic_now = host->monotonic_now;
+  context->clock_context = host->clock_context;
   context->float_font = host->font_20();
   context->float_start_y = host->sy(56);
   context->bindings[0].context = context;

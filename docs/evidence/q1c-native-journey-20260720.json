@@ -1,0 +1,736 @@
+{
+  "app_ui_ready_seconds": 0.780311,
+  "checks": {
+    "app_no_fatal": true,
+    "attributed_process_cleanup": true,
+    "console_ping": true,
+    "fixed_output_unchanged": true,
+    "heart_metric_structured_state": true,
+    "heart_model_png": true,
+    "heart_page_title_golden": true,
+    "heart_sensor_png": true,
+    "heart_value_104_bpm_golden": true,
+    "heart_value_transition_pixels": true,
+    "nsh_ready": true,
+    "page_transition_pixels": true,
+    "pidof": true,
+    "port_cleanup": true,
+    "port_preflight": true,
+    "process_cleanup": true,
+    "ps": true,
+    "runtime_input_cleanup": true,
+    "runtime_staged_isolated": true,
+    "sensor_enabled": true,
+    "sensor_get_104": true,
+    "sensor_set_console_ok": true,
+    "source_label_transition_pixels": true,
+    "source_sensor_golden": true,
+    "swipe_console_ok": true,
+    "uorb_heart_node": true,
+    "watch_face_png": true
+  },
+  "cleanup": {
+    "attributed_processes": {
+      "absent": true,
+      "actions": [],
+      "baseline": [],
+      "initial": [],
+      "remaining": [],
+      "run_id": "96d662210e6469e892752b1b1b73a3c3",
+      "supported": true
+    },
+    "console_kill_response": "OK: killing emulator, bye bye\r\nOK",
+    "console_port_available": true,
+    "log": "cleanup.txt",
+    "process_group_absent": true,
+    "runtime_inputs": {
+      "already_missing": [],
+      "errors": [],
+      "inventory": [
+        {
+          "bytes": 103932,
+          "path": ".config"
+        },
+        {
+          "bytes": 65536,
+          "path": "build.avd/data/misc/pstore/pstore.bin"
+        },
+        {
+          "bytes": 26,
+          "path": "config.ini"
+        },
+        {
+          "bytes": 474,
+          "path": "emu-launch-params.txt"
+        },
+        {
+          "bytes": 3450,
+          "path": "hardware-qemu.ini"
+        },
+        {
+          "bytes": 7,
+          "path": "hardware-qemu.ini.lock"
+        },
+        {
+          "bytes": 0,
+          "path": "multiinstance.lock"
+        },
+        {
+          "bytes": 65911432,
+          "path": "nuttx"
+        },
+        {
+          "bytes": 0,
+          "path": "read-snapshot.txt"
+        },
+        {
+          "bytes": 7,
+          "path": "snapshot.lock.lock"
+        },
+        {
+          "bytes": 25,
+          "path": "system/build.prop"
+        },
+        {
+          "bytes": 268435456,
+          "path": "vela_data.bin"
+        },
+        {
+          "bytes": 1024,
+          "path": "vela_system.bin"
+        },
+        {
+          "bytes": 3,
+          "path": "version_num.cache"
+        }
+      ],
+      "passed": true,
+      "removed": [
+        ".config",
+        "nuttx",
+        "vela_system.bin",
+        "vela_data.bin"
+      ],
+      "tree_removed": true
+    }
+  },
+  "completed_at_utc": "2026-07-20T15:50:24.617344+00:00",
+  "console": {
+    "ping": "I am alive!\r\nOK",
+    "sensor_get": "heart-rate = 104\r\nOK",
+    "sensor_sets": [
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 1
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 2
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 3
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 4
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 5
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 6
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 7
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 8
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 9
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 10
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 11
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 12
+      }
+    ],
+    "sensor_status": "acceleration: enabled.\r\ngyroscope: enabled.\r\nmagnetic-field: enabled.\r\norientation: enabled.\r\ntemperature: enabled.\r\nproximity: enabled.\r\nlight: enabled.\r\npressure: enabled.\r\nhumidity: enabled.\r\nmagnetic-field-uncalibrated: enabled.\r\ngyroscope-uncalibrated: enabled.\r\nhinge-angle0: disabled.\r\nhinge-angle1: disabled.\r\nhinge-angle2: disabled.\r\nheart-rate: enabled.\r\nrgbc-light: disabled.\r\nwrist-tilt: disabled.\r\nacceleration-uncalibrated: enabled.\r\nOK",
+    "swipe": [
+      {
+        "command": "event mouse 800 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 760 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 720 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 680 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 640 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 600 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 560 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 520 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 0",
+        "ok": true,
+        "response": "OK"
+      }
+    ],
+    "swipe_attempts": [
+      {
+        "attempt": 1,
+        "commands": [
+          {
+            "command": "event mouse 800 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 760 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 720 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 680 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 640 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 600 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 560 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 520 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 0",
+            "ok": true,
+            "response": "OK"
+          }
+        ],
+        "page_difference": {
+          "changed_pixels": 143269,
+          "changed_ratio": 0.936399,
+          "max_channel_delta": 255,
+          "mean_absolute_rgb_delta": 23.309174,
+          "region": [
+            470,
+            210,
+            810,
+            660
+          ],
+          "total_pixels": 153000
+        },
+        "screenshot": {
+          "bytes": 36636,
+          "channel_max": [
+            255,
+            255,
+            255,
+            255
+          ],
+          "channel_min": [
+            41,
+            12,
+            8,
+            255
+          ],
+          "console_ok": true,
+          "console_response": "OK",
+          "format": "RGBA8 non-interlaced PNG",
+          "height": 800,
+          "nonblank": true,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/heart-model-attempt-01.png",
+          "sha256": "a926212bcc426794d4da2590f405b41a45c9b4b14d750c233be87f0c15a5e7f4",
+          "unique_rgba_colors": 703,
+          "width": 1280
+        },
+        "title_golden": {
+          "bytes": 19600,
+          "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+          "expected_text": "Heart Rate",
+          "matches": true,
+          "region": [
+            570,
+            165,
+            710,
+            200
+          ],
+          "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+        }
+      }
+    ]
+  },
+  "console_port": 5700,
+  "emulator_command": [
+    "/data/smart-band-q1c-20260720T223937CST/openvela/emulator.sh",
+    "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output",
+    "-no-window",
+    "-no-audio",
+    "-accel",
+    "off",
+    "-port",
+    "5700",
+    "-skin",
+    "xiaomi_smart_screen_10",
+    "-skindir",
+    "/data/smart-band-q1c-20260720T223937CST/openvela/prebuilts/emulator/skins"
+  ],
+  "emulator_process": {
+    "pgid": 723763,
+    "pid": 723763
+  },
+  "evidence_dir": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final",
+  "evidence_manifest": "evidence.sha256",
+  "failure": null,
+  "fixed_output": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap",
+  "golden_regions": {
+    "heart_page_title": {
+      "bytes": 19600,
+      "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+      "expected_text": "Heart Rate",
+      "matches": true,
+      "region": [
+        570,
+        165,
+        710,
+        200
+      ],
+      "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+    },
+    "heart_value_104_bpm": {
+      "bytes": 57600,
+      "expected_sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761",
+      "expected_text": "104 bpm",
+      "matches": true,
+      "region": [
+        550,
+        330,
+        790,
+        390
+      ],
+      "sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761"
+    },
+    "source_sensor": {
+      "bytes": 30800,
+      "expected_sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a",
+      "expected_text": "Source / Sensor",
+      "matches": true,
+      "region": [
+        650,
+        490,
+        790,
+        545
+      ],
+      "sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a"
+    }
+  },
+  "harness": {
+    "path": "/data/smart-band-q1c-20260720T223937CST/source-q1c-final/scripts/run_native_e2e.py",
+    "sha256": "9f3795928d1018154136c34014a1d161720104058198ea915865719bb9c433d2"
+  },
+  "nsh": {
+    "fatal_marker": null,
+    "heart_rate_node": true,
+    "ps_contains_smart_band": true,
+    "ready": true,
+    "smart_band_pids": [
+      13
+    ]
+  },
+  "openvela_root": "/data/smart-band-q1c-20260720T223937CST/openvela",
+  "phase": "complete",
+  "pixel_transitions": {
+    "heart_model_to_sensor": {
+      "heart_value": {
+        "changed_pixels": 1874,
+        "changed_ratio": 0.130139,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 17.24662,
+        "region": [
+          550,
+          330,
+          790,
+          390
+        ],
+        "total_pixels": 14400
+      },
+      "source_label": {
+        "changed_pixels": 612,
+        "changed_ratio": 0.079481,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 9.680952,
+        "region": [
+          650,
+          490,
+          790,
+          545
+        ],
+        "total_pixels": 7700
+      }
+    },
+    "watch_face_to_heart_model": {
+      "changed_pixels": 143269,
+      "changed_ratio": 0.936399,
+      "max_channel_delta": 255,
+      "mean_absolute_rgb_delta": 23.309174,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    }
+  },
+  "process_attribution": {
+    "baseline": [],
+    "environment": "SMART_BAND_NATIVE_E2E_RUN_ID",
+    "executables": [
+      "/data/smart-band-q1c-20260720T223937CST/openvela/prebuilts/emulator/linux-x86_64/emulator",
+      "/data/smart-band-q1c-20260720T223937CST/openvela/prebuilts/emulator/linux-x86_64/qemu/linux-x86_64/qemu-system-aarch64-headless"
+    ],
+    "run_id": "96d662210e6469e892752b1b1b73a3c3",
+    "runtime_output": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output"
+  },
+  "rendered_metric_state": {
+    "derivation": {
+      "page": "exact Heart Rate golden ROI",
+      "source_freshness": "exact Sensor golden ROI; production mapping renders Sensor stale when freshness is stale",
+      "transport": "enabled emulator sensor plus NSH uORB node",
+      "value": "exact 104 bpm golden ROI plus console get"
+    },
+    "freshness": "fresh",
+    "page": "heart_rate",
+    "passed": true,
+    "source": "sensor",
+    "value_bpm": 104
+  },
+  "run_id": "96d662210e6469e892752b1b1b73a3c3",
+  "runtime": {
+    "config_ini": {
+      "content": "hw.sensors.heart_rate=yes\n",
+      "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/config.ini"
+    },
+    "files": {
+      ".config": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 103932,
+          "device": 2065,
+          "inode": 6203209,
+          "mtime_ns": 1784559754209433876,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "source_after": {
+          "bytes": 103932,
+          "device": 2065,
+          "inode": 6203209,
+          "mtime_ns": 1784559754209433876,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 103932,
+          "device": 2065,
+          "inode": 5284999,
+          "mtime_ns": 1784559754209433876,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "staged_after": {
+          "bytes": 103932,
+          "device": 2065,
+          "inode": 5284999,
+          "mtime_ns": 1784559754209433876,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        }
+      },
+      "nuttx": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 65911432,
+          "device": 2065,
+          "inode": 6203251,
+          "mtime_ns": 1784562543613831579,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912"
+        },
+        "source_after": {
+          "bytes": 65911432,
+          "device": 2065,
+          "inode": 6203251,
+          "mtime_ns": 1784562543613831579,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 65911432,
+          "device": 2065,
+          "inode": 5285000,
+          "mtime_ns": 1784562543613831579,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/nuttx",
+          "sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912"
+        },
+        "staged_after": {
+          "bytes": 65911432,
+          "device": 2065,
+          "inode": 5285000,
+          "mtime_ns": 1784562543613831579,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/nuttx",
+          "sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912"
+        }
+      },
+      "vela_data.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 268435456,
+          "device": 2065,
+          "inode": 6203259,
+          "mtime_ns": 1784562511878638468,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85"
+        },
+        "source_after": {
+          "bytes": 268435456,
+          "device": 2065,
+          "inode": 6203259,
+          "mtime_ns": 1784562511878638468,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 268435456,
+          "device": 2065,
+          "inode": 5285002,
+          "mtime_ns": 1784562511878638468,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/vela_data.bin",
+          "sha256": "8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85"
+        },
+        "staged_after": {
+          "bytes": 268435456,
+          "device": 2065,
+          "inode": 5285002,
+          "mtime_ns": 1784562511878638468,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/vela_data.bin",
+          "sha256": "8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85"
+        }
+      },
+      "vela_system.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 1024,
+          "device": 2065,
+          "inode": 6203258,
+          "mtime_ns": 1784562511348635245,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf"
+        },
+        "source_after": {
+          "bytes": 1024,
+          "device": 2065,
+          "inode": 6203258,
+          "mtime_ns": 1784562511348635245,
+          "path": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 1024,
+          "device": 2065,
+          "inode": 5285001,
+          "mtime_ns": 1784562511348635245,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/vela_system.bin",
+          "sha256": "77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf"
+        },
+        "staged_after": {
+          "bytes": 1024,
+          "device": 2065,
+          "inode": 5285001,
+          "mtime_ns": 1784562511348635245,
+          "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output/vela_system.bin",
+          "sha256": "77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf"
+        }
+      }
+    },
+    "runtime_output": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/runtime-output",
+    "source_output": "/data/smart-band-q1c-20260720T223937CST/openvela/cmake_out/vela_goldfish-arm64-v8a-ap"
+  },
+  "screenshots": {
+    "heart_model": {
+      "bytes": 36636,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/heart-model.png",
+      "sha256": "a926212bcc426794d4da2590f405b41a45c9b4b14d750c233be87f0c15a5e7f4",
+      "unique_rgba_colors": 703,
+      "width": 1280
+    },
+    "heart_sensor": {
+      "bytes": 36678,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/heart-sensor.png",
+      "sha256": "956ed6c38cab119a7a3bf6232ca06d2e92fc8fa67c424544ef36d1e1415168e3",
+      "unique_rgba_colors": 697,
+      "width": 1280
+    },
+    "watch_face": {
+      "bytes": 51204,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        0,
+        12,
+        16,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final/watch-face.png",
+      "sha256": "edee0ebc08c354399b064d4aa2ddfa4f059da30657adca765d8ecc49fc31c801",
+      "unique_rgba_colors": 1889,
+      "width": 1280
+    }
+  },
+  "smoke_helper": {
+    "path": "/data/smart-band-q1c-20260720T223937CST/source-q1c-final/scripts/smoke_openvela_emulator.py",
+    "sha256": "eff60209d49f8e4c988f22a7e80deea8ced3d59ed3b305e4f7740a70c979811a"
+  },
+  "started_at_utc": "2026-07-20T15:49:35.244213+00:00",
+  "status": "passed"
+}
