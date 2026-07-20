@@ -291,11 +291,65 @@ static void configure_local_time(void)
   tzset();
 }
 
+static const char *metric_source_text(smart_band_metric_t metric)
+{
+  const smart_band_metric_info_t *info =
+    smart_band_state_metric_info(&g_ui.model, metric);
+
+  if (info == NULL ||
+      info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
+    {
+      return "Unavailable";
+    }
+
+  switch (info->source)
+    {
+      case SMART_BAND_DATA_SOURCE_SENSOR:
+        return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
+               "Sensor stale" : "Sensor";
+      case SMART_BAND_DATA_SOURCE_SENSOR_DERIVED:
+        return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
+               "Derived stale" : "Derived";
+      case SMART_BAND_DATA_SOURCE_SIMULATED:
+        return "Model";
+      default:
+        return "Unavailable";
+    }
+}
+
+static bool metric_available(smart_band_metric_t metric)
+{
+  const smart_band_metric_info_t *info =
+    smart_band_state_metric_info(&g_ui.model, metric);
+
+  return info != NULL &&
+         info->freshness != SMART_BAND_DATA_FRESHNESS_UNAVAILABLE;
+}
+
 static void format_temperature(char *buffer, size_t size)
 {
+  const smart_band_metric_info_t *info =
+    smart_band_state_metric_info(&g_ui.model, SMART_BAND_METRIC_TEMPERATURE);
+  const char *suffix = "";
+
+  if (info == NULL ||
+      info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
+    {
+      snprintf(buffer, size, "--");
+      return;
+    }
+
+  if (info->source == SMART_BAND_DATA_SOURCE_SIMULATED)
+    {
+      suffix = " sim";
+    }
+  else if (info->freshness == SMART_BAND_DATA_FRESHNESS_STALE)
+    {
+      suffix = " stale";
+    }
+
   snprintf(buffer, size, "%d%s%s", g_ui.model.temperature_c,
-           "\xC2\xB0" "C",
-           g_ui.model.temperature_sensor_active ? "" : " sim");
+           "\xC2\xB0" "C", suffix);
 }
 
 static void format_duration(char *buffer, size_t size, int seconds)
@@ -757,7 +811,7 @@ static int create_heart_page(void)
                          &g_ui.heart_progress) == NULL ||
       create_mini_card(g_ui.heart_page, 0, 0, "Resting",
                        &g_ui.heart_status) != 0 ||
-      create_mini_card(g_ui.heart_page, 1, 0, "Status",
+       create_mini_card(g_ui.heart_page, 1, 0, "Source",
                        &g_ui.heart_source) != 0 ||
       create_mini_card(g_ui.heart_page, 0, 1, "Battery",
                        &g_ui.heart_battery) != 0 ||
@@ -1377,6 +1431,7 @@ static void update_face(void)
   lv_coord_t fill_w;
   lv_coord_t fill_h;
   lv_color_t battery_color;
+  bool battery_available = metric_available(SMART_BAND_METRIC_BATTERY);
 
   split_time_text(hour, sizeof(hour), minute, sizeof(minute));
   format_watch_date(date_text, sizeof(date_text));
@@ -1385,11 +1440,26 @@ static void update_face(void)
   set_label_text(g_ui.face_minute, minute);
   set_label_text(g_ui.face_date, date_text);
   set_label_text(g_ui.face_sleep_value, "7h 48m");
-  set_label_text_fmt_int(g_ui.face_heart_value, "%d bpm", g_ui.model.heart_rate);
+  if (metric_available(SMART_BAND_METRIC_HEART_RATE))
+    {
+      set_label_text_fmt_int(g_ui.face_heart_value, "%d bpm",
+                             g_ui.model.heart_rate);
+    }
+  else
+    {
+      set_label_text(g_ui.face_heart_value, "-- bpm");
+    }
   set_label_text(g_ui.face_stress_value, "Low");
   set_temperature_label(g_ui.face_weather_value);
 
-  snprintf(value, sizeof(value), "%d%%", g_ui.model.battery_percent);
+  if (battery_available)
+    {
+      snprintf(value, sizeof(value), "%d%%", g_ui.model.battery_percent);
+    }
+  else
+    {
+      snprintf(value, sizeof(value), "--");
+    }
   set_label_text(g_ui.face_battery, value);
 
   battery_w = sx(g_ui.compact_band ? 38 : 42);
@@ -1397,21 +1467,24 @@ static void update_face(void)
   battery_pad_x = sx(3);
   battery_pad_y = sy(3);
   fill_h = max_coord(battery_h - battery_pad_y * 2, 2);
-  fill_w = ((battery_w - battery_pad_x * 2) *
-            g_ui.model.battery_percent) / 100;
-  if (g_ui.model.battery_percent > 0 && fill_w < 2)
+  fill_w = battery_available ?
+           ((battery_w - battery_pad_x * 2) *
+            g_ui.model.battery_percent) / 100 : 0;
+  if (battery_available && g_ui.model.battery_percent > 0 && fill_w < 2)
     {
       fill_w = 2;
     }
 
-  battery_color = g_ui.model.battery_percent <= 20 ?
+  battery_color = !battery_available ?
+                  lv_color_hex(0xc5d0d3) :
+                  (g_ui.model.battery_percent <= 20 ?
                   lv_color_hex(0xea7770) :
                   (g_ui.model.battery_charging ?
                    lv_color_hex(0x6cd66f) :
-                   lv_color_hex(0x6ccbc0));
+                   lv_color_hex(0x6ccbc0)));
   lv_obj_set_size(g_ui.face_battery_fill, fill_w, fill_h);
   lv_obj_set_style_bg_color(g_ui.face_battery_fill, battery_color, 0);
-  if (g_ui.model.battery_charging)
+  if (battery_available && g_ui.model.battery_charging)
     {
       lv_obj_clear_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
     }
@@ -1425,7 +1498,8 @@ static void update_heart_detail(void)
 {
   char date_text[20];
   char value[32];
-  int progress = (g_ui.model.heart_rate * 100) / 135;
+  bool heart_available = metric_available(SMART_BAND_METRIC_HEART_RATE);
+  int progress = heart_available ? (g_ui.model.heart_rate * 100) / 135 : 0;
 
   if (progress > 100)
     {
@@ -1433,16 +1507,30 @@ static void update_heart_detail(void)
     }
 
   format_watch_date(date_text, sizeof(date_text));
-  snprintf(value, sizeof(value), "%d bpm", g_ui.model.heart_rate);
+  if (heart_available)
+    {
+      snprintf(value, sizeof(value), "%d bpm", g_ui.model.heart_rate);
+    }
+  else
+    {
+      snprintf(value, sizeof(value), "-- bpm");
+    }
 
   set_label_text(g_ui.heart_date, date_text);
   set_label_text(g_ui.heart_value, value);
   lv_bar_set_value(g_ui.heart_progress, progress, LV_ANIM_ON);
-  set_label_text(g_ui.heart_status, "62");
+  set_label_text(g_ui.heart_status, heart_available ? "62" : "--");
   set_label_text(g_ui.heart_source,
-                 g_ui.model.heart_sensor_active ? "Sensor" :
-                 (g_ui.model.heart_rate > 110 ? "High" : "Good"));
-  set_label_text_fmt_int(g_ui.heart_battery, "%d%%", g_ui.model.battery_percent);
+                 metric_source_text(SMART_BAND_METRIC_HEART_RATE));
+  if (metric_available(SMART_BAND_METRIC_BATTERY))
+    {
+      set_label_text_fmt_int(g_ui.heart_battery, "%d%%",
+                             g_ui.model.battery_percent);
+    }
+  else
+    {
+      set_label_text(g_ui.heart_battery, "--");
+    }
   set_label_text(g_ui.heart_stress, "Low");
 }
 
@@ -1450,18 +1538,33 @@ static void update_steps_detail(void)
 {
   char date_text[20];
   char value[32];
-  int progress = smart_band_step_progress(&g_ui.model);
+  bool steps_available = metric_available(SMART_BAND_METRIC_STEPS);
+  int progress = steps_available ? smart_band_step_progress(&g_ui.model) : 0;
 
   format_watch_date(date_text, sizeof(date_text));
-  snprintf(value, sizeof(value), "%d", g_ui.model.steps);
+  if (steps_available)
+    {
+      snprintf(value, sizeof(value), "%d", g_ui.model.steps);
+    }
+  else
+    {
+      snprintf(value, sizeof(value), "--");
+    }
 
   set_label_text(g_ui.steps_date, date_text);
   set_label_text(g_ui.steps_value, value);
   lv_bar_set_value(g_ui.steps_progress, progress, LV_ANIM_ON);
   set_label_text_fmt_int(g_ui.steps_goal, "%d", g_ui.model.step_goal);
-  set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
+  if (steps_available)
+    {
+      set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
+    }
+  else
+    {
+      set_label_text(g_ui.steps_percent, "--");
+    }
   set_label_text(g_ui.steps_source,
-                 g_ui.model.step_sensor_active ? "Sensor" : "Model");
+                 metric_source_text(SMART_BAND_METRIC_STEPS));
   set_temperature_label(g_ui.steps_weather);
 }
 
@@ -1527,10 +1630,12 @@ static void step_goal_cb(lv_event_t *event)
 static void timer_cb(lv_timer_t *timer)
 {
   smart_band_app_host_t host;
+  time_t now;
 
   (void)timer;
-  smart_band_state_tick(&g_ui.model, time(NULL));
-  smart_band_sensor_bridge_update(&g_ui.sensors, &g_ui.model);
+  now = time(NULL);
+  smart_band_state_tick(&g_ui.model, now);
+  smart_band_sensor_bridge_update_at(&g_ui.sensors, &g_ui.model, now);
   host = make_app_host();
   smart_band_apps_tick(g_ui.active_app, &host);
 

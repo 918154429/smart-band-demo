@@ -47,8 +47,10 @@ cd /home/dhy/openvela
 - 交叉编译工具链。
 - LVGL + NuttX + libuv UI 循环。
 - framebuffer/display/input 支持。
-- `SENSORS` 和 `UORB` 支持。
 - goldfish 模拟器或实际开发板。
+
+真实 provider 额外需要 `SENSORS`、`UORB` 和
+`LVX_DEMO_SMART_BAND_USE_SENSORS`；关闭 provider 时可仅运行模拟数据。
 
 ## 2.1 Skill 一键复现流程
 
@@ -155,6 +157,7 @@ CONFIG_LV_USE_NUTTX_LIBUV=y
 CONFIG_SENSORS=y
 CONFIG_UORB=y
 CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC=y
+CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS=y
 CONFIG_LVX_DEMO_SMART_BAND_BASIC_PRIORITY=100
 CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE=32768
 ```

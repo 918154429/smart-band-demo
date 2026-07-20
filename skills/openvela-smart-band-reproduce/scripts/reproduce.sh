@@ -311,6 +311,7 @@ enable_config() {
   append_unique_config "$defconfig" "CONFIG_SENSORS" "y"
   append_unique_config "$defconfig" "CONFIG_UORB" "y"
   append_unique_config "$defconfig" "CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC" "y"
+  append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS" "y"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_PRIORITY" "100"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE" "32768"
 }

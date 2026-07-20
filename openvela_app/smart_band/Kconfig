@@ -1,13 +1,11 @@
 config LVX_USE_DEMO_SMART_BAND_BASIC
 	bool "Smart band basic LVGL demo"
 	depends on GRAPHICS_LVGL && LV_USE_NUTTX && LV_USE_NUTTX_LIBUV
-	depends on SENSORS && UORB
 	default n
 	---help---
 		Enable the basic smart band demo application. It follows the
 		packages/demos style used by openvela native demos such as Bandx.
-		The demo shows a watch face, simulated heart rate, simulated steps,
-		and swipe navigation.
+		The demo shows a watch face, health metrics, and swipe navigation.
 
 if LVX_USE_DEMO_SMART_BAND_BASIC
 
@@ -18,5 +16,14 @@ config LVX_DEMO_SMART_BAND_BASIC_PRIORITY
 config LVX_DEMO_SMART_BAND_BASIC_STACKSIZE
 	int "Smart band basic stack size"
 	default 32768
+
+config LVX_DEMO_SMART_BAND_USE_SENSORS
+	bool "Use uORB and battery sensor providers"
+	depends on SENSORS && UORB
+	default y
+	---help---
+		Read real sensor samples when the required openvela sensor and uORB
+		subsystems are enabled. If disabled, sensor_bridge.c builds as a
+		no-op provider and the watch model uses explicit simulation mode.
 
 endif

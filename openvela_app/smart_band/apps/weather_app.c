@@ -12,6 +12,34 @@ static lv_obj_t *g_range;
 static lv_obj_t *g_humidity;
 static lv_obj_t *g_wind;
 
+static const char *weather_source_text(const smart_band_state_t *model,
+                                       smart_band_metric_t metric)
+{
+  const smart_band_metric_info_t *info =
+    smart_band_state_metric_info(model, metric);
+
+  if (info == NULL ||
+      info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
+    {
+      return "unavailable";
+    }
+
+  if (info->source == SMART_BAND_DATA_SOURCE_SIMULATED)
+    {
+      return model->data_mode == SMART_BAND_DATA_MODE_SIMULATION ?
+             "model" : "model fallback";
+    }
+
+  if (info->source == SMART_BAND_DATA_SOURCE_SENSOR_DERIVED)
+    {
+      return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
+             "derived stale" : "derived sensor";
+    }
+
+  return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
+         "sensor stale" : "sensor";
+}
+
 static lv_obj_t *weather_label(lv_obj_t *parent, const char *text,
                                const smart_band_app_host_t *host,
                                const lv_font_t *font, uint32_t color,
@@ -118,6 +146,8 @@ void smart_band_weather_app_update(const smart_band_app_host_t *host)
   char humidity[16];
   char wind[16];
   const char *condition;
+  const smart_band_metric_info_t *humidity_info;
+  const smart_band_metric_info_t *temperature_info;
 
   if (host == NULL || host->model == NULL)
     {
@@ -125,21 +155,44 @@ void smart_band_weather_app_update(const smart_band_app_host_t *host)
     }
 
   host->format_temperature(temp, sizeof(temp));
+  temperature_info = smart_band_state_metric_info(
+    host->model, SMART_BAND_METRIC_TEMPERATURE);
   snprintf(source, sizeof(source), "%s",
-           host->model->temperature_sensor_active ? "ambient_temp0" :
-           "model fallback");
-  snprintf(humidity, sizeof(humidity), "%d%%",
-           host->model->humidity_percent);
+           weather_source_text(host->model, SMART_BAND_METRIC_TEMPERATURE));
+  humidity_info = smart_band_state_metric_info(host->model,
+                                               SMART_BAND_METRIC_HUMIDITY);
+  if (humidity_info == NULL ||
+      humidity_info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
+    {
+      snprintf(humidity, sizeof(humidity), "--");
+    }
+  else
+    {
+      snprintf(humidity, sizeof(humidity), "%d%%%s",
+               host->model->humidity_percent,
+               humidity_info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
+               " stale" : "");
+    }
   snprintf(wind, sizeof(wind), "E%d", 2 + (int)(host->model->ticks % 3u));
-  condition = host->model->temperature_c >= 30 ? "Sunny" : "Cloudy";
+  condition = temperature_info == NULL ||
+              temperature_info->freshness ==
+                SMART_BAND_DATA_FRESHNESS_UNAVAILABLE ?
+              "Unavailable" :
+              (host->model->temperature_c >= 30 ? "Sunny" : "Cloudy");
 
   host->set_label_text(g_temp, temp);
   host->set_label_text(g_source, source);
   host->set_label_text(g_condition, condition);
-  host->set_label_text(g_sky, condition);
-  host->set_label_text(g_range,
-                       host->model->temperature_c >= 30 ? "32/26" :
-                       "28/22");
+  host->set_label_text(g_sky,
+                       temperature_info == NULL ||
+                       temperature_info->freshness ==
+                         SMART_BAND_DATA_FRESHNESS_UNAVAILABLE ?
+                       "--" : condition);
+  host->set_label_text(
+    g_range,
+    temperature_info == NULL ||
+    temperature_info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE ?
+    "--" : (host->model->temperature_c >= 30 ? "32/26" : "28/22"));
   host->set_label_text(g_humidity, humidity);
   host->set_label_text(g_wind, wind);
 }

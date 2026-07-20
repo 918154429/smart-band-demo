@@ -9,7 +9,8 @@ void smart_band_calculator_app_update(const smart_band_app_host_t *host);
 int smart_band_timer_app_build(lv_obj_t *parent,
                                const smart_band_app_host_t *host);
 void smart_band_timer_app_update(const smart_band_app_host_t *host);
-void smart_band_timer_app_tick(const smart_band_app_host_t *host);
+void smart_band_timer_app_tick_at(const smart_band_app_host_t *host,
+                                  uint32_t now_ms);
 void smart_band_timer_app_unmount(void);
 int smart_band_music_app_build(lv_obj_t *parent,
                                const smart_band_app_host_t *host);
@@ -17,7 +18,8 @@ void smart_band_music_app_update(const smart_band_app_host_t *host);
 int smart_band_stopwatch_app_build(lv_obj_t *parent,
                                    const smart_band_app_host_t *host);
 void smart_band_stopwatch_app_update(const smart_band_app_host_t *host);
-void smart_band_stopwatch_app_tick(const smart_band_app_host_t *host);
+void smart_band_stopwatch_app_tick_at(const smart_band_app_host_t *host,
+                                      uint32_t now_ms);
 void smart_band_stopwatch_app_unmount(void);
 int smart_band_mines_app_build(lv_obj_t *parent,
                                const smart_band_app_host_t *host);
@@ -139,8 +141,10 @@ void smart_band_app_update(smart_band_app_id_t id,
 void smart_band_apps_tick(smart_band_app_id_t active_id,
                            const smart_band_app_host_t *host)
 {
-  smart_band_timer_app_tick(host);
-  smart_band_stopwatch_app_tick(host);
+  uint32_t now_ms = lv_tick_get();
+
+  smart_band_timer_app_tick_at(host, now_ms);
+  smart_band_stopwatch_app_tick_at(host, now_ms);
 
   if (active_id == SMART_BAND_APP_TETRIS)
     {

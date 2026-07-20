@@ -52,7 +52,8 @@ The script will:
    - clone `$OPENVELA_ROOT/.claude` when it is absent;
    - copy `openvela_app/smart_band` into `packages/demos/smart_band_basic`;
    - copy it into `apps/packages/demos/smart_band_basic` when that mirror exists;
-   - enable `CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC` in the goldfish defconfig;
+   - enable `CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC` and its real-sensor provider
+     option in the goldfish defconfig;
    - build goldfish arm64, trying CMake first and legacy build as fallback;
    - serve and open `demo/index.html` so the final browser demo is visible.
 

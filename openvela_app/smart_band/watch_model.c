@@ -5,6 +5,15 @@
 
 #define SMART_BAND_UTC_OFFSET_SECONDS (8 * 60 * 60)
 
+static smart_band_data_mode_t default_data_mode(void)
+{
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
+  return SMART_BAND_DATA_MODE_AUTO;
+#else
+  return SMART_BAND_DATA_MODE_SIMULATION;
+#endif
+}
+
 static int clamp_int(int value, int min_value, int max_value)
 {
   if (value < min_value)
@@ -59,6 +68,11 @@ bool smart_band_display_time(time_t now, struct tm *display_time)
 #if defined(__NuttX__)
   now += SMART_BAND_UTC_OFFSET_SECONDS;
   tm_result = gmtime_r(&now, display_time);
+#elif defined(_WIN32)
+  if (localtime_s(display_time, &now) == 0)
+    {
+      tm_result = display_time;
+    }
 #elif defined(_POSIX_VERSION)
   tm_result = localtime_r(&now, display_time);
 #else
@@ -73,31 +87,45 @@ bool smart_band_display_time(time_t now, struct tm *display_time)
   return tm_result != NULL;
 }
 
-static void simulate_health_data(smart_band_state_t *state)
+static bool source_is_sensor(smart_band_data_source_t source)
 {
-  const int pulse_wave = (int)((state->ticks * 7u + 11u) % 23u);
-  const int motion_wave = (int)((state->ticks * 5u + 3u) % 9u);
+  return source == SMART_BAND_DATA_SOURCE_SENSOR ||
+         source == SMART_BAND_DATA_SOURCE_SENSOR_DERIVED;
+}
 
-  state->heart_rate = clamp_int(66 + pulse_wave + motion_wave / 3, 55, 135);
-  state->steps += 4 + (int)(state->ticks % 6u);
-  state->temperature_c = clamp_int(24 + (int)(state->ticks % 3u) - 1,
-                                   -40, 80);
-  state->humidity_percent = clamp_int(56 + (int)(state->ticks % 8u), 0, 100);
-
-  if (state->steps > 99999)
+static smart_band_metric_info_t *metric_info(smart_band_state_t *state,
+                                             smart_band_metric_t metric)
+{
+  if (state == NULL || metric < 0 || metric >= SMART_BAND_METRIC_COUNT)
     {
-      state->steps = state->steps % state->step_goal;
+      return NULL;
     }
 
-  state->battery_percent = clamp_int(96 - (int)(state->ticks / 180u), 5, 100);
+  return &state->metrics[metric];
+}
 
-  if (state->heart_rate >= 110)
+static void update_status(smart_band_state_t *state)
+{
+  const smart_band_metric_info_t *heart =
+    &state->metrics[SMART_BAND_METRIC_HEART_RATE];
+  const smart_band_metric_info_t *steps =
+    &state->metrics[SMART_BAND_METRIC_STEPS];
+  bool heart_available =
+    heart->freshness != SMART_BAND_DATA_FRESHNESS_UNAVAILABLE;
+  bool steps_available =
+    steps->freshness != SMART_BAND_DATA_FRESHNESS_UNAVAILABLE;
+
+  if (heart_available && state->heart_rate >= 110)
     {
       snprintf(state->status_text, sizeof(state->status_text), "Active");
     }
-  else if (state->steps >= state->step_goal)
+  else if (steps_available && state->steps >= state->step_goal)
     {
       snprintf(state->status_text, sizeof(state->status_text), "Goal Met");
+    }
+  else if (!heart_available && !steps_available)
+    {
+      snprintf(state->status_text, sizeof(state->status_text), "Unavailable");
     }
   else
     {
@@ -105,11 +133,151 @@ static void simulate_health_data(smart_band_state_t *state)
     }
 }
 
+static void set_metric_value(smart_band_state_t *state,
+                             smart_band_metric_t metric, int value)
+{
+  switch (metric)
+    {
+      case SMART_BAND_METRIC_HEART_RATE:
+        state->heart_rate = clamp_int(value, 0, 500);
+        break;
+      case SMART_BAND_METRIC_STEPS:
+        state->steps = clamp_int(value, 0, 99999);
+        break;
+      case SMART_BAND_METRIC_BATTERY:
+        state->battery_percent = clamp_int(value, 0, 100);
+        break;
+      case SMART_BAND_METRIC_TEMPERATURE:
+        state->temperature_c = clamp_int(value, -100, 200);
+        break;
+      case SMART_BAND_METRIC_HUMIDITY:
+        state->humidity_percent = clamp_int(value, 0, 100);
+        break;
+      default:
+        break;
+    }
+}
+
+static int simulated_metric_value(const smart_band_state_t *state,
+                                  smart_band_metric_t metric)
+{
+  switch (metric)
+    {
+      case SMART_BAND_METRIC_HEART_RATE:
+        return state->simulated_heart_rate;
+      case SMART_BAND_METRIC_STEPS:
+        return state->simulated_steps;
+      case SMART_BAND_METRIC_BATTERY:
+        return state->simulated_battery_percent;
+      case SMART_BAND_METRIC_TEMPERATURE:
+        return state->simulated_temperature_c;
+      case SMART_BAND_METRIC_HUMIDITY:
+        return state->simulated_humidity_percent;
+      default:
+        return 0;
+    }
+}
+
+static void sync_legacy_sensor_flags(smart_band_state_t *state)
+{
+  state->heart_sensor_active =
+    source_is_sensor(state->metrics[SMART_BAND_METRIC_HEART_RATE].source);
+  state->step_sensor_active =
+    source_is_sensor(state->metrics[SMART_BAND_METRIC_STEPS].source);
+  state->battery_sensor_active =
+    source_is_sensor(state->metrics[SMART_BAND_METRIC_BATTERY].source);
+  state->temperature_sensor_active =
+    source_is_sensor(state->metrics[SMART_BAND_METRIC_TEMPERATURE].source);
+  state->humidity_sensor_active =
+    source_is_sensor(state->metrics[SMART_BAND_METRIC_HUMIDITY].source);
+}
+
+static void use_simulated_metric(smart_band_state_t *state,
+                                 smart_band_metric_t metric, time_t now)
+{
+  smart_band_metric_info_t *info = metric_info(state, metric);
+
+  set_metric_value(state, metric, simulated_metric_value(state, metric));
+  info->source = SMART_BAND_DATA_SOURCE_SIMULATED;
+  info->freshness = SMART_BAND_DATA_FRESHNESS_FRESH;
+  info->last_update = now;
+  if (metric == SMART_BAND_METRIC_BATTERY)
+    {
+      state->battery_charging = false;
+    }
+}
+
+static void make_metric_unavailable(smart_band_state_t *state,
+                                    smart_band_metric_t metric)
+{
+  smart_band_metric_info_t *info = metric_info(state, metric);
+
+  info->source = SMART_BAND_DATA_SOURCE_UNAVAILABLE;
+  info->freshness = SMART_BAND_DATA_FRESHNESS_UNAVAILABLE;
+  if (metric == SMART_BAND_METRIC_BATTERY)
+    {
+      state->battery_charging = false;
+    }
+}
+
+static void simulate_health_data(smart_band_state_t *state, time_t now)
+{
+  const int pulse_wave = (int)((state->ticks * 7u + 11u) % 23u);
+  const int motion_wave = (int)((state->ticks * 5u + 3u) % 9u);
+  smart_band_metric_t metric;
+
+  state->simulated_heart_rate =
+    clamp_int(66 + pulse_wave + motion_wave / 3, 55, 135);
+  state->simulated_steps += 4 + (int)(state->ticks % 6u);
+  state->simulated_temperature_c =
+    clamp_int(24 + (int)(state->ticks % 3u) - 1, -40, 80);
+  state->simulated_humidity_percent =
+    clamp_int(56 + (int)(state->ticks % 8u), 0, 100);
+
+  if (state->simulated_steps > 99999)
+    {
+      state->simulated_steps = state->simulated_steps % state->step_goal;
+    }
+
+  state->simulated_battery_percent =
+    clamp_int(96 - (int)(state->ticks / 180u), 5, 100);
+
+  for (metric = SMART_BAND_METRIC_HEART_RATE;
+       metric < SMART_BAND_METRIC_COUNT; metric++)
+    {
+      smart_band_metric_info_t *info = metric_info(state, metric);
+
+      if (state->data_mode == SMART_BAND_DATA_MODE_SIMULATION ||
+          (state->data_mode == SMART_BAND_DATA_MODE_AUTO &&
+           !source_is_sensor(info->source)))
+        {
+          use_simulated_metric(state, metric, now);
+        }
+    }
+
+  update_status(state);
+  sync_legacy_sensor_flags(state);
+}
+
 void smart_band_state_init(smart_band_state_t *state, time_t now)
 {
+  smart_band_state_init_mode(state, now, default_data_mode());
+}
+
+void smart_band_state_init_mode(smart_band_state_t *state, time_t now,
+                                smart_band_data_mode_t mode)
+{
+  smart_band_metric_t metric;
+
   if (state == NULL)
     {
       return;
+    }
+
+  if (mode < SMART_BAND_DATA_MODE_AUTO ||
+      mode > SMART_BAND_DATA_MODE_SENSORS_ONLY)
+    {
+      mode = default_data_mode();
     }
 
   memset(state, 0, sizeof(*state));
@@ -120,7 +288,30 @@ void smart_band_state_init(smart_band_state_t *state, time_t now)
   state->battery_percent = 96;
   state->temperature_c = 24;
   state->humidity_percent = 60;
-  snprintf(state->status_text, sizeof(state->status_text), "Stable");
+  state->simulated_heart_rate = state->heart_rate;
+  state->simulated_steps = state->steps;
+  state->simulated_battery_percent = state->battery_percent;
+  state->simulated_temperature_c = state->temperature_c;
+  state->simulated_humidity_percent = state->humidity_percent;
+  state->data_mode = mode;
+
+  for (metric = SMART_BAND_METRIC_HEART_RATE;
+       metric < SMART_BAND_METRIC_COUNT; metric++)
+    {
+      state->metrics[metric].ttl_seconds =
+        SMART_BAND_SENSOR_TTL_SECONDS_DEFAULT;
+      if (mode == SMART_BAND_DATA_MODE_SENSORS_ONLY)
+        {
+          make_metric_unavailable(state, metric);
+        }
+      else
+        {
+          use_simulated_metric(state, metric, now);
+        }
+    }
+
+  update_status(state);
+  sync_legacy_sensor_flags(state);
   format_time(state, now);
 }
 
@@ -133,7 +324,145 @@ void smart_band_state_tick(smart_band_state_t *state, time_t now)
 
   state->ticks++;
   format_time(state, now);
-  simulate_health_data(state);
+  simulate_health_data(state, now);
+}
+
+void smart_band_state_set_data_mode(smart_band_state_t *state,
+                                    smart_band_data_mode_t mode)
+{
+  smart_band_state_set_data_mode_at(state, mode, time(NULL));
+}
+
+void smart_band_state_set_data_mode_at(smart_band_state_t *state,
+                                       smart_band_data_mode_t mode,
+                                       time_t now)
+{
+  smart_band_metric_t metric;
+
+  if (state == NULL || mode < SMART_BAND_DATA_MODE_AUTO ||
+      mode > SMART_BAND_DATA_MODE_SENSORS_ONLY)
+    {
+      return;
+    }
+
+  state->data_mode = mode;
+  for (metric = SMART_BAND_METRIC_HEART_RATE;
+       metric < SMART_BAND_METRIC_COUNT; metric++)
+    {
+      smart_band_metric_info_t *info = metric_info(state, metric);
+
+      if (mode == SMART_BAND_DATA_MODE_SIMULATION ||
+          (mode == SMART_BAND_DATA_MODE_AUTO &&
+           !source_is_sensor(info->source)))
+        {
+          use_simulated_metric(state, metric, now);
+        }
+      else if (mode == SMART_BAND_DATA_MODE_SENSORS_ONLY &&
+               !source_is_sensor(info->source))
+        {
+          make_metric_unavailable(state, metric);
+        }
+    }
+
+  update_status(state);
+  sync_legacy_sensor_flags(state);
+}
+
+static bool metric_is_expired(const smart_band_metric_info_t *info,
+                              time_t now)
+{
+  if (now < info->last_update)
+    {
+      /* A wall-clock correction must not keep an old sample alive forever. */
+
+      return true;
+    }
+
+  if (now == info->last_update)
+    {
+      return false;
+    }
+
+  return (unsigned long)(now - info->last_update) > info->ttl_seconds;
+}
+
+void smart_band_state_begin_sensor_cycle(smart_band_state_t *state,
+                                         time_t now)
+{
+  smart_band_metric_t metric;
+
+  if (state == NULL)
+    {
+      return;
+    }
+
+  for (metric = SMART_BAND_METRIC_HEART_RATE;
+       metric < SMART_BAND_METRIC_COUNT; metric++)
+    {
+      smart_band_metric_info_t *info = metric_info(state, metric);
+
+      if (!source_is_sensor(info->source))
+        {
+          continue;
+        }
+
+      if (!metric_is_expired(info, now))
+        {
+          info->freshness = SMART_BAND_DATA_FRESHNESS_STALE;
+        }
+      else if (state->data_mode == SMART_BAND_DATA_MODE_AUTO)
+        {
+          use_simulated_metric(state, metric, now);
+        }
+      else
+        {
+          make_metric_unavailable(state, metric);
+        }
+    }
+
+  update_status(state);
+  sync_legacy_sensor_flags(state);
+}
+
+bool smart_band_state_publish_metric(smart_band_state_t *state,
+                                     smart_band_metric_t metric,
+                                     int value,
+                                     smart_band_data_source_t source,
+                                     time_t now)
+{
+  smart_band_metric_info_t *info;
+
+  if (state == NULL || !source_is_sensor(source) ||
+      state->data_mode == SMART_BAND_DATA_MODE_SIMULATION)
+    {
+      return false;
+    }
+
+  info = metric_info(state, metric);
+  if (info == NULL)
+    {
+      return false;
+    }
+
+  set_metric_value(state, metric, value);
+  info->source = source;
+  info->freshness = SMART_BAND_DATA_FRESHNESS_FRESH;
+  info->last_update = now;
+  update_status(state);
+  sync_legacy_sensor_flags(state);
+  return true;
+}
+
+const smart_band_metric_info_t *
+smart_band_state_metric_info(const smart_band_state_t *state,
+                             smart_band_metric_t metric)
+{
+  if (state == NULL || metric < 0 || metric >= SMART_BAND_METRIC_COUNT)
+    {
+      return NULL;
+    }
+
+  return &state->metrics[metric];
 }
 
 void smart_band_next_page(smart_band_state_t *state)
