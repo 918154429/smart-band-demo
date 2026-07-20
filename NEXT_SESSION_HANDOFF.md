@@ -4,8 +4,9 @@
 
 > 复赛方向已确认：后续开发以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为工程主路线，
 > 只推进产品功能 A–G、native 验证、稳定性和开发板适配。视频与比赛平台提交事务不在
-> 工程路线内；GitHub 工程提交属于持续开发流程。Q0 与 Q1-V 已完成；Q1-C 第一半代码与本地回归已完成，但 Linux coverage
-> 和真实 openvela 构建尚未在本轮确认。下一对话先关闭这两个 Gate，再推进 Q1-C 后半。
+> 工程路线内；GitHub 工程提交属于持续开发流程。Q0 与 Q1-V 已完成；Q1-C 第一半代码
+> 与本地回归已完成，但 Linux coverage 和真实 openvela 构建尚未在本轮确认。下一对话
+> 先关闭这两个 Gate，再推进 Q1-C 后半。
 
 ## 1. 仓库与权限
 
@@ -14,13 +15,15 @@
 - `origin`：`git@github.com:918154429/smart-band-demo.git`
 - `upstream`：`https://www.gitlink.org.cn/dhy000123/smart-band-demo.git`
 - 默认分支：`master`
-- 当前功能基线：`1ddc533cb3096e541fe5cadaed810df39029ebc1`
+- 当前已验证功能基线：`1ddc533cb3096e541fe5cadaed810df39029ebc1`
+- 已推送路线图/授权提交：`2afca84`（下一对话仍以实际 `git log` 为准）
 - 工作约定：用户确认其对 GitHub 主仓库拥有完整管理权并对仓库负责，长期授权 Codex
   按持续开发需要自主修改、提交、推送以及创建、更新和合并 PR，无需逐次申请；强制
   推送、改写已发布历史、删除远端分支/标签和正式 release 仍需当次明确指示。允许使用
   子智能体处理独立工程子任务。
-- 当前工作树含本轮未提交的路线图/交接、Q0/Q1-V 脚本与测试、CI/README、证据报告和
-  compact evidence；这些均为已知改动，不得在下一会话清除或覆盖。
+- `FINALS_TOP_TIER_ROADMAP.md` 已提交并推送。当前工作树仍含未提交的 Q0/Q1-V 脚本与
+  测试、Q1-C 第一半、CI/README、实现说明、证据报告和 compact evidence；这些均为
+  已知改动，不得在下一会话清除、覆盖或用远端旧树替代。
 
 开始下一会话时仍应先读取用户最新指令；若与本文件冲突，以最新指令为准。
 
@@ -81,6 +84,31 @@
   都是未确认 Gate，不是已通过结果。
 
 本节改动尚未提交、推送或创建 PR。
+
+### 远端 Ubuntu 24.04 执行环境：已核对
+
+现有远端可继续使用，不需要租新服务器：
+
+- Ubuntu `24.04.3 LTS`，x86_64，4 vCPU，31 GiB RAM。
+- GCC/gcov `13.3.0`、Python `3.12.3`、CMake `3.28.3`、Ninja `1.11.1`、Git `2.43.0`
+  和 Make 可用；`gcovr` 尚未安装，PyPI 可访问且可安装固定版 `gcovr==8.6`。
+- `/dev/sdb1` 是 150 GiB ext4 数据盘，已以 `rw` 持久挂载到 `/data`；文件系统显示
+  `146.6G`，当前约 `129.4G` 可用、使用率 7%，inode 使用率 5%。
+- `/data` 由 `ubuntu:ubuntu` 持有且当前用户可写；`/etc/fstab` 使用 UUID、
+  `defaults,nofail`，`findmnt --verify` 为 0 parse errors / 0 errors。非 root 检查产生的
+  on-disk filesystem type permission warnings 不代表挂载失败。
+- 系统盘约 48G，`/home/ubuntu` 和旧项目都落在系统盘，当前约 25G 可用。因此新的完整
+  openvela checkout/build 必须放在 `/data` 的新隔离目录，不能继续消耗旧项目所在分区。
+- `/data` 还包含 `codex-audit`、`lxd-storage` 和 `lost+found`；它们不属于本轮工作范围，
+  不得读取、修改、移动或清理。
+
+`/home/ubuntu/smart-band-sim-20260720-v1/openvela` 只是运行产物快照：有 `cmake_out/`、
+`prebuilts/`、`vendor/` 和 `emulator.sh`，但没有 `build.sh`、`.repo` 或完整源码树，不能
+用于当前源码的真实 fresh build。其既有 NuttX artifact 与 Q0/Q1-V evidence 必须保留。
+
+`/home/ubuntu/smart-band-sim-20260720-v1/smart-band-demo` 仍是 `b75cbb0` 的 dirty 旧树，
+不得 pull、覆盖或拿来代替本地当前工作树。下一对话应把本地精确工作树复制为 `/data`
+下的新 source snapshot，并把完整 openvela checkout/build 放入另一个新目录。
 
 ### 固定 openvela 构建与真实 runtime
 
@@ -249,10 +277,14 @@ T2026 的失败 JSON/截图未复制进本地 `docs/evidence/`；本地保存的
 复赛目标已经冻结，不再让用户重新选择。当前 central runtime、事件队列、clock、
 capability model 和 controller 接线均已实现，且未增加用户可见功能。下一对话：
 
-1. 在 Linux/CI 运行 `python tests/test_core_coverage.py`，要求新增四个 service `>=90%`、
-   总体 `>=85%`。
-2. 用当前源码完成真实 openvela 构建；不得使用远端旧 dirty tree 代替本地工作树。
-3. 两项通过后才进入 Q1-C 后半：dirty flags、platform no-op/loopback 和 fake LVGL
+1. 在 `/data` 创建新的隔离 source snapshot，把本地精确当前工作树传到远端；排除
+   `node_modules`、构建输出和大型 evidence，但不得漏掉未提交 Q1-C 源码与测试。
+2. 在 snapshot 内创建项目 venv，安装固定版 `gcovr==8.6`，运行
+   `python tests/test_core_coverage.py`；要求新增四个 service `>=90%`、总体 `>=85%`。
+3. 按 `.github/workflows/openvela-nightly.yml` 的固定 manifest/revisions，在 `/data` 的另一个
+   隔离目录建立完整 openvela checkout，用当前 snapshot 完成真实构建，建议 `-j2` 或 `-j4`。
+4. coverage/build 失败时只修 Q1-C 第一半；保留失败日志和结构化 evidence。
+5. 两项通过后才进入 Q1-C 后半：dirty flags、platform no-op/loopback 和 fake LVGL
    第 N 次创建失败注入。
 
 不得同时实现 Q1-S storage codec、表盘或其他 A-G 功能；Q1-C 总项仍保持未完成。
@@ -267,13 +299,10 @@ git log -5 --oneline --decorate
 Get-Item -LiteralPath 'E:\C_Moved_From_C\Users\Lenovo\Desktop\AI Gateway 工具\Remote Codex.cmd'
 ```
 
-远端现有独立工作区为 `/home/ubuntu/smart-band-sim-20260720-v1`，其中包含 `openvela/`、
-`smart-band-demo/` 和 `evidence/`。下一对话先确认远端磁盘、进程、端口和源码状态，
-只操作该项目目录与本轮启动的进程组；不在文档或日志中写入凭据。
-
-用户确认远端磁盘容量为 `150G`，当前无需另租服务器。大型 checkout/build 前必须确认
-该容量对应的实际挂载点和剩余空间，并在新隔离目录操作；此前记录的约 `25G` 可用空间
-只代表当时检查到的文件系统，不代表远端总容量。
+远端旧工作区为 `/home/ubuntu/smart-band-sim-20260720-v1`，只用于保留既有 artifact 和
+evidence。新工作区必须位于 `/data`；开始前重跑 `lsblk`、`df -hT /data`、`findmnt /data`，
+确认没有本轮遗留进程/端口，并使用带时间戳或 run-id 的新目录。不在文档或日志中写入
+SSH key、token 或其他凭据。
 
 快速 host 验证：
 
@@ -307,7 +336,8 @@ gh workflow run openvela-nightly.yml `
   -f build_jobs=2
 ```
 
-本机没有可用 GCC，因此不要把本地 coverage tool 缺失误判为代码失败；覆盖率以 GitHub Actions 的 Ubuntu job 为准。
+Windows 本机没有可用 GCC，因此不要把本地 coverage tool 缺失误判为代码失败；本轮优先
+使用已核对的远端 Ubuntu `/data` 隔离 snapshot 跑 coverage，并由 GitHub Actions 复核。
 
 需要复验 Q1-V 时，先把当前脚本安全复制到远端独立 tools 目录，再使用新的空 evidence
 目录和空闲偶数端口运行：
@@ -326,4 +356,5 @@ python3 scripts/run_native_e2e.py \
 镜像 SHA 已单独复核。最终工具/源码 snapshot 为
 `tools/audit-final-20260720T2025CST`；远端最终无 emulator/QEMU/`smart_band` host 进程、
 无 `5690/5692/5694` 监听端口、无 runtime-output 目录残留，剩余磁盘
-`26,559,209,472` bytes。
+`26,559,209,472` bytes。该数值仅指旧工作区所在的系统盘；150 GiB 数据盘实际挂载在
+`/data`，当前约 `129.4G` 可用。
