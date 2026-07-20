@@ -26,6 +26,7 @@ typedef enum
 } smart_band_app_id_t;
 
 typedef struct smart_band_app_host_s smart_band_app_host_t;
+typedef uint32_t (*smart_band_app_monotonic_now_fn)(void *context);
 
 typedef struct
 {
@@ -62,6 +63,8 @@ struct smart_band_app_host_s
   lv_coord_t screen_w;
   lv_coord_t screen_h;
   const smart_band_state_t *model;
+  smart_band_app_monotonic_now_fn monotonic_now;
+  void *clock_context;
 
   lv_coord_t (*sx)(int value);
   lv_coord_t (*sy)(int value);
@@ -120,7 +123,7 @@ int smart_band_app_mount(smart_band_apps_runtime_t *runtime,
 void smart_band_app_unmount(smart_band_apps_runtime_t *runtime);
 void smart_band_app_render(smart_band_apps_runtime_t *runtime,
                            const smart_band_app_host_t *host);
-void smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
+bool smart_band_apps_tick_at(smart_band_apps_runtime_t *runtime,
                              bool active_visible, uint32_t now_ms);
 smart_band_app_id_t
 smart_band_apps_active(const smart_band_apps_runtime_t *runtime);

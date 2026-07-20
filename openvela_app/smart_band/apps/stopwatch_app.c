@@ -26,6 +26,8 @@ typedef struct
 {
   stopwatch_state_t state;
   stopwatch_view_t view;
+  smart_band_app_monotonic_now_fn monotonic_now;
+  void *clock_context;
   smart_band_app_event_binding_t bindings[STOPWATCH_ACTION_COUNT];
 } stopwatch_context_t;
 
@@ -127,7 +129,7 @@ static void stopwatch_cb(lv_event_t *event)
   smart_band_app_event_binding_t *binding =
     lv_event_get_user_data(event);
   stopwatch_context_t *stopwatch;
-  uint32_t now_ms = lv_tick_get();
+  uint32_t now_ms;
 
   if (binding == NULL || binding->context == NULL)
     {
@@ -135,6 +137,8 @@ static void stopwatch_cb(lv_event_t *event)
     }
 
   stopwatch = binding->context;
+  now_ms = stopwatch->monotonic_now == NULL ? lv_tick_get() :
+           stopwatch->monotonic_now(stopwatch->clock_context);
   if (binding->action == 1)
     {
       if (stopwatch->state.running)
@@ -170,6 +174,8 @@ static int stopwatch_mount(void *context, lv_obj_t *parent,
     }
 
   stopwatch_unmount(stopwatch);
+  stopwatch->monotonic_now = host->monotonic_now;
+  stopwatch->clock_context = host->clock_context;
   for (index = 0; index < STOPWATCH_ACTION_COUNT; index++)
     {
       stopwatch->bindings[index].context = stopwatch;

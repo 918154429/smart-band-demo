@@ -19,6 +19,13 @@ FAKE_LVGL_SOURCE = Path(__file__).with_name("fake_lvgl_runtime.c")
 PRODUCTION_SOURCES = [
     APP_DIR / "watch_model.c",
     APP_DIR / "sensor_bridge.c",
+    APP_DIR / "services" / "event_queue.c",
+    APP_DIR / "services" / "event_inbox.c",
+    APP_DIR / "services" / "clock.c",
+    APP_DIR / "services" / "capabilities.c",
+    APP_DIR / "services" / "runtime.c",
+    APP_DIR / "platform" / "platform_noop.c",
+    APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "logic" / "calculator_model.c",
     APP_DIR / "logic" / "game_2048_model.c",
     APP_DIR / "logic" / "mines_model.c",

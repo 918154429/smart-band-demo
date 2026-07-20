@@ -30,6 +30,8 @@
 openvela_app/smart_band/        openvela 原生应用源码，可复制到 packages/demos
 openvela_app/smart_band/apps/   每个小应用的 context、view 与 lifecycle 实现
 openvela_app/smart_band/logic/  Calculator、2048、Mines 等无 LVGL 生产状态机
+openvela_app/smart_band/services 中央 runtime、事件、时钟与能力服务
+openvela_app/smart_band/platform 可注入 platform no-op 与 sync loopback
 openvela_app/smart_band/ui/lvgl 通用 LVGL 组件与主页面 view
 openvela_app/smart_band/include 公共头文件、模型和图标声明
 openvela_app/smart_band/assets  项目图标与演示图片资源
@@ -240,8 +242,10 @@ python3 scripts/smoke_openvela_emulator.py \
   --evidence-dir /tmp/smart-band-emulator-smoke
 ```
 
-通过时还必须看到原生应用输出 `smart_band: UI ready`。该检查证明 native LVGL
-初始化和应用主循环已运行；像素、触摸和布局仍由浏览器视觉测试及人工模拟器验收覆盖。
+通过时还必须看到原生应用输出 `smart_band: UI ready`。该 smoke 只证明 native LVGL
+初始化和应用主循环已运行。native 像素、触摸滑动和 sensor UI 由
+`scripts/run_native_e2e.py` 的 framebuffer 截图、结构化状态与 golden ROI 门禁覆盖；
+Browser 测试只覆盖 Web demo，不作为 native 证据。
 
 如果使用开发板，完成烧录后在串口 shell 中执行同样的命令：
 
@@ -295,30 +299,47 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含五组不依赖 openvela 的 host C 门禁。Python 入口会寻找
-GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、应用 runtime、Timer、
-Stopwatch 以及完整 LVGL/UI 源集，再执行测试或编译链接 smoke：
+本仓库包含六组不依赖 openvela 的 host C 门禁。Python 入口会寻找
+GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、中央 runtime、应用
+registry、Timer、Stopwatch 以及完整 LVGL/UI 源集，再执行测试或编译链接 smoke：
 
 ```sh
 python3 tests/test_watch_model.py
 python3 tests/test_time_apps.py
 python3 tests/test_app_runtime.py
+python3 tests/test_runtime_core.py
 python3 tests/test_app_logic.py
 python3 tests/test_ui_compile.py
+python3 tests/test_emulator_smoke.py
+python3 tests/test_q0_baseline.py
+python3 tests/test_native_e2e.py
 bash scripts/test_reproduce_failure.sh
 npm ci
 npx playwright install chromium
 npm run test:browser
 ```
 
-测试覆盖时间格式、页面切换、数据来源/TTL/墙钟回拨、无传感器构建、模拟数据范围、
-步数目标，以及应用 runtime 的 owned container、失败回滚、双实例隔离、1000 次
-mount/unmount，Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
+测试覆盖定长事件队列的合并/满载/优先级、带锁外部事件 inbox、32 位单调 tick 回绕、
+启动无效后可恢复的 RTC、墙钟回拨、page-specific dirty render、可注入
+storage/power/haptic/sync 平台接口与固定内存 loopback、时间格式、页面切换、数据来源/TTL、
+无传感器构建、模拟数据范围、步数目标，以及应用 runtime 的 owned container、失败回滚、
+双实例隔离、全部 UI/app 创建失败扫点和 1000 次 create/navigation/mount/tick/back/destroy
+零对象、event、timer 净增长，Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
 与生产代码分离的 Python 模型副本，并直接验证 Calculator、2048、Mines 的生产
 reducer、显式 seed 与边界条件。浏览器门禁覆盖 320x568、667x375、焦点保留、
 ARIA live、对比度、触控尺寸和 reduced-motion。Linux CI 还使用
 `tests/test_core_coverage.py` 对完整 host-testable production C core 强制至少 85% 行
-覆盖率。也可以通过 `CC` 环境变量指定编译器。
+覆盖率，并对新增 event queue/inbox、clock、capabilities、runtime、platform no-op 和
+sync loopback 每个生产源文件分别强制至少 90%。也可以
+通过 `CC` 环境变量指定编译器。
+
+Q0 的 20 次冷启动/资源采集入口为 `scripts/collect_q0_baseline.py`；正式运行硬性要求
+不少于 20 次、匹配的 gate receipt/source manifest/NuttX SHA、每轮全量隔离输入和批次
+前后完整性。Q1-V 的 native 截图、goldfish 触摸滑动和心率注入入口为
+`scripts/run_native_e2e.py`，并精确断言 `Heart Rate`、`104 bpm`、`Source / Sensor`
+golden ROI。两者都拒绝覆盖非空 evidence 目录并保留结构化失败结果。当前结果见
+[`docs/q0-q1v-baseline-20260720.md`](docs/q0-q1v-baseline-20260720.md) 和
+[`docs/q1c-runtime-platform-20260720.md`](docs/q1c-runtime-platform-20260720.md)。
 
 ## 基本异常处理说明
 

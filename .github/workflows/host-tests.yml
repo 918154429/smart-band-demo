@@ -75,6 +75,29 @@ jobs:
       - name: Compile and run production app runtime tests
         run: python tests/test_app_runtime.py
 
+  production-central-runtime:
+    name: Central runtime (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Compile and run central runtime tests
+        run: python tests/test_runtime_core.py
+
   production-app-logic:
     name: App logic (${{ matrix.os }}, ${{ matrix.compiler }})
     strategy:
@@ -136,6 +159,24 @@ jobs:
       - name: Compile and link all production UI and app sources
         run: python tests/test_ui_compile.py
 
+  evidence-harness:
+    name: Evidence harness (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Validate native evidence harnesses
+        run: |
+          python tests/test_emulator_smoke.py
+          python tests/test_q0_baseline.py
+          python tests/test_native_e2e.py
+
   shell-syntax:
     runs-on: ubuntu-latest
     steps:
@@ -148,13 +189,18 @@ jobs:
           test "$(git ls-files -s skills/openvela-smart-band-reproduce/scripts/reproduce.sh | awk '{print $1}')" = 100755
       - name: Validate shell syntax
         run: bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh
-      - name: Validate emulator smoke harness
-        run: python3 tests/test_emulator_smoke.py
       - name: Verify reproduction failure rollback
         run: bash scripts/test_reproduce_failure.sh
       - name: Validate application registry and 2048 rename
         run: |
           for source in \
+            services/event_queue.c \
+            services/event_inbox.c \
+            services/clock.c \
+            services/capabilities.c \
+            services/runtime.c \
+            platform/platform_noop.c \
+            platform/loopback/sync_loopback.c \
             apps/game_2048_app.c \
             logic/calculator_model.c \
             logic/game_2048_model.c \

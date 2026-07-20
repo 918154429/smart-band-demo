@@ -41,6 +41,7 @@ static void format_time(smart_band_state_t *state, time_t now)
       snprintf(state->time_text, sizeof(state->time_text), "--:--");
       snprintf(state->date_text, sizeof(state->date_text), "----/--/--");
       state->time_valid = false;
+      state->wall_time = (time_t)-1;
       return;
     }
 
@@ -54,6 +55,28 @@ static void format_time(smart_band_state_t *state, time_t now)
   snprintf(state->date_text, sizeof(state->date_text), "%04d/%02d/%02d",
            year, month, day);
   state->time_valid = true;
+  state->wall_time = now;
+}
+
+void smart_band_state_set_wall_time(smart_band_state_t *state, time_t now,
+                                    bool valid)
+{
+  if (state == NULL)
+    {
+      return;
+    }
+
+  if (valid)
+    {
+      format_time(state, now);
+    }
+  else
+    {
+      snprintf(state->time_text, sizeof(state->time_text), "--:--");
+      snprintf(state->date_text, sizeof(state->date_text), "----/--/--");
+      state->time_valid = false;
+      state->wall_time = (time_t)-1;
+    }
 }
 
 bool smart_band_display_time(time_t now, struct tm *display_time)
@@ -201,6 +224,8 @@ static void use_simulated_metric(smart_band_state_t *state,
   info->source = SMART_BAND_DATA_SOURCE_SIMULATED;
   info->freshness = SMART_BAND_DATA_FRESHNESS_FRESH;
   info->last_update = now;
+  info->last_update_monotonic_ms = 0;
+  info->monotonic_valid = false;
   if (metric == SMART_BAND_METRIC_BATTERY)
     {
       state->battery_charging = false;
@@ -369,25 +394,41 @@ void smart_band_state_set_data_mode_at(smart_band_state_t *state,
 }
 
 static bool metric_is_expired(const smart_band_metric_info_t *info,
-                              time_t now)
+                              time_t wall_now, uint64_t monotonic_ms,
+                              bool monotonic_valid)
 {
-  if (now < info->last_update)
+  if (monotonic_valid && info->monotonic_valid)
+    {
+      return monotonic_ms - info->last_update_monotonic_ms >
+             (uint64_t)info->ttl_seconds * 1000u;
+    }
+
+  if (wall_now < info->last_update)
     {
       /* A wall-clock correction must not keep an old sample alive forever. */
 
       return true;
     }
 
-  if (now == info->last_update)
+  if (wall_now == info->last_update)
     {
       return false;
     }
 
-  return (unsigned long)(now - info->last_update) > info->ttl_seconds;
+  return (unsigned long)(wall_now - info->last_update) > info->ttl_seconds;
 }
 
 void smart_band_state_begin_sensor_cycle(smart_band_state_t *state,
                                          time_t now)
+{
+  smart_band_state_begin_sensor_cycle_at(
+    state, now, SMART_BAND_MONOTONIC_INVALID, false);
+}
+
+void smart_band_state_begin_sensor_cycle_at(smart_band_state_t *state,
+                                            time_t wall_now,
+                                            uint64_t monotonic_ms,
+                                            bool wall_rollback)
 {
   smart_band_metric_t metric;
 
@@ -406,13 +447,15 @@ void smart_band_state_begin_sensor_cycle(smart_band_state_t *state,
           continue;
         }
 
-      if (!metric_is_expired(info, now))
+      if (!wall_rollback &&
+          !metric_is_expired(info, wall_now, monotonic_ms,
+                             monotonic_ms != SMART_BAND_MONOTONIC_INVALID))
         {
           info->freshness = SMART_BAND_DATA_FRESHNESS_STALE;
         }
       else if (state->data_mode == SMART_BAND_DATA_MODE_AUTO)
         {
-          use_simulated_metric(state, metric, now);
+          use_simulated_metric(state, metric, wall_now);
         }
       else
         {
@@ -429,6 +472,18 @@ bool smart_band_state_publish_metric(smart_band_state_t *state,
                                      int value,
                                      smart_band_data_source_t source,
                                      time_t now)
+{
+  return smart_band_state_publish_metric_at(state, metric, value, source,
+                                            now,
+                                            SMART_BAND_MONOTONIC_INVALID);
+}
+
+bool smart_band_state_publish_metric_at(smart_band_state_t *state,
+                                        smart_band_metric_t metric,
+                                        int value,
+                                        smart_band_data_source_t source,
+                                        time_t wall_now,
+                                        uint64_t monotonic_ms)
 {
   smart_band_metric_info_t *info;
 
@@ -447,7 +502,9 @@ bool smart_band_state_publish_metric(smart_band_state_t *state,
   set_metric_value(state, metric, value);
   info->source = source;
   info->freshness = SMART_BAND_DATA_FRESHNESS_FRESH;
-  info->last_update = now;
+  info->last_update = wall_now;
+  info->last_update_monotonic_ms = monotonic_ms;
+  info->monotonic_valid = monotonic_ms != SMART_BAND_MONOTONIC_INVALID;
   update_status(state);
   sync_legacy_sensor_flags(state);
   return true;

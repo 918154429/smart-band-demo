@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 #ifdef __cplusplus
@@ -17,6 +18,7 @@ extern "C" {
 #define SMART_BAND_STEP_GOAL_MAX 50000
 #define SMART_BAND_STEP_GOAL_DELTA 1000
 #define SMART_BAND_SENSOR_TTL_SECONDS_DEFAULT 5
+#define SMART_BAND_MONOTONIC_INVALID UINT64_MAX
 
 typedef enum
 {
@@ -64,7 +66,9 @@ typedef struct
   smart_band_data_source_t source;
   smart_band_data_freshness_t freshness;
   time_t last_update;
+  uint64_t last_update_monotonic_ms;
   unsigned int ttl_seconds;
+  bool monotonic_valid;
 } smart_band_metric_info_t;
 
 typedef struct
@@ -89,6 +93,7 @@ typedef struct
   char date_text[SMART_BAND_DATE_TEXT_LEN];
   char status_text[SMART_BAND_STATUS_TEXT_LEN];
   bool time_valid;
+  time_t wall_time;
   int simulated_heart_rate;
   int simulated_steps;
   int simulated_battery_percent;
@@ -107,11 +112,21 @@ void smart_band_state_set_data_mode_at(smart_band_state_t *state,
                                        time_t now);
 void smart_band_state_begin_sensor_cycle(smart_band_state_t *state,
                                          time_t now);
+void smart_band_state_begin_sensor_cycle_at(smart_band_state_t *state,
+                                            time_t wall_now,
+                                            uint64_t monotonic_ms,
+                                            bool wall_rollback);
 bool smart_band_state_publish_metric(smart_band_state_t *state,
                                      smart_band_metric_t metric,
                                      int value,
                                      smart_band_data_source_t source,
                                      time_t now);
+bool smart_band_state_publish_metric_at(smart_band_state_t *state,
+                                        smart_band_metric_t metric,
+                                        int value,
+                                        smart_band_data_source_t source,
+                                        time_t wall_now,
+                                        uint64_t monotonic_ms);
 const smart_band_metric_info_t *
 smart_band_state_metric_info(const smart_band_state_t *state,
                              smart_band_metric_t metric);
@@ -121,6 +136,8 @@ void smart_band_adjust_step_goal(smart_band_state_t *state, int delta);
 const char *smart_band_page_title(smart_band_page_t page);
 int smart_band_step_progress(const smart_band_state_t *state);
 bool smart_band_display_time(time_t now, struct tm *display_time);
+void smart_band_state_set_wall_time(smart_band_state_t *state, time_t now,
+                                    bool valid);
 
 #ifdef __cplusplus
 }

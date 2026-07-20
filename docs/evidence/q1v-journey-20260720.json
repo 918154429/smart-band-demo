@@ -1,0 +1,736 @@
+{
+  "app_ui_ready_seconds": 0.750653,
+  "checks": {
+    "app_no_fatal": true,
+    "attributed_process_cleanup": true,
+    "console_ping": true,
+    "fixed_output_unchanged": true,
+    "heart_metric_structured_state": true,
+    "heart_model_png": true,
+    "heart_page_title_golden": true,
+    "heart_sensor_png": true,
+    "heart_value_104_bpm_golden": true,
+    "heart_value_transition_pixels": true,
+    "nsh_ready": true,
+    "page_transition_pixels": true,
+    "pidof": true,
+    "port_cleanup": true,
+    "port_preflight": true,
+    "process_cleanup": true,
+    "ps": true,
+    "runtime_input_cleanup": true,
+    "runtime_staged_isolated": true,
+    "sensor_enabled": true,
+    "sensor_get_104": true,
+    "sensor_set_console_ok": true,
+    "source_label_transition_pixels": true,
+    "source_sensor_golden": true,
+    "swipe_console_ok": true,
+    "uorb_heart_node": true,
+    "watch_face_png": true
+  },
+  "cleanup": {
+    "attributed_processes": {
+      "absent": true,
+      "actions": [],
+      "baseline": [],
+      "initial": [],
+      "remaining": [],
+      "run_id": "ae5b8ce885eb2f6ddd5da718133c0d2f",
+      "supported": true
+    },
+    "console_kill_response": "OK: killing emulator, bye bye\r\nOK",
+    "console_port_available": true,
+    "log": "cleanup.txt",
+    "process_group_absent": true,
+    "runtime_inputs": {
+      "already_missing": [],
+      "errors": [],
+      "inventory": [
+        {
+          "bytes": 103932,
+          "path": ".config"
+        },
+        {
+          "bytes": 65536,
+          "path": "build.avd/data/misc/pstore/pstore.bin"
+        },
+        {
+          "bytes": 26,
+          "path": "config.ini"
+        },
+        {
+          "bytes": 474,
+          "path": "emu-launch-params.txt"
+        },
+        {
+          "bytes": 3504,
+          "path": "hardware-qemu.ini"
+        },
+        {
+          "bytes": 7,
+          "path": "hardware-qemu.ini.lock"
+        },
+        {
+          "bytes": 0,
+          "path": "multiinstance.lock"
+        },
+        {
+          "bytes": 65913280,
+          "path": "nuttx"
+        },
+        {
+          "bytes": 0,
+          "path": "read-snapshot.txt"
+        },
+        {
+          "bytes": 7,
+          "path": "snapshot.lock.lock"
+        },
+        {
+          "bytes": 25,
+          "path": "system/build.prop"
+        },
+        {
+          "bytes": 268435456,
+          "path": "vela_data.bin"
+        },
+        {
+          "bytes": 1024,
+          "path": "vela_system.bin"
+        },
+        {
+          "bytes": 3,
+          "path": "version_num.cache"
+        }
+      ],
+      "passed": true,
+      "removed": [
+        ".config",
+        "nuttx",
+        "vela_system.bin",
+        "vela_data.bin"
+      ],
+      "tree_removed": true
+    }
+  },
+  "completed_at_utc": "2026-07-20T12:32:07.920028+00:00",
+  "console": {
+    "ping": "I am alive!\r\nOK",
+    "sensor_get": "heart-rate = 104\r\nOK",
+    "sensor_sets": [
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 1
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 2
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 3
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 4
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 5
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 6
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 7
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 8
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 9
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 10
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 11
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 12
+      }
+    ],
+    "sensor_status": "acceleration: enabled.\r\ngyroscope: enabled.\r\nmagnetic-field: enabled.\r\norientation: enabled.\r\ntemperature: enabled.\r\nproximity: enabled.\r\nlight: enabled.\r\npressure: enabled.\r\nhumidity: enabled.\r\nmagnetic-field-uncalibrated: enabled.\r\ngyroscope-uncalibrated: enabled.\r\nhinge-angle0: disabled.\r\nhinge-angle1: disabled.\r\nhinge-angle2: disabled.\r\nheart-rate: enabled.\r\nrgbc-light: disabled.\r\nwrist-tilt: disabled.\r\nacceleration-uncalibrated: enabled.\r\nOK",
+    "swipe": [
+      {
+        "command": "event mouse 800 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 760 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 720 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 680 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 640 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 600 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 560 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 520 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 0",
+        "ok": true,
+        "response": "OK"
+      }
+    ],
+    "swipe_attempts": [
+      {
+        "attempt": 1,
+        "commands": [
+          {
+            "command": "event mouse 800 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 760 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 720 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 680 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 640 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 600 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 560 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 520 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 0",
+            "ok": true,
+            "response": "OK"
+          }
+        ],
+        "page_difference": {
+          "changed_pixels": 143269,
+          "changed_ratio": 0.936399,
+          "max_channel_delta": 255,
+          "mean_absolute_rgb_delta": 23.309174,
+          "region": [
+            470,
+            210,
+            810,
+            660
+          ],
+          "total_pixels": 153000
+        },
+        "screenshot": {
+          "bytes": 36636,
+          "channel_max": [
+            255,
+            255,
+            255,
+            255
+          ],
+          "channel_min": [
+            41,
+            12,
+            8,
+            255
+          ],
+          "console_ok": true,
+          "console_response": "OK",
+          "format": "RGBA8 non-interlaced PNG",
+          "height": 800,
+          "nonblank": true,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/heart-model-attempt-01.png",
+          "sha256": "a926212bcc426794d4da2590f405b41a45c9b4b14d750c233be87f0c15a5e7f4",
+          "unique_rgba_colors": 703,
+          "width": 1280
+        },
+        "title_golden": {
+          "bytes": 19600,
+          "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+          "expected_text": "Heart Rate",
+          "matches": true,
+          "region": [
+            570,
+            165,
+            710,
+            200
+          ],
+          "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+        }
+      }
+    ]
+  },
+  "console_port": 5692,
+  "emulator_command": [
+    "/home/ubuntu/smart-band-sim-20260720-v1/openvela/emulator.sh",
+    "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output",
+    "-no-window",
+    "-no-audio",
+    "-accel",
+    "off",
+    "-port",
+    "5692",
+    "-skin",
+    "xiaomi_smart_screen_10",
+    "-skindir",
+    "/home/ubuntu/smart-band-sim-20260720-v1/openvela/prebuilts/emulator/skins"
+  ],
+  "emulator_process": {
+    "pgid": 510907,
+    "pid": 510907
+  },
+  "evidence_dir": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST",
+  "evidence_manifest": "evidence.sha256",
+  "failure": null,
+  "fixed_output": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap",
+  "golden_regions": {
+    "heart_page_title": {
+      "bytes": 19600,
+      "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+      "expected_text": "Heart Rate",
+      "matches": true,
+      "region": [
+        570,
+        165,
+        710,
+        200
+      ],
+      "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+    },
+    "heart_value_104_bpm": {
+      "bytes": 57600,
+      "expected_sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761",
+      "expected_text": "104 bpm",
+      "matches": true,
+      "region": [
+        550,
+        330,
+        790,
+        390
+      ],
+      "sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761"
+    },
+    "source_sensor": {
+      "bytes": 30800,
+      "expected_sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a",
+      "expected_text": "Source / Sensor",
+      "matches": true,
+      "region": [
+        650,
+        490,
+        790,
+        545
+      ],
+      "sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a"
+    }
+  },
+  "harness": {
+    "path": "/home/ubuntu/smart-band-sim-20260720-v1/tools/audit-final-20260720T2025CST/scripts/run_native_e2e.py",
+    "sha256": "9f3795928d1018154136c34014a1d161720104058198ea915865719bb9c433d2"
+  },
+  "nsh": {
+    "fatal_marker": null,
+    "heart_rate_node": true,
+    "ps_contains_smart_band": true,
+    "ready": true,
+    "smart_band_pids": [
+      13
+    ]
+  },
+  "openvela_root": "/home/ubuntu/smart-band-sim-20260720-v1/openvela",
+  "phase": "complete",
+  "pixel_transitions": {
+    "heart_model_to_sensor": {
+      "heart_value": {
+        "changed_pixels": 1874,
+        "changed_ratio": 0.130139,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 17.24662,
+        "region": [
+          550,
+          330,
+          790,
+          390
+        ],
+        "total_pixels": 14400
+      },
+      "source_label": {
+        "changed_pixels": 612,
+        "changed_ratio": 0.079481,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 9.680952,
+        "region": [
+          650,
+          490,
+          790,
+          545
+        ],
+        "total_pixels": 7700
+      }
+    },
+    "watch_face_to_heart_model": {
+      "changed_pixels": 143269,
+      "changed_ratio": 0.936399,
+      "max_channel_delta": 255,
+      "mean_absolute_rgb_delta": 23.309174,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    }
+  },
+  "process_attribution": {
+    "baseline": [],
+    "environment": "SMART_BAND_NATIVE_E2E_RUN_ID",
+    "executables": [
+      "/home/ubuntu/smart-band-sim-20260720-v1/openvela/prebuilts/emulator/linux-x86_64/emulator",
+      "/home/ubuntu/smart-band-sim-20260720-v1/openvela/prebuilts/emulator/linux-x86_64/qemu/linux-x86_64/qemu-system-aarch64-headless"
+    ],
+    "run_id": "ae5b8ce885eb2f6ddd5da718133c0d2f",
+    "runtime_output": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output"
+  },
+  "rendered_metric_state": {
+    "derivation": {
+      "page": "exact Heart Rate golden ROI",
+      "source_freshness": "exact Sensor golden ROI; production mapping renders Sensor stale when freshness is stale",
+      "transport": "enabled emulator sensor plus NSH uORB node",
+      "value": "exact 104 bpm golden ROI plus console get"
+    },
+    "freshness": "fresh",
+    "page": "heart_rate",
+    "passed": true,
+    "source": "sensor",
+    "value_bpm": 104
+  },
+  "run_id": "ae5b8ce885eb2f6ddd5da718133c0d2f",
+  "runtime": {
+    "config_ini": {
+      "content": "hw.sensors.heart_rate=yes\n",
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/config.ini"
+    },
+    "files": {
+      ".config": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 103932,
+          "device": 64512,
+          "inode": 1102100,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "source_after": {
+          "bytes": 103932,
+          "device": 64512,
+          "inode": 1102100,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 103932,
+          "device": 64512,
+          "inode": 1488942,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        },
+        "staged_after": {
+          "bytes": 103932,
+          "device": 64512,
+          "inode": 1488942,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/.config",
+          "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+        }
+      },
+      "nuttx": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 65913280,
+          "device": 64512,
+          "inode": 1102099,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+        },
+        "source_after": {
+          "bytes": 65913280,
+          "device": 64512,
+          "inode": 1102099,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 65913280,
+          "device": 64512,
+          "inode": 1488943,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/nuttx",
+          "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+        },
+        "staged_after": {
+          "bytes": 65913280,
+          "device": 64512,
+          "inode": 1488943,
+          "mtime_ns": 1784536828000000000,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/nuttx",
+          "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+        }
+      },
+      "vela_data.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 268435456,
+          "device": 64512,
+          "inode": 1102103,
+          "mtime_ns": 1784538626239587636,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+        },
+        "source_after": {
+          "bytes": 268435456,
+          "device": 64512,
+          "inode": 1102103,
+          "mtime_ns": 1784538626239587636,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 268435456,
+          "device": 64512,
+          "inode": 1488954,
+          "mtime_ns": 1784538626239587636,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/vela_data.bin",
+          "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+        },
+        "staged_after": {
+          "bytes": 268435456,
+          "device": 64512,
+          "inode": 1488954,
+          "mtime_ns": 1784538626239587636,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/vela_data.bin",
+          "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+        }
+      },
+      "vela_system.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 1024,
+          "device": 64512,
+          "inode": 1102102,
+          "mtime_ns": 1784537496749299712,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+        },
+        "source_after": {
+          "bytes": 1024,
+          "device": 64512,
+          "inode": 1102102,
+          "mtime_ns": 1784537496749299712,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 1024,
+          "device": 64512,
+          "inode": 1488953,
+          "mtime_ns": 1784537496749299712,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/vela_system.bin",
+          "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+        },
+        "staged_after": {
+          "bytes": 1024,
+          "device": 64512,
+          "inode": 1488953,
+          "mtime_ns": 1784537496749299712,
+          "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output/vela_system.bin",
+          "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+        }
+      }
+    },
+    "runtime_output": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/runtime-output",
+    "source_output": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap"
+  },
+  "screenshots": {
+    "heart_model": {
+      "bytes": 36636,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/heart-model.png",
+      "sha256": "a926212bcc426794d4da2590f405b41a45c9b4b14d750c233be87f0c15a5e7f4",
+      "unique_rgba_colors": 703,
+      "width": 1280
+    },
+    "heart_sensor": {
+      "bytes": 36678,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/heart-sensor.png",
+      "sha256": "956ed6c38cab119a7a3bf6232ca06d2e92fc8fa67c424544ef36d1e1415168e3",
+      "unique_rgba_colors": 697,
+      "width": 1280
+    },
+    "watch_face": {
+      "bytes": 50890,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        0,
+        12,
+        16,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST/watch-face.png",
+      "sha256": "3196411357d75f424813a442065206943cf76dbb91baa5759128f520d8c01dfe",
+      "unique_rgba_colors": 1886,
+      "width": 1280
+    }
+  },
+  "smoke_helper": {
+    "path": "/home/ubuntu/smart-band-sim-20260720-v1/tools/audit-final-20260720T2025CST/scripts/smoke_openvela_emulator.py",
+    "sha256": "eff60209d49f8e4c988f22a7e80deea8ced3d59ed3b305e4f7740a70c979811a"
+  },
+  "started_at_utc": "2026-07-20T12:31:18.633883+00:00",
+  "status": "passed"
+}

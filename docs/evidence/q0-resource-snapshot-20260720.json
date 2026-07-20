@@ -1,0 +1,169 @@
+{
+  "artifacts": {
+    ".config": {
+      "bytes": 103932,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+      "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+    },
+    "nuttx": {
+      "bytes": 65913280,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+      "sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58"
+    },
+    "vela_data.bin": {
+      "bytes": 268435456,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+      "sha256": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+    },
+    "vela_system.bin": {
+      "bytes": 1024,
+      "path": "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+      "sha256": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5"
+    }
+  },
+  "linker_map": null,
+  "map_evidence": "elf-symbol-map",
+  "rejected_linker_maps": [],
+  "required_tools_ok": true,
+  "revisions": {
+    "claude": null,
+    "emulator": "be9cdef6709c2a7aed547c3029d8872c58e5f3f9",
+    "emulator_tools": "37f5024f1d9157b9778d0d9e739ee0fa68743d42",
+    "manifest": null
+  },
+  "smart_band_symbols": {
+    "anchors_present": true,
+    "matched_symbols": 546,
+    "required_anchors": {
+      "smart_band_icon_heart_map": true,
+      "smart_band_main": true
+    },
+    "summed_symbol_bytes": 303999
+  },
+  "static_assets": {
+    "file_count": 14,
+    "files": [
+      {
+        "bytes": 1281317,
+        "path": "openvela_app/smart_band/assets/capybara_lotus_reference.png",
+        "sha256": "ad3d515684c9a9d685b2400198e4c4ae27d140e3e243883d7b05da6637541dff"
+      },
+      {
+        "bytes": 4144,
+        "path": "openvela_app/smart_band/assets/generated_icons/calculator.png",
+        "sha256": "82e294db24b716693ebdfedbd09e754b402bf9833146014c1c22ed339f5d8a86"
+      },
+      {
+        "bytes": 4367,
+        "path": "openvela_app/smart_band/assets/generated_icons/game2048.png",
+        "sha256": "8a6b65da870807fd670c3d3de03abb1ca48b42615ad13d19160e1709377b46fe"
+      },
+      {
+        "bytes": 4233,
+        "path": "openvela_app/smart_band/assets/generated_icons/heart.png",
+        "sha256": "7a2f71a83af0a91a7aef7b521c40bb422eae8e59f8efde07e56956afc7e7b95c"
+      },
+      {
+        "bytes": 4893,
+        "path": "openvela_app/smart_band/assets/generated_icons/mines.png",
+        "sha256": "31994183c525accfd060bf1424398211a44dbae8b0f5af65fc6e7014f6cd9ad6"
+      },
+      {
+        "bytes": 4610,
+        "path": "openvela_app/smart_band/assets/generated_icons/sleep.png",
+        "sha256": "d38804582951d06b74335efecb1490e17765e454ac500139a80a418e87219251"
+      },
+      {
+        "bytes": 5732,
+        "path": "openvela_app/smart_band/assets/generated_icons/steps.png",
+        "sha256": "407306029e3184fef2600a59a1c43e6211216f88725fe800e1042f5a338dab5a"
+      },
+      {
+        "bytes": 4950,
+        "path": "openvela_app/smart_band/assets/generated_icons/stopwatch.png",
+        "sha256": "093b05f98e940a916c5f55c7ab31ed160f1ebc4cafd688a16401b0f36330492e"
+      },
+      {
+        "bytes": 4574,
+        "path": "openvela_app/smart_band/assets/generated_icons/stress.png",
+        "sha256": "67a66c4feffae37d25a5d4319e611ee040c7f81105adead1cc95a2ad975f610f"
+      },
+      {
+        "bytes": 4395,
+        "path": "openvela_app/smart_band/assets/generated_icons/tetris.png",
+        "sha256": "255c576bc3794585287fae5eaf206701e6775eb3d6b46a3e80e848ca84ad26d7"
+      },
+      {
+        "bytes": 4857,
+        "path": "openvela_app/smart_band/assets/generated_icons/timer.png",
+        "sha256": "5b8adb4e8238097fc944eae7c42bc50cb30793852b5e92cbecad409404fac44e"
+      },
+      {
+        "bytes": 4259,
+        "path": "openvela_app/smart_band/assets/generated_icons/weather.png",
+        "sha256": "8d9c9bb1d93b45a54b5e63c21ee267b185f0f600b2dd8cb5ffb1da5b5b9631d5"
+      },
+      {
+        "bytes": 5070,
+        "path": "openvela_app/smart_band/assets/generated_icons/wooden_fish.png",
+        "sha256": "cf65e7714b1d7001f4e0364e9782c9584f4d2bebaf4a8b4accee3e040edd22a4"
+      },
+      {
+        "bytes": 689642,
+        "path": "openvela_app/smart_band/icon_assets.c",
+        "sha256": "aae7f65582d7620a8cc5d33b41fa90d3ce9dd38b66361c7c39dc5376c20b865c"
+      }
+    ],
+    "total_source_bytes": 2027043
+  },
+  "tools": {
+    "file": {
+      "available": true,
+      "command": [
+        "file",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx"
+      ],
+      "returncode": 0
+    },
+    "nm": {
+      "available": true,
+      "command": [
+        "nm",
+        "-a",
+        "-S",
+        "--size-sort",
+        "--radix=d",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx"
+      ],
+      "returncode": 0
+    },
+    "readelf_header": {
+      "available": true,
+      "command": [
+        "readelf",
+        "-h",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx"
+      ],
+      "returncode": 0
+    },
+    "readelf_sections": {
+      "available": true,
+      "command": [
+        "readelf",
+        "-SW",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx"
+      ],
+      "returncode": 0
+    },
+    "size": {
+      "available": true,
+      "command": [
+        "size",
+        "-A",
+        "-d",
+        "/home/ubuntu/smart-band-sim-20260720-v1/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx"
+      ],
+      "returncode": 0
+    }
+  }
+}

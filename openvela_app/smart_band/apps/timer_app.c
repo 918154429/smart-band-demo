@@ -29,6 +29,8 @@ typedef struct
 {
   timer_state_t state;
   timer_view_t view;
+  smart_band_app_monotonic_now_fn monotonic_now;
+  void *clock_context;
   smart_band_app_event_binding_t bindings[TIMER_ACTION_COUNT];
 } timer_context_t;
 
@@ -147,7 +149,7 @@ static void timer_cb(lv_event_t *event)
   smart_band_app_event_binding_t *binding =
     lv_event_get_user_data(event);
   timer_context_t *timer;
-  uint32_t now_ms = lv_tick_get();
+  uint32_t now_ms;
 
   if (binding == NULL || binding->context == NULL)
     {
@@ -155,6 +157,8 @@ static void timer_cb(lv_event_t *event)
     }
 
   timer = binding->context;
+  now_ms = timer->monotonic_now == NULL ? lv_tick_get() :
+           timer->monotonic_now(timer->clock_context);
   if (binding->action == 1)
     {
       if (timer->state.running)
@@ -229,6 +233,8 @@ static int timer_mount(void *context, lv_obj_t *parent,
     }
 
   timer_unmount(timer);
+  timer->monotonic_now = host->monotonic_now;
+  timer->clock_context = host->clock_context;
   for (index = 0; index < TIMER_ACTION_COUNT; index++)
     {
       timer->bindings[index].context = timer;

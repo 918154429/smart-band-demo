@@ -38,7 +38,14 @@ packages/demos/smart_band_basic
 核心文件职责：
 
 - `smart_band_main.c`：应用入口，初始化 LVGL、NuttX LVGL 适配和 libuv UI 循环。
-- `app_lvgl.c`：根对象生命周期、页面导航、模型/传感器 timer 和应用 runtime 调度。
+- `app_lvgl.c`：根对象生命周期、页面导航和 central runtime 的 LVGL controller 适配。
+- `services/runtime.c`：统一持有 model、sensor provider、app registry、event queue、clock
+  与 capability snapshot，并固定 model -> sensor -> app tick 顺序。
+- `services/event_queue.c`：无堆分配的定长优先级队列、metrics/tick 合并和满载淘汰。
+- `services/event_inbox.c`：外部 callback 使用的带锁定长 inbox，UI tick 串行化到主队列。
+- `services/clock.c` / `services/capabilities.c`：可注入墙钟/单调钟及平台能力基线。
+- `platform/platform_noop.c`：storage、power、haptic、sync 的显式 unavailable 后端。
+- `platform/loopback/sync_loopback.c`：固定 8 x 64 bytes 内存 sync transport。
 - `ui/lvgl/components.c`：缩放、字体、标签、卡片、图标和格式化等通用 helper。
 - `ui/lvgl/watch_pages.c`：表盘、心率和计步页面的 view 创建与按需渲染。
 - `watch_model.c`：基础模型、时间、模拟数据、步数目标等逻辑。
@@ -72,7 +79,7 @@ packages/demos/smart_band_basic
 - 页面切换时只切换可见状态，减少重复创建对象。
 - 应用中心点击图标进入详情页。
 - 详情页使用左上角 `<` 返回应用中心。
-- 每秒 tick 更新模型、传感器数据和当前应用状态。
+- tick 更新模型、传感器数据和当前应用状态；dirty flags 只触发受影响页面或应用渲染。
 
 UI 处理重点：
 
@@ -174,12 +181,21 @@ include/icon_assets.h
   双实例隔离、后台计时、卸载重挂载和 tick 回绕。
 - `python3 tests/test_app_runtime.py` 直接编译生产 registry/runtime，验证 8 个应用
   反复 mount/unmount、owned container、失败回滚和 tick policy。
+- `python3 tests/test_runtime_core.py` 直接编译 central runtime、event queue/inbox、clock、
+  capability、model、provider 和 platform adapters，验证满载优先级、外部 callback
+  串行化、tick 回绕、RTC 恢复、墙钟回拨、dirty flags、no-op 与 sync loopback。
 - `python3 tests/test_app_logic.py` 直接编译 Calculator、2048、Mines 的生产 model，
   验证 reducer、合并规则、确定性随机数、邻居计数、连锁展开和非法输入不变性。
 - openvela 目标配置下执行 `./build.sh ... -j2` 验证编译。
 - 启动 goldfish 模拟器，在 NSH 中运行 `smart_band`。
 - 使用模拟器传感器滚动脚本验证心率、温度、湿度和电池状态进入 UI。
 - 手动点击和滑动验证页面切换、应用进入、返回和按钮操作。
+
+Q1-C 的最终自动化验收还覆盖 compact/framed 主 UI 和 8 个 lazy app 的每一个对象创建
+失败点，均要求清理后可重试；1000 次完整 UI 生命周期 object/event/timer 零净增长。
+Linux GCC/gcov 总行覆盖率为 `90.9% (1388/1527)`，7 个 Q1-C 新生产源文件各自不低于
+90%。固定版本 openvela fresh/incremental 构建和 native Heart Rate 旅程均通过，结果见
+`docs/q1c-runtime-platform-20260720.md`。
 
 ## 9. 后续维护建议
 

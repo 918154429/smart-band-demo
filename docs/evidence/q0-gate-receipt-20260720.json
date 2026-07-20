@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-07-20T12:24:34.9267811Z",
+  "baseline_revision": "1ddc533cb3096e541fe5cadaed810df39029ebc1",
+  "artifact_source_revision": "82c066cce36b5b05f5a8e90d3093aaaefbb1e04f",
+  "baseline_smart_band_git_tree": "1b1d3d2335c2976b4941bdeac1bc9daa2bed1830",
+  "artifact_smart_band_git_tree": "1b1d3d2335c2976b4941bdeac1bc9daa2bed1830",
+  "smart_band_tree_sha256": "9a3499266fa3caf85b5f0687eb053c79d934fc3080b7d932bb02a7f59960cfdf",
+  "nuttx_sha256": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58",
+  "collector_sha256": "3839647d7163fb3eb5389b91d79732fadfd4ba2dfb205dadb655cd994eec4181",
+  "smoke_sha256": "eff60209d49f8e4c988f22a7e80deea8ced3d59ed3b305e4f7740a70c979811a",
+  "fixed_input_sha256": {
+    ".config": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0",
+    "nuttx": "5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58",
+    "vela_system.bin": "8e83a5e4e0b78adf3b1363b66b81b478746ef2501862a90ea692140a805d2ff5",
+    "vela_data.bin": "051b8406d211024e75e268a0c6f4e76062537181e1358b7bdc2232649f8e2b58"
+  },
+  "openvela_revisions": {
+    "manifest": "67df2c52308f2579ac50d0cd7413e7f0e092b83a",
+    "claude": "ab5f8be8225ce25c2f808fae0085dbf2db8fadf4",
+    "emulator": "be9cdef6709c2a7aed547c3029d8872c58e5f3f9",
+    "emulator_tools": "37f5024f1d9157b9778d0d9e739ee0fa68743d42"
+  },
+  "fixed_build": {
+    "run_id": 29725945155,
+    "job_id": 88298959484,
+    "artifact_id": 8454484599,
+    "artifact_name": "openvela-fixed-release-29725945155",
+    "artifact_digest": "sha256:6bd49787456f5da9ca5f182944873d1bd192c77bd7ba0ca7d62282f8cdc25398",
+    "head_sha": "82c066cce36b5b05f5a8e90d3093aaaefbb1e04f",
+    "conclusion": "success",
+    "url": "https://github.com/918154429/smart-band-demo/actions/runs/29725945155"
+  },
+  "checks": {
+    "host": true,
+    "browser": true,
+    "shell": true,
+    "fixed_build_native_smoke": true,
+    "source_tree_equivalent": true,
+    "working_tree_attributed": true
+  },
+  "evidence": {
+    "host_actions": {
+      "run_id": 29730739442,
+      "head_sha": "1ddc533cb3096e541fe5cadaed810df39029ebc1",
+      "conclusion": "success",
+      "coverage_lines": "909/1052",
+      "coverage_percent": 86.4,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29730739442"
+    },
+    "browser_actions": {
+      "run_id": 29730739529,
+      "head_sha": "1ddc533cb3096e541fe5cadaed810df39029ebc1",
+      "conclusion": "success",
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29730739529"
+    },
+    "local_2026_07_20": {
+      "host_msvc_strict": {
+        "status": "passed",
+        "commands": [
+          "python tests/test_watch_model.py",
+          "python tests/test_time_apps.py",
+          "python tests/test_app_runtime.py",
+          "python tests/test_app_logic.py",
+          "python tests/test_ui_compile.py"
+        ],
+        "compiler_flags": "/std:c11 /W4 /WX"
+      },
+      "browser": {
+        "status": "passed",
+        "command": "npm run test:browser",
+        "tests": "6/6"
+      },
+      "shell": {
+        "status": "passed",
+        "command": "bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh && bash scripts/test_reproduce_failure.sh"
+      },
+      "harness_helpers": {
+        "status": "passed",
+        "emulator_smoke": "5 run, 1 Windows-only skip",
+        "q0": "15 total, 1 Windows-only skip",
+        "native_e2e": "14 total, 1 Windows-only skip"
+      }
+    },
+    "working_tree": {
+      "branch": "master",
+      "head": "1ddc533cb3096e541fe5cadaed810df39029ebc1",
+      "product_tree_modified": false,
+      "all_changes_attributed_to_q0_q1v_or_preexisting_roadmap_handoff": true
+    }
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "gate": "Q1-C",
+  "status": "passed",
+  "completed_at": "2026-07-20T23:57:47+08:00",
+  "scope": {
+    "implemented": [
+      "central runtime and deterministic controller tick",
+      "fixed-capacity priority event queue",
+      "locked external event inbox",
+      "injectable wall and monotonic clocks",
+      "capability snapshot with recoverable RTC detection",
+      "page-specific dirty rendering",
+      "injectable storage, power, haptic, and sync interfaces",
+      "explicit no-op platform backend",
+      "fixed-memory sync loopback",
+      "fake LVGL object, event, timer, tick, and failure model"
+    ],
+    "excluded": [
+      "Q1-S storage codec, schema, CRC, A/B slots, and fault backend",
+      "finals features A-G"
+    ]
+  },
+  "source_snapshot": {
+    "path": "/data/smart-band-q1c-20260720T223937CST/source-q1c-final",
+    "sha256": "c2d7fa8757761c3fabbe29e9b7e2f5e37aa381789f90633144a8f44254ee26c3"
+  },
+  "linux_coverage": {
+    "toolchain": "GCC/gcov 13.3.0, gcovr 8.6",
+    "overall": {
+      "covered_lines": 1388,
+      "total_lines": 1527,
+      "percent": 90.9,
+      "required_percent": 85.0
+    },
+    "new_production_sources": {
+      "services/event_queue.c": 93.2,
+      "services/event_inbox.c": 100.0,
+      "services/clock.c": 100.0,
+      "services/capabilities.c": 100.0,
+      "services/runtime.c": 96.6,
+      "platform/platform_noop.c": 100.0,
+      "platform/loopback/sync_loopback.c": 100.0
+    },
+    "required_each_percent": 90.0,
+    "passed": true
+  },
+  "ui_fault_and_soak": {
+    "main_ui_create_failure_sweep": "all create calls, compact and framed layouts",
+    "lazy_app_create_failure_sweep": "all create calls for all 8 applications",
+    "retry_after_failure": true,
+    "lifecycle_iterations": 1000,
+    "net_object_growth": 0,
+    "net_event_growth": 0,
+    "net_timer_growth": 0,
+    "passed": true
+  },
+  "openvela_build": {
+    "root": "/data/smart-band-q1c-20260720T223937CST/openvela",
+    "resolved_projects": 214,
+    "manifest_commit": "67df2c52308f2579ac50d0cd7413e7f0e092b83a",
+    "claude_commit": "ab5f8be8225ce25c2f808fae0085dbf2db8fadf4",
+    "emulator_commit": "be9cdef6709c2a7aed547c3029d8872c58e5f3f9",
+    "emulator_tools_commit": "37f5024f1d9157b9778d0d9e739ee0fa68743d42",
+    "fresh_build_passed": true,
+    "incremental_build_passed": true,
+    "artifacts": {
+      "nuttx": {
+        "bytes": 65911432,
+        "sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912"
+      },
+      ".config": {
+        "sha256": "54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0"
+      },
+      "vela_system.bin": {
+        "sha256": "77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf"
+      },
+      "vela_data.bin": {
+        "sha256": "8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85"
+      }
+    },
+    "passed": true
+  },
+  "native_e2e": {
+    "evidence_path": "/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final",
+    "local_journey": "docs/evidence/q1c-native-journey-20260720.json",
+    "local_screenshot": "docs/evidence/q1c-native-heart-sensor-20260720.png",
+    "ui_ready_seconds": 0.780311,
+    "first_swipe_reached_heart_rate": true,
+    "rendered_state": {
+      "page": "heart_rate",
+      "value_bpm": 104,
+      "source": "sensor",
+      "freshness": "fresh"
+    },
+    "golden_matches": [
+      "Heart Rate",
+      "104 bpm",
+      "Source / Sensor"
+    ],
+    "journey_sha256": "1abfe0816c070feae3de608d9e7e6d4804e23a6311517d4912559a805008ca21",
+    "screenshot_sha256": "956ed6c38cab119a7a3bf6232ca06d2e92fc8fa67c424544ef36d1e1415168e3",
+    "cleanup_passed": true,
+    "passed": true
+  },
+  "local_regression": {
+    "msvc_w4_wx_production_gates": 6,
+    "emulator_harness": "4 passed, 1 expected Windows POSIX skip (5 collected)",
+    "q0_harness": "14 passed, 1 expected Windows POSIX skip (15 collected)",
+    "native_harness": "13 passed, 1 expected Windows POSIX skip (14 collected)",
+    "browser": "6/6 passed",
+    "shell_syntax_and_rollback": "passed",
+    "passed": true
+  },
+  "remaining_unproven": [
+    "Q1-S persistence and storage fault recovery",
+    "native stale/TTL sensor fallback",
+    "all-page and all-app native pixel interaction coverage",
+    "second native reference resolution and long-duration native soak",
+    "physical board behavior and power measurements"
+  ]
+}

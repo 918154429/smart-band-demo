@@ -5,11 +5,9 @@
 #include "app_lvgl.h"
 
 #include "icon_assets.h"
-#include "sensor_bridge.h"
-#include "smart_band_apps.h"
+#include "smart_band_runtime.h"
 #include "ui/lvgl/components.h"
 #include "ui/lvgl/watch_pages.h"
-#include "watch_model.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -38,12 +36,8 @@ typedef struct
   lv_obj_t *app_content;
   lv_obj_t *app_back;
 
-  smart_band_apps_runtime_t apps;
-
   lv_timer_t *timer;
-  smart_band_state_t model;
-  smart_band_sensor_bridge_t sensors;
-  bool sensors_initialized;
+  smart_band_runtime_t runtime;
   lv_coord_t screen_w;
   lv_coord_t screen_h;
   lv_point_t press_point;
@@ -64,11 +58,24 @@ static void app_icon_cb(lv_event_t *event);
 static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
 static void render_page(void);
+static void render_pending(void);
 static lv_obj_t *create_action_button(lv_obj_t *parent, const char *text,
                                       lv_coord_t x, lv_coord_t y,
                                       lv_coord_t w, lv_coord_t h,
                                       lv_color_t color, lv_event_cb_t cb,
                                       uintptr_t data);
+
+static time_t runtime_wall_now(void *context)
+{
+  (void)context;
+  return time(NULL);
+}
+
+static uint32_t runtime_monotonic_now(void *context)
+{
+  (void)context;
+  return lv_tick_get();
+}
 
 static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
 static const lv_font_t *font_14(void) { return smart_band_ui_font_14(); }
@@ -125,7 +132,7 @@ static void configure_local_time(void)
 
 static void format_temperature(char *buffer, size_t size)
 {
-  smart_band_ui_format_temperature(&g_ui.model, buffer, size);
+  smart_band_ui_format_temperature(&g_ui.runtime.model, buffer, size);
 }
 static void format_duration(char *buffer, size_t size, int seconds)
 {
@@ -133,7 +140,7 @@ static void format_duration(char *buffer, size_t size, int seconds)
 }
 static void format_watch_date(char *buffer, size_t size)
 {
-  smart_band_ui_format_watch_date(&g_ui.model, buffer, size);
+  smart_band_ui_format_watch_date(&g_ui.runtime.model, buffer, size);
 }
 static lv_obj_t *create_page(lv_obj_t *parent)
 {
@@ -264,7 +271,9 @@ static smart_band_app_host_t make_app_host(void)
   memset(&host, 0, sizeof(host));
   host.screen_w = g_ui.screen_w;
   host.screen_h = g_ui.screen_h;
-  host.model = &g_ui.model;
+  host.model = &g_ui.runtime.model;
+  host.monotonic_now = runtime_monotonic_now;
+  host.clock_context = g_ui.runtime.clock.source.context;
   host.sx = sx;
   host.sy = sy;
   host.font_12 = font_12;
@@ -289,7 +298,7 @@ static void update_active_app(void)
 {
   smart_band_app_host_t host = make_app_host();
 
-  smart_band_app_render(&g_ui.apps, &host);
+  smart_band_app_render(&g_ui.runtime.apps, &host);
 }
 
 static void open_app(smart_band_app_id_t id)
@@ -303,11 +312,12 @@ static void open_app(smart_band_app_id_t id)
     }
 
   host = make_app_host();
-  smart_band_app_unmount(&g_ui.apps);
+  smart_band_app_unmount(&g_ui.runtime.apps);
   lv_obj_clean(g_ui.app_content);
   set_label_text(g_ui.app_title, def->title);
 
-  if (smart_band_app_mount(&g_ui.apps, id, g_ui.app_content, &host) != 0)
+  if (smart_band_app_mount(&g_ui.runtime.apps, id, g_ui.app_content,
+                           &host) != 0)
     {
       lv_obj_clean(g_ui.app_content);
       set_label_text(g_ui.app_title, "App failed");
@@ -638,8 +648,8 @@ static void update_dots(void)
 {
   for (int i = 0; i < SMART_BAND_PAGE_COUNT; i++)
     {
-      lv_color_t color = i == (int)g_ui.model.page ? lv_color_hex(0x79c5be) :
-                                                       lv_color_hex(0xc2d3d1);
+      lv_color_t color = i == (int)g_ui.runtime.model.page ?
+                         lv_color_hex(0x79c5be) : lv_color_hex(0xc2d3d1);
       lv_obj_set_style_bg_color(g_ui.dots[i], color, 0);
       lv_obj_set_size(g_ui.dots[i], sx(12), sx(12));
     }
@@ -665,12 +675,13 @@ static void set_page_visible(lv_obj_t *page, bool visible)
 static void update_page_visibility(void)
 {
   set_page_visible(g_ui.watch_pages.face_page,
-                   g_ui.model.page == SMART_BAND_PAGE_FACE);
+                   g_ui.runtime.model.page == SMART_BAND_PAGE_FACE);
   set_page_visible(g_ui.watch_pages.heart_page,
-                   g_ui.model.page == SMART_BAND_PAGE_HEART);
+                   g_ui.runtime.model.page == SMART_BAND_PAGE_HEART);
   set_page_visible(g_ui.watch_pages.steps_page,
-                   g_ui.model.page == SMART_BAND_PAGE_STEPS);
-  set_page_visible(g_ui.apps_page, g_ui.model.page == SMART_BAND_PAGE_APPS);
+                   g_ui.runtime.model.page == SMART_BAND_PAGE_STEPS);
+  set_page_visible(g_ui.apps_page,
+                   g_ui.runtime.model.page == SMART_BAND_PAGE_APPS);
 
   update_dots();
 }
@@ -682,24 +693,27 @@ static void switch_to_page(smart_band_page_t page)
       return;
     }
 
-  g_ui.model.page = page;
-  render_page();
+  g_ui.runtime.model.page = page;
+  smart_band_runtime_mark_dirty(&g_ui.runtime, SMART_BAND_DIRTY_PAGE);
+  render_pending();
 }
 
 static void update_face(void)
 {
   smart_band_watch_pages_render_face(&g_ui.watch_pages, &g_ui.components,
-                                     &g_ui.model, g_ui.compact_band);
+                                     &g_ui.runtime.model, g_ui.compact_band);
 }
 
 static void update_heart_detail(void)
 {
-  smart_band_watch_pages_render_heart(&g_ui.watch_pages, &g_ui.model);
+  smart_band_watch_pages_render_heart(&g_ui.watch_pages,
+                                      &g_ui.runtime.model);
 }
 
 static void update_steps_detail(void)
 {
-  smart_band_watch_pages_render_steps(&g_ui.watch_pages, &g_ui.model);
+  smart_band_watch_pages_render_steps(&g_ui.watch_pages,
+                                      &g_ui.runtime.model);
 }
 
 static void update_apps_page(void)
@@ -713,7 +727,7 @@ static void update_apps_page(void)
 
 static void render_page(void)
 {
-  switch (g_ui.model.page)
+  switch (g_ui.runtime.model.page)
     {
       case SMART_BAND_PAGE_FACE:
         update_face();
@@ -732,6 +746,38 @@ static void render_page(void)
     }
 
   update_page_visibility();
+}
+
+static smart_band_dirty_flags_t current_page_dirty_mask(void)
+{
+  switch (g_ui.runtime.model.page)
+    {
+      case SMART_BAND_PAGE_FACE:
+        return SMART_BAND_DIRTY_TIME | SMART_BAND_DIRTY_HEART |
+               SMART_BAND_DIRTY_STEPS | SMART_BAND_DIRTY_BATTERY |
+               SMART_BAND_DIRTY_ENVIRONMENT | SMART_BAND_DIRTY_STATUS |
+               SMART_BAND_DIRTY_PAGE;
+      case SMART_BAND_PAGE_HEART:
+        return SMART_BAND_DIRTY_HEART | SMART_BAND_DIRTY_PAGE;
+      case SMART_BAND_PAGE_STEPS:
+        return SMART_BAND_DIRTY_STEPS | SMART_BAND_DIRTY_PAGE;
+      case SMART_BAND_PAGE_APPS:
+        return SMART_BAND_DIRTY_TIME | SMART_BAND_DIRTY_APP |
+               SMART_BAND_DIRTY_PAGE;
+      default:
+        return SMART_BAND_DIRTY_PAGE;
+    }
+}
+
+static void render_pending(void)
+{
+  smart_band_dirty_flags_t dirty =
+    smart_band_runtime_take_dirty(&g_ui.runtime);
+
+  if ((dirty & current_page_dirty_mask()) != 0)
+    {
+      render_page();
+    }
 }
 
 static void app_icon_cb(lv_event_t *event)
@@ -753,7 +799,7 @@ static void app_back_cb(lv_event_t *event)
 {
   (void)event;
 
-  smart_band_app_unmount(&g_ui.apps);
+  smart_band_app_unmount(&g_ui.runtime.apps);
   if (g_ui.app_content != NULL)
     {
       lv_obj_clean(g_ui.app_content);
@@ -770,35 +816,32 @@ static void step_goal_cb(lv_event_t *event)
   int delta = direction == 0 ? -SMART_BAND_STEP_GOAL_DELTA :
               SMART_BAND_STEP_GOAL_DELTA;
 
-  smart_band_adjust_step_goal(&g_ui.model, delta);
-  render_page();
+  smart_band_adjust_step_goal(&g_ui.runtime.model, delta);
+  smart_band_runtime_mark_dirty(&g_ui.runtime, SMART_BAND_DIRTY_STEPS);
+  render_pending();
 }
 
 static void timer_cb(lv_timer_t *timer)
 {
-  time_t now;
-
   (void)timer;
-  now = time(NULL);
-  smart_band_state_tick(&g_ui.model, now);
-  smart_band_sensor_bridge_update_at(&g_ui.sensors, &g_ui.model, now);
-  smart_band_apps_tick_at(&g_ui.apps,
-                          g_ui.model.page == SMART_BAND_PAGE_APPS,
-                          lv_tick_get());
+  (void)smart_band_runtime_tick(
+    &g_ui.runtime, g_ui.runtime.model.page == SMART_BAND_PAGE_APPS);
 
-  render_page();
+  render_pending();
 }
 
 static void next_page(void)
 {
-  smart_band_next_page(&g_ui.model);
-  render_page();
+  smart_band_next_page(&g_ui.runtime.model);
+  smart_band_runtime_mark_dirty(&g_ui.runtime, SMART_BAND_DIRTY_PAGE);
+  render_pending();
 }
 
 static void prev_page(void)
 {
-  smart_band_prev_page(&g_ui.model);
-  render_page();
+  smart_band_prev_page(&g_ui.runtime.model);
+  smart_band_runtime_mark_dirty(&g_ui.runtime, SMART_BAND_DIRTY_PAGE);
+  render_pending();
 }
 
 static void page_drag_cb(lv_event_t *event)
@@ -894,13 +937,14 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   lv_obj_t *owned_root;
   lv_coord_t root_w;
   lv_coord_t root_h;
+  smart_band_clock_source_t clock_source;
 
   if (parent_root == NULL)
     {
       return -1;
     }
 
-  if (g_ui.root != NULL || g_ui.timer != NULL || g_ui.sensors_initialized)
+  if (g_ui.root != NULL || g_ui.timer != NULL || g_ui.runtime.initialized)
     {
       smart_band_lvgl_destroy();
     }
@@ -926,14 +970,11 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
   g_ui.root = owned_root;
   configure_local_time();
-  smart_band_state_init(&g_ui.model, time(NULL));
-  smart_band_sensor_bridge_init(&g_ui.sensors);
-  g_ui.sensors_initialized = true;
-
-  if (smart_band_apps_init(&g_ui.apps) != 0)
+  memset(&clock_source, 0, sizeof(clock_source));
+  clock_source.wall_now = runtime_wall_now;
+  clock_source.monotonic_now = runtime_monotonic_now;
+  if (smart_band_runtime_init(&g_ui.runtime, &clock_source, NULL) != 0)
     {
-      smart_band_sensor_bridge_deinit(&g_ui.sensors);
-      g_ui.sensors_initialized = false;
       lv_obj_del(owned_root);
       g_ui.root = NULL;
       return -1;
@@ -941,9 +982,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
   if (create_ui_tree(owned_root) != 0)
     {
-      smart_band_apps_deinit(&g_ui.apps);
-      smart_band_sensor_bridge_deinit(&g_ui.sensors);
-      g_ui.sensors_initialized = false;
+      smart_band_runtime_deinit(&g_ui.runtime);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
       return -1;
@@ -952,16 +991,14 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   g_ui.timer = lv_timer_create(timer_cb, 1000, NULL);
   if (g_ui.timer == NULL)
     {
-      smart_band_apps_deinit(&g_ui.apps);
-      smart_band_sensor_bridge_deinit(&g_ui.sensors);
-      g_ui.sensors_initialized = false;
+      smart_band_runtime_deinit(&g_ui.runtime);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
       return -1;
     }
 
-  smart_band_sensor_bridge_update(&g_ui.sensors, &g_ui.model);
-  render_page();
+  (void)smart_band_runtime_refresh_sensors(&g_ui.runtime);
+  render_pending();
   return 0;
 }
 
@@ -973,15 +1010,10 @@ void smart_band_lvgl_destroy(void)
       g_ui.timer = NULL;
     }
 
-  if (g_ui.sensors_initialized)
-    {
-      smart_band_sensor_bridge_deinit(&g_ui.sensors);
-      g_ui.sensors_initialized = false;
-    }
+  smart_band_runtime_deinit(&g_ui.runtime);
 
   if (g_ui.root != NULL)
     {
-      smart_band_apps_deinit(&g_ui.apps);
       if (lv_obj_is_valid(g_ui.root))
         {
           lv_obj_del(g_ui.root);

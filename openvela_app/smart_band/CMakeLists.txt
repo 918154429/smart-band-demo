@@ -17,6 +17,13 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     logic/game_2048_model.c
     logic/mines_model.c
     sensor_bridge.c
+    services/event_queue.c
+    services/event_inbox.c
+    services/clock.c
+    services/capabilities.c
+    services/runtime.c
+    platform/platform_noop.c
+    platform/loopback/sync_loopback.c
     app_lvgl.c
     ui/lvgl/components.c
     ui/lvgl/watch_pages.c

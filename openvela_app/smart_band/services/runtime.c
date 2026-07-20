@@ -1,0 +1,389 @@
+#include "smart_band_runtime.h"
+
+#include <string.h>
+
+typedef struct
+{
+  smart_band_page_t page;
+  bool time_valid;
+  char time_text[SMART_BAND_TIME_TEXT_LEN];
+  char date_text[SMART_BAND_DATE_TEXT_LEN];
+  char status_text[SMART_BAND_STATUS_TEXT_LEN];
+  int values[SMART_BAND_METRIC_COUNT];
+  smart_band_data_source_t sources[SMART_BAND_METRIC_COUNT];
+  smart_band_data_freshness_t freshness[SMART_BAND_METRIC_COUNT];
+  int step_goal;
+  bool battery_charging;
+} smart_band_view_snapshot_t;
+
+static int metric_value(const smart_band_state_t *model,
+                        smart_band_metric_t metric)
+{
+  switch (metric)
+    {
+      case SMART_BAND_METRIC_HEART_RATE:
+        return model->heart_rate;
+      case SMART_BAND_METRIC_STEPS:
+        return model->steps;
+      case SMART_BAND_METRIC_BATTERY:
+        return model->battery_percent;
+      case SMART_BAND_METRIC_TEMPERATURE:
+        return model->temperature_c;
+      case SMART_BAND_METRIC_HUMIDITY:
+        return model->humidity_percent;
+      case SMART_BAND_METRIC_COUNT:
+      default:
+        return 0;
+    }
+}
+
+static void capture_view_snapshot(const smart_band_state_t *model,
+                                  smart_band_view_snapshot_t *snapshot)
+{
+  smart_band_metric_t metric;
+
+  memset(snapshot, 0, sizeof(*snapshot));
+  snapshot->page = model->page;
+  snapshot->time_valid = model->time_valid;
+  memcpy(snapshot->time_text, model->time_text, sizeof(snapshot->time_text));
+  memcpy(snapshot->date_text, model->date_text, sizeof(snapshot->date_text));
+  memcpy(snapshot->status_text, model->status_text,
+         sizeof(snapshot->status_text));
+  snapshot->step_goal = model->step_goal;
+  snapshot->battery_charging = model->battery_charging;
+  for (metric = SMART_BAND_METRIC_HEART_RATE;
+       metric < SMART_BAND_METRIC_COUNT; metric++)
+    {
+      snapshot->values[metric] = metric_value(model, metric);
+      snapshot->sources[metric] = model->metrics[metric].source;
+      snapshot->freshness[metric] = model->metrics[metric].freshness;
+    }
+}
+
+static bool metric_snapshot_changed(const smart_band_view_snapshot_t *before,
+                                    const smart_band_view_snapshot_t *after,
+                                    smart_band_metric_t metric)
+{
+  return before->values[metric] != after->values[metric] ||
+         before->sources[metric] != after->sources[metric] ||
+         before->freshness[metric] != after->freshness[metric];
+}
+
+static smart_band_dirty_flags_t
+view_changes(const smart_band_view_snapshot_t *before,
+             const smart_band_view_snapshot_t *after)
+{
+  smart_band_dirty_flags_t dirty = SMART_BAND_DIRTY_NONE;
+
+  if (before->page != after->page)
+    {
+      dirty |= SMART_BAND_DIRTY_PAGE;
+    }
+
+  if (before->time_valid != after->time_valid ||
+      memcmp(before->time_text, after->time_text,
+             sizeof(before->time_text)) != 0 ||
+      memcmp(before->date_text, after->date_text,
+             sizeof(before->date_text)) != 0)
+    {
+      dirty |= SMART_BAND_DIRTY_TIME;
+    }
+
+  if (metric_snapshot_changed(before, after,
+                              SMART_BAND_METRIC_HEART_RATE))
+    {
+      dirty |= SMART_BAND_DIRTY_HEART;
+    }
+
+  if (metric_snapshot_changed(before, after, SMART_BAND_METRIC_STEPS) ||
+      before->step_goal != after->step_goal)
+    {
+      dirty |= SMART_BAND_DIRTY_STEPS;
+    }
+
+  if (metric_snapshot_changed(before, after, SMART_BAND_METRIC_BATTERY) ||
+      before->battery_charging != after->battery_charging)
+    {
+      dirty |= SMART_BAND_DIRTY_BATTERY;
+    }
+
+  if (metric_snapshot_changed(before, after,
+                              SMART_BAND_METRIC_TEMPERATURE) ||
+      metric_snapshot_changed(before, after, SMART_BAND_METRIC_HUMIDITY))
+    {
+      dirty |= SMART_BAND_DIRTY_ENVIRONMENT;
+    }
+
+  if (memcmp(before->status_text, after->status_text,
+             sizeof(before->status_text)) != 0)
+    {
+      dirty |= SMART_BAND_DIRTY_STATUS;
+    }
+
+  return dirty;
+}
+
+static void detect_sensor_capabilities(smart_band_runtime_t *runtime)
+{
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
+  runtime->capabilities.heart_rate = runtime->sensors.hrate_fd >= 0;
+  runtime->capabilities.step_counter = runtime->sensors.step_fd >= 0;
+  runtime->capabilities.accelerometer = runtime->sensors.accel_fd >= 0;
+  runtime->capabilities.temperature = runtime->sensors.temp_fd >= 0;
+  runtime->capabilities.humidity = runtime->sensors.humi_fd >= 0;
+  runtime->capabilities.battery = runtime->sensors.battery_fd >= 0;
+  runtime->capabilities.charging = runtime->capabilities.battery;
+#else
+  (void)runtime;
+#endif
+}
+
+static bool advance_runtime(smart_band_runtime_t *runtime,
+                            bool active_app_visible)
+{
+  smart_band_view_snapshot_t before;
+  smart_band_view_snapshot_t after;
+
+  if (!smart_band_clock_sample(&runtime->clock, &runtime->last_clock))
+    {
+      return false;
+    }
+
+  capture_view_snapshot(&runtime->model, &before);
+  runtime->last_clock.wall_valid = runtime->last_clock.wall_valid &&
+                                   runtime->capabilities.rtc;
+  runtime->last_clock.wall_rollback = runtime->last_clock.wall_rollback &&
+                                      runtime->capabilities.rtc;
+  smart_band_state_tick(&runtime->model,
+                        runtime->last_clock.wall_valid ?
+                        runtime->last_clock.wall_time : 0);
+  smart_band_state_set_wall_time(&runtime->model,
+                                 runtime->last_clock.wall_time,
+                                 runtime->last_clock.wall_valid);
+  smart_band_sensor_bridge_update_clocked(
+    &runtime->sensors, &runtime->model, runtime->last_clock.wall_time,
+    runtime->last_clock.elapsed_ms, runtime->last_clock.wall_rollback);
+  capture_view_snapshot(&runtime->model, &after);
+  runtime->dirty |= view_changes(&before, &after);
+
+  if (smart_band_apps_tick_at(&runtime->apps, active_app_visible,
+                              runtime->last_clock.monotonic_ms))
+    {
+      runtime->dirty |= SMART_BAND_DIRTY_APP;
+    }
+
+  return true;
+}
+
+int smart_band_runtime_init(
+  smart_band_runtime_t *runtime,
+  const smart_band_clock_source_t *clock_source,
+  const smart_band_capabilities_t *capabilities)
+{
+  smart_band_platform_t platform;
+
+  smart_band_platform_init_noop(&platform);
+  return smart_band_runtime_init_with_platform(runtime, clock_source,
+                                               capabilities, &platform);
+}
+
+int smart_band_runtime_init_with_platform(
+  smart_band_runtime_t *runtime,
+  const smart_band_clock_source_t *clock_source,
+  const smart_band_capabilities_t *capabilities,
+  const smart_band_platform_t *platform)
+{
+  bool detect_capabilities = capabilities == NULL;
+  smart_band_platform_t default_platform;
+
+  if (runtime == NULL)
+    {
+      return -1;
+    }
+
+  if (platform == NULL)
+    {
+      smart_band_platform_init_noop(&default_platform);
+      platform = &default_platform;
+    }
+
+  memset(runtime, 0, sizeof(*runtime));
+  runtime->platform = *platform;
+  if (!smart_band_event_inbox_init(&runtime->external_events,
+                                   &runtime->platform.event_lock) ||
+      smart_band_clock_init(&runtime->clock, clock_source) != 0 ||
+      !smart_band_clock_sample(&runtime->clock, &runtime->last_clock))
+    {
+      memset(runtime, 0, sizeof(*runtime));
+      return -1;
+    }
+
+  if (capabilities == NULL)
+    {
+      smart_band_capabilities_init_base(&runtime->capabilities);
+      runtime->capabilities.rtc = runtime->clock.source.wall_now != NULL;
+    }
+  else
+    {
+      runtime->capabilities = *capabilities;
+    }
+
+  smart_band_event_queue_init(&runtime->events);
+  runtime->last_clock.wall_valid = runtime->last_clock.wall_valid &&
+                                   runtime->capabilities.rtc;
+  smart_band_state_init(&runtime->model,
+                        runtime->last_clock.wall_valid ?
+                        runtime->last_clock.wall_time : 0);
+  smart_band_state_set_wall_time(&runtime->model,
+                                 runtime->last_clock.wall_time,
+                                 runtime->last_clock.wall_valid);
+  smart_band_sensor_bridge_init(&runtime->sensors);
+  runtime->sensors_initialized = true;
+  if (detect_capabilities)
+    {
+      detect_sensor_capabilities(runtime);
+    }
+
+  if (smart_band_apps_init(&runtime->apps) != 0)
+    {
+      smart_band_sensor_bridge_deinit(&runtime->sensors);
+      runtime->sensors_initialized = false;
+      (void)smart_band_event_inbox_close(&runtime->external_events);
+      return -1;
+    }
+
+  runtime->dirty = SMART_BAND_DIRTY_ALL;
+  runtime->initialized = true;
+  return 0;
+}
+
+void smart_band_runtime_deinit(smart_band_runtime_t *runtime)
+{
+  if (runtime == NULL)
+    {
+      return;
+    }
+
+  if (runtime->initialized && runtime->platform.sync.ops != NULL &&
+      runtime->platform.sync.ops->stop != NULL)
+    {
+      (void)runtime->platform.sync.ops->stop(runtime->platform.sync.context);
+    }
+
+  (void)smart_band_event_inbox_close(&runtime->external_events);
+  if (runtime->initialized)
+    {
+      smart_band_apps_deinit(&runtime->apps);
+    }
+
+  if (runtime->sensors_initialized)
+    {
+      smart_band_sensor_bridge_deinit(&runtime->sensors);
+    }
+
+  memset(runtime, 0, sizeof(*runtime));
+}
+
+bool smart_band_runtime_post(smart_band_runtime_t *runtime,
+                             const smart_band_event_t *event)
+{
+  return runtime != NULL && runtime->initialized &&
+         smart_band_event_queue_push(&runtime->events, event);
+}
+
+bool smart_band_runtime_post_external(void *context,
+                                      const smart_band_event_t *event)
+{
+  smart_band_runtime_t *runtime = context;
+
+  return runtime != NULL &&
+         smart_band_event_inbox_post(&runtime->external_events, event);
+}
+
+size_t smart_band_runtime_drain_external(smart_band_runtime_t *runtime,
+                                         size_t limit)
+{
+  smart_band_event_t event;
+  size_t drained = 0;
+
+  if (runtime == NULL || !runtime->initialized)
+    {
+      return 0;
+    }
+
+  while (drained < limit &&
+         smart_band_event_inbox_pop(&runtime->external_events, &event))
+    {
+      (void)smart_band_event_queue_push(&runtime->events, &event);
+      drained++;
+    }
+
+  return drained;
+}
+
+bool smart_band_runtime_tick(smart_band_runtime_t *runtime,
+                             bool active_app_visible)
+{
+  if (runtime == NULL || !runtime->initialized)
+    {
+      return false;
+    }
+
+  (void)smart_band_runtime_drain_external(
+    runtime, SMART_BAND_EVENT_QUEUE_CAPACITY);
+  return advance_runtime(runtime, active_app_visible);
+}
+
+bool smart_band_runtime_refresh_sensors(smart_band_runtime_t *runtime)
+{
+  smart_band_view_snapshot_t before;
+  smart_band_view_snapshot_t after;
+
+  if (runtime == NULL || !runtime->initialized ||
+      !smart_band_clock_sample(&runtime->clock, &runtime->last_clock))
+    {
+      return false;
+    }
+
+  capture_view_snapshot(&runtime->model, &before);
+  runtime->last_clock.wall_valid = runtime->last_clock.wall_valid &&
+                                   runtime->capabilities.rtc;
+  runtime->last_clock.wall_rollback = runtime->last_clock.wall_rollback &&
+                                      runtime->capabilities.rtc;
+  smart_band_sensor_bridge_update_clocked(
+    &runtime->sensors, &runtime->model, runtime->last_clock.wall_time,
+    runtime->last_clock.elapsed_ms, runtime->last_clock.wall_rollback);
+  capture_view_snapshot(&runtime->model, &after);
+  runtime->dirty |= view_changes(&before, &after);
+  return true;
+}
+
+void smart_band_runtime_mark_dirty(smart_band_runtime_t *runtime,
+                                   smart_band_dirty_flags_t flags)
+{
+  if (runtime != NULL)
+    {
+      runtime->dirty |= flags & SMART_BAND_DIRTY_ALL;
+    }
+}
+
+smart_band_dirty_flags_t
+smart_band_runtime_peek_dirty(const smart_band_runtime_t *runtime)
+{
+  return runtime == NULL ? SMART_BAND_DIRTY_NONE : runtime->dirty;
+}
+
+smart_band_dirty_flags_t smart_band_runtime_take_dirty(
+  smart_band_runtime_t *runtime)
+{
+  smart_band_dirty_flags_t dirty;
+
+  if (runtime == NULL)
+    {
+      return SMART_BAND_DIRTY_NONE;
+    }
+
+  dirty = runtime->dirty;
+  runtime->dirty = SMART_BAND_DIRTY_NONE;
+  return dirty;
+}

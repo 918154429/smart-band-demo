@@ -233,7 +233,7 @@ void smart_band_ui_format_watch_date(const smart_band_state_t *model,
   static const char *const weekdays[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
   static const char *const months[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
   struct tm local_now;
-  time_t now = time(NULL);
+  time_t now = model->wall_time;
   if (!smart_band_display_time(now, &local_now))
     { snprintf(buffer, size, "%s", model->date_text); return; }
   snprintf(buffer, size, "%s %02d %s", weekdays[local_now.tm_wday],
