@@ -2,7 +2,7 @@
 
 - 更新时间：2026-07-21（Asia/Shanghai）
 - 状态：复赛工程主路线，后续对话必须优先读取
-- 当前基线：`master` / `1ddc533cb3096e541fe5cadaed810df39029ebc1`
+- 当前 Q1-C 合并基线：`master` / `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`
 
 ## 0. 文档定位与硬边界
 
