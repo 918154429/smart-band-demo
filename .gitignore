@@ -13,6 +13,9 @@ docs/*.mp4
 docs/*.mov
 docs/*.webm
 demo/browser-demo.log
+node_modules/
+output/playwright/
+.playwright-cli/
 
 # Python
 __pycache__/

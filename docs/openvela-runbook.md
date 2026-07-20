@@ -4,6 +4,35 @@
 模拟器或开发板上复现。本文只覆盖本仓库提交的智能手环应用部分，上游 openvela
 SDK、NuttX、LVGL、模拟器和工具链请按各自官方文档准备。
 
+## 固定版本的 Nightly 构建
+
+仓库的 `.github/workflows/openvela-nightly.yml` 每天定时运行，也支持从 GitHub
+Actions 页面手动触发。它不是只检查脚本语法，而是同步固定的 openvela release、
+执行 goldfish arm64 真实构建，并验证最终 NuttX ELF 中包含 `smart_band`。
+
+openvela manifest 提交、manifest 文件、官方 `.claude` URL 和提交的唯一版本清单是
+`skills/openvela-smart-band-reproduce/versions.env`。Nightly 和本地复现脚本都读取该
+文件，不在 workflow 中各维护一份版本号。Google `repo` launcher/tool 当前固定为
+`2.54`，launcher 还会校验 workflow 中记录的固定 SHA-256。
+
+workflow 会生成 `repo manifest -r`，并拒绝任何未解析成 40 位 Git SHA 的项目。
+因此定时构建不会悄悄追踪 `dev`、`trunk` 或其他浮动 HEAD。需要升级 openvela 时，
+应在同一个 PR 中更新上述固定值，先手动运行 workflow，确认 resolved manifest、
+构建日志和 NuttX SHA-256 artifact 后再合并。
+
+GitHub hosted runner 是一次性的。workflow 有意不缓存 `.repo`、源码树或构建目录，
+避免恢复与固定 manifest 不一致的 mutable checkout；它会清理 runner 中与本项目
+无关的 Android/.NET/GHC SDK 来获得同步空间。repo sync 和构建分别有硬超时，
+整个 job 也有总超时。无论成功或失败，以下证据都会上传并保留 14 天：
+
+- resolved SHA manifest 与 manifest/.claude 实际提交；
+- repo sync、openvela build 完整日志；
+- runner 磁盘状态、repo dirty status、最终 `.config`；
+- 成功时的 NuttX ELF、文件类型与 SHA-256。
+
+超时、sync 失败、构建失败、配置未启用、找不到 NuttX ELF，或无法在 ELF 中确认
+`smart_band`，都会让 job 失败，不会用占位步骤报告成功。
+
 ## 1. 工程边界
 
 本项目提交内容：

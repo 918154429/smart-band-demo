@@ -10,9 +10,27 @@ NO_BROWSER=0
 DRY_RUN=0
 ALLOW_DIRTY=0
 OPENVELA_ROOT=""
+DEFCONFIG_PATH=""
+DEFCONFIG_BACKUP=""
+DEFCONFIG_TRANSACTION_ACTIVE=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEMO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+VERSION_FILE="$DEMO_ROOT/skills/openvela-smart-band-reproduce/versions.env"
+
+[ -r "$VERSION_FILE" ] || {
+  printf '[smart-band-reproduce] ERROR: version manifest not found: %s\n' \
+    "$VERSION_FILE" >&2
+  exit 1
+}
+# shellcheck disable=SC1090
+source "$VERSION_FILE"
+
+CLAUDE_REPOSITORY="${SMART_BAND_CLAUDE_REPOSITORY:-$SMART_BAND_DEFAULT_CLAUDE_REPOSITORY}"
+CLAUDE_REVISION="${SMART_BAND_CLAUDE_REVISION:-$SMART_BAND_DEFAULT_CLAUDE_REVISION}"
+OPENVELA_MANIFEST_REVISION="${SMART_BAND_OPENVELA_MANIFEST_REVISION:-$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_REVISION}"
+OPENVELA_MANIFEST_FILE="${SMART_BAND_OPENVELA_MANIFEST_FILE:-$SMART_BAND_DEFAULT_OPENVELA_MANIFEST_FILE}"
+FAIL_AT="${SMART_BAND_REPRODUCE_FAIL_AT:-}"
 
 usage() {
   cat <<'USAGE'
@@ -30,6 +48,12 @@ What it does:
 Environment:
   SMART_BAND_BUILD_JOBS    build parallelism, default nproc
   SMART_BAND_DEMO_PORT     browser demo port, default 8765
+  SMART_BAND_CLAUDE_REVISION
+                            full .claude commit, defaults to versions.env
+  SMART_BAND_OPENVELA_MANIFEST_REVISION
+                            full openvela manifest commit, defaults to versions.env
+  SMART_BAND_OPENVELA_MANIFEST_FILE
+                            release manifest path, defaults to tags/trunk-5.4.xml
 
 Safety:
   --dry-run       Validate prerequisites and print planned mutations only.
@@ -46,7 +70,41 @@ die() {
   exit 1
 }
 
-trap 'status=$?; printf "[smart-band-reproduce] ERROR: command failed at line %s (exit %s)\n" "$LINENO" "$status" >&2; exit "$status"' ERR
+on_error() {
+  local status="$1"
+  local line="$2"
+
+  trap - ERR
+  printf '[smart-band-reproduce] ERROR: command failed at line %s (exit %s)\n' \
+    "$line" "$status" >&2
+  exit "$status"
+}
+
+on_exit() {
+  local status="$?"
+
+  trap - EXIT
+  if [ "$DEFCONFIG_TRANSACTION_ACTIVE" -eq 1 ]; then
+    if [ "$status" -eq 0 ]; then
+      rm -f -- "$DEFCONFIG_BACKUP"
+    else
+      if cp -p -- "$DEFCONFIG_BACKUP" "$DEFCONFIG_PATH"; then
+        log "restored defconfig after failure: $DEFCONFIG_PATH"
+        rm -f -- "$DEFCONFIG_BACKUP"
+      else
+        printf '[smart-band-reproduce] ERROR: failed to restore defconfig from %s\n' \
+          "$DEFCONFIG_BACKUP" >&2
+      fi
+    fi
+  fi
+
+  exit "$status"
+}
+
+trap 'on_error "$?" "$LINENO"' ERR
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -111,10 +169,26 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
+require_full_revision() {
+  local name="$1"
+  local revision="$2"
+
+  [[ "$revision" =~ ^[0-9a-fA-F]{40}$ ]] || \
+    die "$name must be a full 40-character Git commit: $revision"
+}
+
+maybe_fail() {
+  local point="$1"
+
+  if [ -n "$FAIL_AT" ] && [ "$FAIL_AT" = "$point" ]; then
+    die "injected failure at $point"
+  fi
+}
+
 preflight() {
   local value
 
-  for value in git rsync grep sed; do
+  for value in cmp git rsync grep sed; do
     require_command "$value"
   done
 
@@ -128,6 +202,13 @@ preflight() {
   esac
   [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || \
     die "SMART_BAND_DEMO_PORT must be between 1 and 65535"
+
+  require_full_revision "SMART_BAND_CLAUDE_REVISION" "$CLAUDE_REVISION"
+  require_full_revision "SMART_BAND_OPENVELA_MANIFEST_REVISION" \
+    "$OPENVELA_MANIFEST_REVISION"
+  case "$OPENVELA_MANIFEST_FILE" in
+    ''|/*|*..*) die "SMART_BAND_OPENVELA_MANIFEST_FILE must be a repository-relative manifest name" ;;
+  esac
 
   [ -d "$DEMO_ROOT/openvela_app/smart_band" ] || \
     die "smart band app source not found: $DEMO_ROOT/openvela_app/smart_band"
@@ -204,17 +285,43 @@ protect_mutation_targets() {
 }
 
 ensure_claude_skills() {
-  if [ ! -d "$OPENVELA_ROOT/.claude/.git" ]; then
+  local claude_root="$OPENVELA_ROOT/.claude"
+  local dirty
+  local current
+
+  if [ ! -d "$claude_root/.git" ]; then
     if [ "$DRY_RUN" -eq 1 ]; then
-      log "dry-run: would clone official .claude skills into $OPENVELA_ROOT/.claude"
+      log "dry-run: would clone $CLAUDE_REPOSITORY at $CLAUDE_REVISION into $claude_root"
       return 0
     fi
     mkdir -p "$OPENVELA_ROOT"
-    log "cloning official open-vela .claude skills"
-    git clone https://github.com/open-vela/.claude.git "$OPENVELA_ROOT/.claude"
-  else
-    log "official .claude skills already exist"
+    log "cloning official open-vela .claude skills at pinned revision"
+    git clone "$CLAUDE_REPOSITORY" "$claude_root"
   fi
+
+  dirty="$(git -C "$claude_root" status --porcelain --untracked-files=all -- \
+    . ':(exclude)skills/openvela-smart-band-reproduce')"
+  [ -z "$dirty" ] || die "official .claude checkout has local changes outside the installed smart-band skill"
+
+  current="$(git -C "$claude_root" rev-parse HEAD 2>/dev/null || true)"
+  if [ "$current" = "$CLAUDE_REVISION" ]; then
+    log "official .claude revision: $CLAUDE_REVISION"
+    return 0
+  fi
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry-run: would fetch and check out .claude revision $CLAUDE_REVISION"
+    return 0
+  fi
+
+  if ! git -C "$claude_root" cat-file -e "$CLAUDE_REVISION^{commit}" 2>/dev/null; then
+    log "fetching pinned .claude revision $CLAUDE_REVISION"
+    git -C "$claude_root" fetch --depth 1 origin "$CLAUDE_REVISION"
+  fi
+
+  git -C "$claude_root" checkout --detach "$CLAUDE_REVISION"
+
+  log "official .claude revision: $CLAUDE_REVISION"
 }
 
 install_local_skill() {
@@ -233,7 +340,7 @@ install_local_skill() {
 
   log "installing smart-band reproduce skill into .claude/skills"
   mkdir -p "$dst"
-  rsync -a --delete "$src" "$dst"
+  rsync -a "$src" "$dst"
 }
 
 require_openvela_checkout() {
@@ -257,6 +364,37 @@ EOF
   fi
 }
 
+verify_openvela_revision() {
+  local revision_root
+  local current
+  local dirty
+  local selected_manifest="$OPENVELA_ROOT/.repo/manifest.xml"
+  local pinned_manifest
+
+  if compgen -G "$OPENVELA_ROOT/.repo/local_manifests/*.xml" >/dev/null; then
+    die "openvela local manifests are present; remove or explicitly review them before pinned reproduction"
+  fi
+
+  if git -C "$OPENVELA_ROOT/.repo/manifests" rev-parse --is-inside-work-tree \
+      >/dev/null 2>&1; then
+    revision_root="$OPENVELA_ROOT/.repo/manifests"
+  else
+    die "cannot verify openvela revision: .repo/manifests is not a Git checkout"
+  fi
+
+  dirty="$(git -C "$revision_root" status --porcelain --untracked-files=no)"
+  [ -z "$dirty" ] || die "openvela manifest checkout is dirty: $revision_root"
+  current="$(git -C "$revision_root" rev-parse HEAD)"
+  [ "$current" = "$OPENVELA_MANIFEST_REVISION" ] || die \
+    "openvela manifest revision is $current, expected $OPENVELA_MANIFEST_REVISION; sync the pinned revision or explicitly set SMART_BAND_OPENVELA_MANIFEST_REVISION after review"
+  pinned_manifest="$revision_root/$OPENVELA_MANIFEST_FILE"
+  [ -f "$pinned_manifest" ] || die "pinned openvela manifest not found: $pinned_manifest"
+  [ -e "$selected_manifest" ] || die "selected openvela manifest not found: $selected_manifest"
+  cmp -s "$selected_manifest" "$pinned_manifest" || die \
+    "openvela checkout does not use pinned manifest $OPENVELA_MANIFEST_FILE"
+  log "openvela manifest: $OPENVELA_MANIFEST_FILE at $OPENVELA_MANIFEST_REVISION"
+}
+
 sync_demo_app() {
   local src="$DEMO_ROOT/openvela_app/smart_band/"
   local dst="$OPENVELA_ROOT/packages/demos/smart_band_basic/"
@@ -272,12 +410,12 @@ sync_demo_app() {
 
   log "syncing smart_band app into packages/demos"
   mkdir -p "$dst"
-  rsync -a --delete "$src" "$dst"
+  rsync -a "$src" "$dst"
 
   if [ -d "$OPENVELA_ROOT/apps/packages/demos" ]; then
     log "syncing smart_band app into apps/packages mirror"
     mkdir -p "$mirror"
-    rsync -a --delete "$src" "$mirror"
+    rsync -a "$src" "$mirror"
   fi
 }
 
@@ -304,6 +442,10 @@ enable_config() {
     return 0
   fi
 
+  DEFCONFIG_PATH="$defconfig"
+  DEFCONFIG_BACKUP="$(mktemp "${TMPDIR:-/tmp}/smart-band-defconfig.XXXXXX")"
+  cp -p -- "$DEFCONFIG_PATH" "$DEFCONFIG_BACKUP"
+  DEFCONFIG_TRANSACTION_ACTIVE=1
   log "enabling smart_band config in $CONFIG_PATH/defconfig"
   append_unique_config "$defconfig" "CONFIG_GRAPHICS_LVGL" "y"
   append_unique_config "$defconfig" "CONFIG_LV_USE_NUTTX" "y"
@@ -314,6 +456,7 @@ enable_config() {
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS" "y"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_PRIORITY" "100"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE" "32768"
+  maybe_fail "after-enable-config"
 }
 
 build_openvela() {
@@ -409,8 +552,9 @@ main() {
   preflight
   protect_mutation_targets
   ensure_claude_skills
-  install_local_skill
   require_openvela_checkout
+  verify_openvela_revision
+  install_local_skill
   sync_demo_app
   enable_config
   build_openvela

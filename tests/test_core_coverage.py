@@ -1,0 +1,169 @@
+"""Measure line coverage of the host-testable production C core with GCC."""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+APP_DIR = ROOT / "openvela_app" / "smart_band"
+INCLUDE_DIR = APP_DIR / "include"
+FAKE_LVGL_DIR = Path(__file__).with_name("fake_lvgl")
+
+# This is the architectural production-core boundary, not a list selected from
+# coverage results. It includes every host-testable model/provider/controller and
+# time-state implementation introduced by the reliability refactor. LVGL page and
+# app view adapters remain outside the C core and are covered by runtime/UI gates.
+CORE_SOURCES = [
+    APP_DIR / "watch_model.c",
+    APP_DIR / "sensor_bridge.c",
+    APP_DIR / "smart_band_apps.c",
+    APP_DIR / "logic" / "calculator_model.c",
+    APP_DIR / "logic" / "game_2048_model.c",
+    APP_DIR / "logic" / "mines_model.c",
+    APP_DIR / "apps" / "timer_app.c",
+    APP_DIR / "apps" / "stopwatch_app.c",
+]
+
+
+@dataclass(frozen=True)
+class CoverageTarget:
+    name: str
+    test_source: Path
+    production_sources: tuple[Path, ...]
+    include_dirs: tuple[Path, ...] = ()
+
+
+TARGETS = [
+    CoverageTarget(
+        "watch_model",
+        Path(__file__).with_name("watch_model_test.c"),
+        (APP_DIR / "watch_model.c", APP_DIR / "sensor_bridge.c"),
+    ),
+    CoverageTarget(
+        "app_logic",
+        Path(__file__).with_name("app_logic_test.c"),
+        (
+            APP_DIR / "logic" / "calculator_model.c",
+            APP_DIR / "logic" / "game_2048_model.c",
+            APP_DIR / "logic" / "mines_model.c",
+        ),
+    ),
+    CoverageTarget(
+        "app_runtime",
+        Path(__file__).with_name("app_runtime_test.c"),
+        (APP_DIR / "smart_band_apps.c",),
+        (FAKE_LVGL_DIR,),
+    ),
+    CoverageTarget(
+        "time_apps",
+        Path(__file__).with_name("time_apps_test.c"),
+        (
+            APP_DIR / "smart_band_apps.c",
+            APP_DIR / "apps" / "timer_app.c",
+            APP_DIR / "apps" / "stopwatch_app.c",
+        ),
+        (FAKE_LVGL_DIR,),
+    ),
+]
+
+
+def require_tool(name: str) -> str:
+    path = shutil.which(name)
+    if path is None:
+        raise RuntimeError(f"required coverage tool is unavailable: {name}")
+    return path
+
+
+def validate_scope() -> None:
+    measured = {source.resolve() for target in TARGETS for source in target.production_sources}
+    expected = {source.resolve() for source in CORE_SOURCES}
+    if measured != expected:
+        missing = sorted(str(path) for path in expected - measured)
+        unexpected = sorted(str(path) for path in measured - expected)
+        raise RuntimeError(
+            f"coverage target/source drift; missing={missing}, unexpected={unexpected}"
+        )
+    for source in [*CORE_SOURCES, *(target.test_source for target in TARGETS)]:
+        if not source.is_file():
+            raise RuntimeError(f"coverage source is missing: {source}")
+
+
+def compile_and_run(gcc: str, build_root: Path, target: CoverageTarget) -> None:
+    target_dir = build_root / target.name
+    target_dir.mkdir()
+    output = target_dir / (f"{target.name}.exe" if os.name == "nt" else target.name)
+    sources = [target.test_source, *target.production_sources]
+    include_dirs = [INCLUDE_DIR, *target.include_dirs]
+    command = [
+        gcc,
+        "-std=c11",
+        "-O0",
+        "-g",
+        "--coverage",
+        "-fprofile-abs-path",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        *(f"-I{directory}" for directory in include_dirs),
+        *(str(source) for source in sources),
+        "-o",
+        str(output),
+    ]
+    print(f"coverage compile [{target.name}]:", " ".join(command), flush=True)
+    subprocess.run(command, cwd=target_dir, check=True)
+    subprocess.run([str(output)], cwd=target_dir, check=True)
+
+
+def run_gcovr(build_root: Path) -> None:
+    filters = []
+    for source in CORE_SOURCES:
+        relative = source.relative_to(ROOT).as_posix()
+        filters.extend(["--filter", f"^{re.escape(relative)}$"])
+
+    command = [
+        sys.executable,
+        "-m",
+        "gcovr",
+        "--root",
+        str(ROOT),
+        "--object-directory",
+        str(build_root),
+        "--gcov-executable",
+        require_tool("gcov"),
+        *filters,
+        "--exclude",
+        "^tests/",
+        "--txt",
+        "--print-summary",
+        "--fail-under-line",
+        "85",
+    ]
+    print("coverage report:", " ".join(command), flush=True)
+    subprocess.run(command, cwd=ROOT, check=True)
+
+
+def main() -> None:
+    validate_scope()
+    gcc = require_tool(os.environ.get("CC", "gcc"))
+    with tempfile.TemporaryDirectory(prefix="smart-band-core-coverage-") as temp:
+        build_root = Path(temp)
+        for target in TARGETS:
+            compile_and_run(gcc, build_root, target)
+        run_gcovr(build_root)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"production C core coverage failed: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

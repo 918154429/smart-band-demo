@@ -3,6 +3,9 @@
   font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
   background: #edf5f4;
   color: #26394c;
+  --color-primary: #216e68;
+  --color-secondary: #526d78;
+  --color-muted: #526a73;
 }
 
 * {
@@ -20,6 +23,34 @@ body {
   place-items: center;
   overflow: auto;
   background: linear-gradient(145deg, #f8fbfa 0%, #e8f1ef 52%, #fff7e8 100%);
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #26394c;
+  color: #ffffff;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 button {
@@ -63,6 +94,8 @@ button {
   min-height: 100%;
   padding: 28px 18px 76px;
   transition: transform 180ms ease, opacity 180ms ease;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .content.switching {
@@ -151,7 +184,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  color: #6f8790;
+  color: var(--color-muted);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
@@ -302,7 +335,7 @@ button {
 
 .metric-label {
   margin: 0 0 5px;
-  color: #7a9198;
+  color: var(--color-muted);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
@@ -367,7 +400,7 @@ button {
 
 .source {
   margin: 6px 0 0;
-  color: #81939a;
+  color: var(--color-muted);
   font-size: 12px;
   font-weight: 700;
   text-align: center;
@@ -409,7 +442,7 @@ button {
 .goal-row span,
 .score-row span {
   display: block;
-  color: #7a9198;
+  color: var(--color-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
@@ -447,7 +480,9 @@ button {
 .calc-grid button {
   border: 0;
   border-radius: 14px;
-  background: #80cbc3;
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--color-primary);
   color: #ffffff;
   cursor: pointer;
   font-weight: 800;
@@ -455,7 +490,7 @@ button {
 }
 
 .goal-row button {
-  height: 40px;
+  height: 44px;
   font-size: 22px;
 }
 
@@ -495,11 +530,11 @@ button {
   top: 20px;
   left: 18px;
   z-index: 5;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 12px;
-  background: #78909c;
+  background: var(--color-secondary);
   color: #ffffff;
   cursor: pointer;
   font-size: 26px;
@@ -538,7 +573,7 @@ button {
 }
 
 .weather-temp span {
-  color: #d99d38;
+  color: #765000;
   font-size: 12px;
   font-weight: 800;
 }
@@ -565,14 +600,14 @@ button {
 }
 
 .calc-grid button {
-  min-height: 42px;
-  background: #8aa8d8;
+  min-height: 44px;
+  background: #4f678f;
   font-size: 17px;
 }
 
 .calc-grid .equals {
   grid-row: span 2;
-  background: #80cbc3;
+  background: var(--color-primary);
 }
 
 .calc-grid button:last-child {
@@ -592,7 +627,7 @@ button {
 .button-row button {
   min-height: 46px;
   padding: 0 6px;
-  background: #80cbc3;
+  background: var(--color-primary);
   font-size: 13px;
 }
 
@@ -648,7 +683,9 @@ button {
 
 .pad button {
   min-height: 38px;
-  background: #78909c;
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--color-secondary);
   font-size: 16px;
 }
 
@@ -660,7 +697,8 @@ button {
 
 .difficulty button {
   min-height: 34px;
-  background: #8aa8d8;
+  min-height: 44px;
+  background: #4f678f;
   font-size: 12px;
 }
 
@@ -679,7 +717,9 @@ button {
   aspect-ratio: 1;
   border: 0;
   border-radius: 8px;
-  background: #8aa8d8;
+  min-width: 44px;
+  min-height: 44px;
+  background: #4f678f;
   color: #ffffff;
   cursor: pointer;
   font-size: 13px;
@@ -901,8 +941,8 @@ button {
 .controls button {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 1px solid rgba(99, 129, 134, 0.26);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.8);
@@ -914,7 +954,7 @@ button {
 }
 
 button:focus-visible {
-  outline: 3px solid #79c5be;
+  outline: 3px solid #125e59;
   outline-offset: 2px;
 }
 
@@ -938,22 +978,189 @@ button:focus-visible {
 
 @media (max-height: 720px) {
   .stage {
-    padding: 12px;
+    gap: 8px;
+    padding: 8px;
   }
 
   .watch {
-    width: min(76vw, 286px);
+    width: min(81vw, 286px);
   }
 
   .content {
-    padding: 22px 16px 68px;
+    padding: 14px 14px 36px;
+  }
+
+  .leaf-mark {
+    height: 20px;
+    margin-top: 0;
+    margin-bottom: 3px;
+  }
+
+  .leaf-mark span,
+  .leaf-mark strong {
+    width: 20px;
+    height: 12px;
+  }
+
+  .leaf-mark strong {
+    transform: translateY(-5px);
+  }
+
+  .date-row {
+    font-size: 12px;
+  }
+
+  .time-display {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .time-part {
+    font-size: 36px;
+  }
+
+  .colon {
+    gap: 5px;
+  }
+
+  .colon span {
+    width: 8px;
+    height: 8px;
+  }
+
+  .ornament {
+    gap: 8px;
+    margin: 7px 2px;
+  }
+
+  .ornament span {
+    width: 32px;
+    height: 24px;
+  }
+
+  .cards {
+    gap: 5px;
   }
 
   .metric-card {
-    min-height: 58px;
+    grid-template-columns: 44px 1px 1fr;
+    min-height: 51px;
+    padding: 5px 8px;
+  }
+
+  .icon-orb {
+    width: 38px;
+    height: 38px;
+  }
+
+  .divider {
+    height: 34px;
+  }
+
+  .metric-copy {
+    padding-left: 9px;
+  }
+
+  .metric-label {
+    margin-bottom: 2px;
+    font-size: 11px;
+  }
+
+  .metric-value {
+    font-size: 16px;
   }
 
   .app-icon {
     min-height: 74px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body {
+    place-items: center;
+  }
+
+  .stage {
+    grid-template-columns: auto auto;
+    gap: 18px;
+    padding: 12px;
+  }
+
+  .watch {
+    width: auto;
+    height: calc(100dvh - 24px);
+    max-height: 351px;
+  }
+
+  .controls {
+    flex-direction: column;
+  }
+
+  .content {
+    padding: 10px 10px 24px;
+  }
+
+  .leaf-mark {
+    display: none;
+  }
+
+  .battery {
+    top: 10px;
+    right: 12px;
+    transform: scale(0.72);
+    transform-origin: top right;
+  }
+
+  .date-row {
+    justify-content: flex-start;
+    padding-left: 2px;
+    font-size: 10px;
+  }
+
+  .date-row::before,
+  .date-row::after {
+    display: none;
+  }
+
+  .time-part {
+    font-size: 30px;
+  }
+
+  .ornament {
+    margin: 4px 2px;
+  }
+
+  .metric-card {
+    min-height: 44px;
+    padding-block: 3px;
+  }
+
+  .icon-orb {
+    width: 32px;
+    height: 32px;
+  }
+
+  .divider {
+    height: 30px;
+  }
+
+  .button-row.four,
+  .difficulty {
+    grid-template-columns: repeat(2, minmax(44px, 1fr));
+  }
+
+  .mine-board {
+    min-width: 284px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }
