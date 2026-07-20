@@ -28,7 +28,9 @@
 
 ```text
 openvela_app/smart_band/        openvela 原生应用源码，可复制到 packages/demos
-openvela_app/smart_band/apps/   每个小应用的独立实现文件
+openvela_app/smart_band/apps/   每个小应用的 context、view 与 lifecycle 实现
+openvela_app/smart_band/logic/  Calculator、2048、Mines 等无 LVGL 生产状态机
+openvela_app/smart_band/ui/lvgl 通用 LVGL 组件与主页面 view
 openvela_app/smart_band/include 公共头文件、模型和图标声明
 openvela_app/smart_band/assets  项目图标与演示图片资源
 demo/                           浏览器静态演示页面，便于无模拟器时录屏
@@ -256,18 +258,22 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含两组不依赖 openvela 的 host C 测试。Python 入口会寻找
-GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、Timer 和 Stopwatch，
-再执行测试二进制：
+本仓库包含四组不依赖 openvela 的 host C 测试。Python 入口会寻找
+GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、应用 runtime、Timer
+和 Stopwatch，再执行测试二进制：
 
 ```sh
 python3 tests/test_watch_model.py
 python3 tests/test_time_apps.py
+python3 tests/test_app_runtime.py
+python3 tests/test_app_logic.py
 ```
 
 测试覆盖时间格式、页面切换、数据来源/TTL/墙钟回拨、无传感器构建、模拟数据范围、
-步数目标，以及 Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
-与生产代码分离的 Python 模型副本。也可以通过 `CC` 环境变量指定编译器。
+步数目标，以及应用 runtime 的 owned container、失败回滚、双实例隔离、1000 次
+mount/unmount，Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
+与生产代码分离的 Python 模型副本，并直接验证 Calculator、2048、Mines 的生产
+reducer、显式 seed 与边界条件。也可以通过 `CC` 环境变量指定编译器。
 
 ## 基本异常处理说明
 

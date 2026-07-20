@@ -1,4 +1,4 @@
-"""Compile and execute the production Timer and Stopwatch host test."""
+"""Compile and execute the production smart-band app runtime host test."""
 
 from __future__ import annotations
 
@@ -14,12 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "openvela_app" / "smart_band"
 INCLUDE_DIR = APP_DIR / "include"
 FAKE_LVGL_DIR = Path(__file__).with_name("fake_lvgl")
-TEST_SOURCE = Path(__file__).with_name("time_apps_test.c")
-PRODUCTION_SOURCES = [
-    APP_DIR / "smart_band_apps.c",
-    APP_DIR / "apps" / "timer_app.c",
-    APP_DIR / "apps" / "stopwatch_app.c",
-]
+TEST_SOURCE = Path(__file__).with_name("app_runtime_test.c")
+PRODUCTION_SOURCE = APP_DIR / "smart_band_apps.c"
 
 
 def find_visual_studio_environment() -> Path | None:
@@ -59,37 +55,29 @@ def find_compiler() -> tuple[str, str, Path | None]:
     if requested:
         if shutil.which(requested):
             name = Path(requested).name.lower()
-            family = "msvc" if name in {"cl", "cl.exe"} else "unix"
-            return requested, family, None
-
+            return requested, "msvc" if name in {"cl", "cl.exe"} else "unix", None
         if Path(requested).name.lower() in {"cl", "cl.exe"}:
-            visual_studio_environment = find_visual_studio_environment()
-            if visual_studio_environment is not None:
-                return "cl", "msvc", visual_studio_environment
-
+            environment = find_visual_studio_environment()
+            if environment is not None:
+                return "cl", "msvc", environment
         raise RuntimeError(f"requested C compiler is unavailable: {requested}")
 
     for candidate in ["cc", "gcc", "clang", "cl"]:
         if shutil.which(candidate):
             name = Path(candidate).name.lower()
-            family = "msvc" if name in {"cl", "cl.exe"} else "unix"
-            return candidate, family, None
+            return candidate, "msvc" if name in {"cl", "cl.exe"} else "unix", None
 
-    visual_studio_environment = find_visual_studio_environment()
-    if visual_studio_environment is not None:
-        return "cl", "msvc", visual_studio_environment
-
-    raise RuntimeError(
-        "no C compiler found; install GCC/Clang/MSVC or set CC to its executable"
-    )
+    environment = find_visual_studio_environment()
+    if environment is not None:
+        return "cl", "msvc", environment
+    raise RuntimeError("no C compiler found; install GCC/Clang/MSVC or set CC")
 
 
 def compile_and_run() -> None:
     compiler, family, compiler_environment = find_compiler()
-
-    with tempfile.TemporaryDirectory(prefix="smart-band-time-apps-") as temp:
-        output = Path(temp) / ("time_apps_test.exe" if os.name == "nt" else "time_apps_test")
-        sources = [str(TEST_SOURCE), *(str(source) for source in PRODUCTION_SOURCES)]
+    with tempfile.TemporaryDirectory(prefix="smart-band-app-runtime-") as temp:
+        output = Path(temp) / ("app_runtime_test.exe" if os.name == "nt" else "app_runtime_test")
+        sources = [str(TEST_SOURCE), str(PRODUCTION_SOURCE)]
         if family == "msvc":
             command = [
                 compiler,
@@ -118,11 +106,11 @@ def compile_and_run() -> None:
                 str(output),
             ]
 
-        print("compiling production time apps:", " ".join(command), flush=True)
+        print("compiling production app runtime:", " ".join(command), flush=True)
         if compiler_environment is None:
             subprocess.run(command, cwd=ROOT, check=True)
         else:
-            batch = Path(temp) / "compile_time_apps_test.bat"
+            batch = Path(temp) / "compile_app_runtime_test.bat"
             batch.write_text(
                 "@echo off\r\n"
                 f'call "{compiler_environment}" >nul || exit /b 1\r\n'
@@ -138,5 +126,5 @@ if __name__ == "__main__":
     try:
         compile_and_run()
     except (RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"time apps host test failed: {error}", file=sys.stderr)
+        print(f"app runtime host test failed: {error}", file=sys.stderr)
         raise SystemExit(1) from error

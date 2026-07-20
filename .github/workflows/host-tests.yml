@@ -52,6 +52,75 @@ jobs:
       - name: Compile and run production Timer and Stopwatch tests
         run: python tests/test_time_apps.py
 
+  production-app-runtime:
+    name: App runtime (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Compile and run production app runtime tests
+        run: python tests/test_app_runtime.py
+
+  production-app-logic:
+    name: App logic (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Compile and run production app logic tests
+        run: python tests/test_app_logic.py
+
+  production-ui-compile:
+    name: UI compile smoke (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Compile and link all production UI and app sources
+        run: python tests/test_ui_compile.py
+
   shell-syntax:
     runs-on: ubuntu-latest
     steps:
@@ -63,3 +132,17 @@ jobs:
           test "$(git ls-files -s skills/openvela-smart-band-reproduce/scripts/reproduce.sh | awk '{print $1}')" = 100755
       - name: Validate shell syntax
         run: bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh
+      - name: Validate application registry and 2048 rename
+        run: |
+          for source in \
+            apps/game_2048_app.c \
+            logic/calculator_model.c \
+            logic/game_2048_model.c \
+            logic/mines_model.c \
+            ui/lvgl/components.c \
+            ui/lvgl/watch_pages.c; do
+            grep -q "$source" openvela_app/smart_band/CMakeLists.txt
+            grep -q "$source" openvela_app/smart_band/Makefile
+          done
+          ! grep -R -E 'SMART_BAND_APP_MUSIC|smart_band_music_app|apps/music_app.c' \
+            openvela_app README.md docs

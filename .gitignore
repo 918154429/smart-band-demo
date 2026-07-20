@@ -16,6 +16,9 @@ demo/browser-demo.log
 
 # Python
 __pycache__/
+*.obj
+*.o
+*.exe
 *.pyc
 
 # Editor and OS noise

@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define STOPWATCH_ACTION_COUNT 2
+
 typedef struct
 {
   uint64_t elapsed_ms;
@@ -20,12 +22,20 @@ typedef struct
   bool mounted;
 } stopwatch_view_t;
 
-static stopwatch_state_t g_state;
-static stopwatch_view_t g_view;
-
-static void format_stopwatch(char *buffer, size_t size)
+typedef struct
 {
-  uint64_t seconds = g_state.elapsed_ms / 1000u;
+  stopwatch_state_t state;
+  stopwatch_view_t view;
+  smart_band_app_event_binding_t bindings[STOPWATCH_ACTION_COUNT];
+} stopwatch_context_t;
+
+_Static_assert(sizeof(stopwatch_context_t) <= SMART_BAND_APP_CONTEXT_CAPACITY,
+               "stopwatch context exceeds app storage");
+
+static void format_stopwatch(const stopwatch_context_t *stopwatch,
+                             char *buffer, size_t size)
+{
+  uint64_t seconds = stopwatch->state.elapsed_ms / 1000u;
 
   snprintf(buffer, size, "%02llu:%02llu",
            (unsigned long long)(seconds / 60u),
@@ -48,95 +58,123 @@ static void set_button_text(lv_obj_t *button, const char *text)
     }
 }
 
-static void stopwatch_advance_to(uint32_t now_ms)
+static bool stopwatch_advance_to(stopwatch_context_t *stopwatch,
+                                 uint32_t now_ms)
 {
   uint32_t elapsed_ms;
 
-  if (!g_state.running)
+  if (!stopwatch->state.running)
     {
-      return;
+      return false;
     }
 
-  elapsed_ms = now_ms - g_state.last_now_ms;
-  g_state.last_now_ms = now_ms;
-  g_state.elapsed_ms += elapsed_ms;
+  elapsed_ms = now_ms - stopwatch->state.last_now_ms;
+  stopwatch->state.last_now_ms = now_ms;
+  stopwatch->state.elapsed_ms += elapsed_ms;
+  return elapsed_ms != 0;
 }
 
-void smart_band_stopwatch_app_unmount(void)
+static int stopwatch_init(void *context)
 {
-  memset(&g_view, 0, sizeof(g_view));
+  if (context == NULL)
+    {
+      return -1;
+    }
+
+  memset(context, 0, sizeof(stopwatch_context_t));
+  return 0;
 }
 
-void smart_band_stopwatch_app_update(const smart_band_app_host_t *host)
+static void stopwatch_unmount(void *context)
 {
+  stopwatch_context_t *stopwatch = context;
+
+  if (stopwatch != NULL)
+    {
+      memset(&stopwatch->view, 0, sizeof(stopwatch->view));
+    }
+}
+
+static void stopwatch_render(void *context,
+                             const smart_band_app_host_t *host)
+{
+  stopwatch_context_t *stopwatch = context;
   char value[16];
 
   (void)host;
-  if (!g_view.mounted)
+  if (stopwatch == NULL || !stopwatch->view.mounted)
     {
       return;
     }
 
-  format_stopwatch(value, sizeof(value));
-  lv_label_set_text(g_view.display, value);
-  lv_label_set_text(g_view.status, g_state.running ? "Running" : "Paused");
-  set_button_text(g_view.start_button,
-                  g_state.running ? "Pause" : "Start");
+  format_stopwatch(stopwatch, value, sizeof(value));
+  lv_label_set_text(stopwatch->view.display, value);
+  lv_label_set_text(stopwatch->view.status,
+                    stopwatch->state.running ? "Running" : "Paused");
+  set_button_text(stopwatch->view.start_button,
+                  stopwatch->state.running ? "Pause" : "Start");
 }
 
-void smart_band_stopwatch_app_tick_at(const smart_band_app_host_t *host,
-                                      uint32_t now_ms)
+static bool stopwatch_tick(void *context, uint32_t now_ms)
 {
-  if (!g_state.running)
-    {
-      return;
-    }
+  stopwatch_context_t *stopwatch = context;
 
-  stopwatch_advance_to(now_ms);
-  if (g_view.mounted)
-    {
-      smart_band_stopwatch_app_update(host);
-    }
-}
-
-void smart_band_stopwatch_app_tick(const smart_band_app_host_t *host)
-{
-  smart_band_stopwatch_app_tick_at(host, lv_tick_get());
+  return stopwatch != NULL && stopwatch_advance_to(stopwatch, now_ms);
 }
 
 static void stopwatch_cb(lv_event_t *event)
 {
-  uintptr_t action = (uintptr_t)lv_event_get_user_data(event);
+  smart_band_app_event_binding_t *binding =
+    lv_event_get_user_data(event);
+  stopwatch_context_t *stopwatch;
   uint32_t now_ms = lv_tick_get();
 
-  if (action == 1)
+  if (binding == NULL || binding->context == NULL)
     {
-      if (g_state.running)
+      return;
+    }
+
+  stopwatch = binding->context;
+  if (binding->action == 1)
+    {
+      if (stopwatch->state.running)
         {
-          stopwatch_advance_to(now_ms);
-          g_state.running = false;
+          stopwatch_advance_to(stopwatch, now_ms);
+          stopwatch->state.running = false;
         }
       else
         {
-          g_state.last_now_ms = now_ms;
-          g_state.running = true;
+          stopwatch->state.last_now_ms = now_ms;
+          stopwatch->state.running = true;
         }
     }
   else
     {
-      g_state.elapsed_ms = 0;
-      g_state.running = false;
+      stopwatch->state.elapsed_ms = 0;
+      stopwatch->state.running = false;
     }
 
-  smart_band_stopwatch_app_update(NULL);
+  stopwatch_render(stopwatch, NULL);
 }
 
-int smart_band_stopwatch_app_build(lv_obj_t *parent,
-                                   const smart_band_app_host_t *host)
+static int stopwatch_mount(void *context, lv_obj_t *parent,
+                           const smart_band_app_host_t *host)
 {
+  stopwatch_context_t *stopwatch = context;
   lv_obj_t *panel;
+  size_t index;
 
-  smart_band_stopwatch_app_unmount();
+  if (stopwatch == NULL || parent == NULL || host == NULL)
+    {
+      return -1;
+    }
+
+  stopwatch_unmount(stopwatch);
+  for (index = 0; index < STOPWATCH_ACTION_COUNT; index++)
+    {
+      stopwatch->bindings[index].context = stopwatch;
+      stopwatch->bindings[index].action = index + 1;
+    }
 
   panel = host->create_box(parent, host->sx(22), host->sy(18),
                            host->screen_w - host->sx(44), host->sy(174),
@@ -146,38 +184,49 @@ int smart_band_stopwatch_app_build(lv_obj_t *parent,
       return -1;
     }
 
-  g_view.display = host->create_label(panel, "00:00", host->font_time(),
-                                      lv_color_hex(0x293b53),
-                                      LV_TEXT_ALIGN_CENTER);
-  g_view.status = host->create_label(panel, "Paused", host->font_14(),
-                                     lv_color_hex(0x6f8790),
-                                     LV_TEXT_ALIGN_CENTER);
-  if (g_view.display == NULL || g_view.status == NULL)
+  stopwatch->view.display =
+    host->create_label(panel, "00:00", host->font_time(),
+                       lv_color_hex(0x293b53), LV_TEXT_ALIGN_CENTER);
+  stopwatch->view.status =
+    host->create_label(panel, "Paused", host->font_14(),
+                       lv_color_hex(0x6f8790), LV_TEXT_ALIGN_CENTER);
+  if (stopwatch->view.display == NULL || stopwatch->view.status == NULL)
     {
-      smart_band_stopwatch_app_unmount();
+      stopwatch_unmount(stopwatch);
       return -1;
     }
 
-  host->place_label(g_view.display, host->sx(12), host->sy(40),
+  host->place_label(stopwatch->view.display, host->sx(12), host->sy(40),
                     host->screen_w - host->sx(68), host->sy(66));
-  host->place_label(g_view.status, host->sx(12), host->sy(116),
+  host->place_label(stopwatch->view.status, host->sx(12), host->sy(116),
                     host->screen_w - host->sx(68), host->sy(24));
 
-  g_view.start_button =
+  stopwatch->view.start_button =
     host->create_action_button(parent, "Start", host->sx(54), host->sy(224),
                                host->sx(96), host->sy(54),
-                               lv_color_hex(0x73a1d6), stopwatch_cb, 1);
-  if (g_view.start_button == NULL ||
-      host->create_action_button(parent, "Reset", host->sx(180),
-                                 host->sy(224), host->sx(96), host->sy(54),
-                                 lv_color_hex(0x6f8790), stopwatch_cb,
-                                 2) == NULL)
+                               lv_color_hex(0x73a1d6), stopwatch_cb,
+                               (uintptr_t)&stopwatch->bindings[0]);
+  if (stopwatch->view.start_button == NULL ||
+      host->create_action_button(
+        parent, "Reset", host->sx(180), host->sy(224), host->sx(96),
+        host->sy(54), lv_color_hex(0x6f8790), stopwatch_cb,
+        (uintptr_t)&stopwatch->bindings[1]) == NULL)
     {
-      smart_band_stopwatch_app_unmount();
+      stopwatch_unmount(stopwatch);
       return -1;
     }
 
-  g_view.mounted = true;
-  smart_band_stopwatch_app_update(host);
+  stopwatch->view.mounted = true;
+  stopwatch_render(stopwatch, host);
   return 0;
 }
+
+const smart_band_app_ops_t smart_band_stopwatch_app_ops =
+{
+  .context_size = sizeof(stopwatch_context_t),
+  .init = stopwatch_init,
+  .mount = stopwatch_mount,
+  .unmount = stopwatch_unmount,
+  .tick = stopwatch_tick,
+  .render = stopwatch_render
+};

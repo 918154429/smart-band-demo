@@ -3,14 +3,22 @@
 #include "icon_assets.h"
 
 #include <stdio.h>
+#include <string.h>
 
-static lv_obj_t *g_temp;
-static lv_obj_t *g_source;
-static lv_obj_t *g_condition;
-static lv_obj_t *g_sky;
-static lv_obj_t *g_range;
-static lv_obj_t *g_humidity;
-static lv_obj_t *g_wind;
+typedef struct
+{
+  lv_obj_t *temp;
+  lv_obj_t *source;
+  lv_obj_t *condition;
+  lv_obj_t *sky;
+  lv_obj_t *range;
+  lv_obj_t *humidity;
+  lv_obj_t *wind;
+  bool mounted;
+} weather_context_t;
+
+_Static_assert(sizeof(weather_context_t) <= SMART_BAND_APP_CONTEXT_CAPACITY,
+               "weather context exceeds app storage");
 
 static const char *weather_source_text(const smart_band_state_t *model,
                                        smart_band_metric_t metric)
@@ -41,7 +49,6 @@ static const char *weather_source_text(const smart_band_state_t *model,
 }
 
 static lv_obj_t *weather_label(lv_obj_t *parent, const char *text,
-                               const smart_band_app_host_t *host,
                                const lv_font_t *font, uint32_t color,
                                lv_text_align_t align,
                                lv_coord_t x, lv_coord_t y,
@@ -66,7 +73,6 @@ static lv_obj_t *weather_label(lv_obj_t *parent, const char *text,
 }
 
 static lv_obj_t *weather_icon(lv_obj_t *parent,
-                              const smart_band_app_host_t *host,
                               const lv_image_dsc_t *src, lv_coord_t x,
                               lv_coord_t y, lv_coord_t size)
 {
@@ -125,10 +131,10 @@ static int weather_metric(lv_obj_t *parent, const smart_band_app_host_t *host,
   dot = host->create_box(card, host->sx(10), host->sy(12),
                          host->sx(7), host->sx(7), lv_color_hex(accent),
                          LV_RADIUS_CIRCLE);
-  title_label = weather_label(card, title, host, host->font_12(), 0x81939a,
+  title_label = weather_label(card, title, host->font_12(), 0x81939a,
                               LV_TEXT_ALIGN_LEFT, host->sx(22),
                               host->sy(7), w - host->sx(32), host->sy(18));
-  *value_out = weather_label(card, "--", host, host->font_16(), 0x293b53,
+  *value_out = weather_label(card, "--", host->font_16(), 0x293b53,
                              LV_TEXT_ALIGN_LEFT, host->sx(22),
                              host->sy(27), w - host->sx(32), host->sy(26));
   if (dot == NULL || title_label == NULL || *value_out == NULL)
@@ -139,8 +145,10 @@ static int weather_metric(lv_obj_t *parent, const smart_band_app_host_t *host,
   return 0;
 }
 
-void smart_band_weather_app_update(const smart_band_app_host_t *host)
+static void weather_render(void *context,
+                           const smart_band_app_host_t *host)
 {
+  weather_context_t *weather = context;
   char temp[32];
   char source[40];
   char humidity[16];
@@ -149,7 +157,8 @@ void smart_band_weather_app_update(const smart_band_app_host_t *host)
   const smart_band_metric_info_t *humidity_info;
   const smart_band_metric_info_t *temperature_info;
 
-  if (host == NULL || host->model == NULL)
+  if (weather == NULL || !weather->mounted || host == NULL ||
+      host->model == NULL)
     {
       return;
     }
@@ -180,42 +189,67 @@ void smart_band_weather_app_update(const smart_band_app_host_t *host)
               "Unavailable" :
               (host->model->temperature_c >= 30 ? "Sunny" : "Cloudy");
 
-  host->set_label_text(g_temp, temp);
-  host->set_label_text(g_source, source);
-  host->set_label_text(g_condition, condition);
-  host->set_label_text(g_sky,
+  host->set_label_text(weather->temp, temp);
+  host->set_label_text(weather->source, source);
+  host->set_label_text(weather->condition, condition);
+  host->set_label_text(weather->sky,
                        temperature_info == NULL ||
                        temperature_info->freshness ==
                          SMART_BAND_DATA_FRESHNESS_UNAVAILABLE ?
                        "--" : condition);
   host->set_label_text(
-    g_range,
+    weather->range,
     temperature_info == NULL ||
     temperature_info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE ?
     "--" : (host->model->temperature_c >= 30 ? "32/26" : "28/22"));
-  host->set_label_text(g_humidity, humidity);
-  host->set_label_text(g_wind, wind);
+  host->set_label_text(weather->humidity, humidity);
+  host->set_label_text(weather->wind, wind);
 }
 
-int smart_band_weather_app_build(lv_obj_t *parent,
-                                 const smart_band_app_host_t *host)
+static int weather_init(void *context)
 {
+  if (context == NULL)
+    {
+      return -1;
+    }
+
+  memset(context, 0, sizeof(weather_context_t));
+  return 0;
+}
+
+static void weather_unmount(void *context)
+{
+  weather_context_t *weather = context;
+
+  if (weather != NULL)
+    {
+      memset(weather, 0, sizeof(*weather));
+    }
+}
+
+static int weather_mount(void *context, lv_obj_t *parent,
+                         const smart_band_app_host_t *host)
+{
+  weather_context_t *weather = context;
   lv_obj_t *hero;
   lv_obj_t *hero_icon;
   lv_obj_t *caption;
   lv_obj_t *sensor_pill;
-  lv_coord_t margin = host->sx(18);
-  lv_coord_t hero_w = host->screen_w - margin * 2;
-  lv_coord_t card_w = (host->screen_w - margin * 2 - host->sx(10)) / 2;
-  lv_coord_t stats_y = host->sy(150);
+  lv_coord_t margin;
+  lv_coord_t hero_w;
+  lv_coord_t card_w;
+  lv_coord_t stats_y;
 
-  g_temp = NULL;
-  g_source = NULL;
-  g_condition = NULL;
-  g_sky = NULL;
-  g_range = NULL;
-  g_humidity = NULL;
-  g_wind = NULL;
+  if (weather == NULL || parent == NULL || host == NULL)
+    {
+      return -1;
+    }
+
+  weather_unmount(weather);
+  margin = host->sx(18);
+  hero_w = host->screen_w - margin * 2;
+  card_w = (host->screen_w - margin * 2 - host->sx(10)) / 2;
+  stats_y = host->sy(150);
 
   hero = host->create_box(parent, margin, host->sy(6), hero_w, host->sy(132),
                           lv_color_hex(0xeefbf8), host->sx(24));
@@ -229,45 +263,57 @@ int smart_band_weather_app_build(lv_obj_t *parent,
   lv_obj_set_style_border_width(hero, 1, 0);
   lv_obj_set_style_border_color(hero, lv_color_hex(0xd9efec), 0);
 
-  hero_icon = weather_icon(hero, host, &smart_band_icon_weather,
+  hero_icon = weather_icon(hero, &smart_band_icon_weather,
                            host->sx(18), host->sy(22), host->sx(56));
-  g_temp = weather_label(hero, "--", host, host->font_32(), 0x293b53,
-                         LV_TEXT_ALIGN_LEFT, host->sx(88), host->sy(16),
-                         hero_w - host->sx(108), host->sy(44));
-  g_condition = weather_label(hero, "--", host, host->font_16(), 0x3b8880,
-                              LV_TEXT_ALIGN_LEFT, host->sx(90),
-                              host->sy(60), hero_w - host->sx(110),
-                              host->sy(24));
+  weather->temp = weather_label(hero, "--", host->font_32(), 0x293b53,
+                                LV_TEXT_ALIGN_LEFT, host->sx(88),
+                                host->sy(16), hero_w - host->sx(108),
+                                host->sy(44));
+  weather->condition = weather_label(hero, "--", host->font_16(),
+                                     0x3b8880, LV_TEXT_ALIGN_LEFT,
+                                     host->sx(90), host->sy(60),
+                                     hero_w - host->sx(110), host->sy(24));
   sensor_pill = host->create_box(hero, host->sx(88), host->sy(92),
                                  hero_w - host->sx(108), host->sy(28),
                                  lv_color_hex(0xffffff), host->sx(14));
-  caption = weather_label(sensor_pill, "Sensor", host, host->font_12(),
+  caption = weather_label(sensor_pill, "Sensor", host->font_12(),
                           0x81939a, LV_TEXT_ALIGN_LEFT, host->sx(10),
                           host->sy(6), host->sx(54), host->sy(16));
-  g_source = weather_label(sensor_pill, "--", host, host->font_12(),
-                           0xe4a840, LV_TEXT_ALIGN_RIGHT, host->sx(62),
-                           host->sy(6), hero_w - host->sx(180),
-                           host->sy(16));
-  if (hero_icon == NULL || g_temp == NULL ||
-      g_condition == NULL || sensor_pill == NULL || caption == NULL ||
-      g_source == NULL)
+  weather->source = weather_label(sensor_pill, "--", host->font_12(),
+                                  0xe4a840, LV_TEXT_ALIGN_RIGHT,
+                                  host->sx(62), host->sy(6),
+                                  hero_w - host->sx(180), host->sy(16));
+  if (hero_icon == NULL || weather->temp == NULL ||
+      weather->condition == NULL || sensor_pill == NULL || caption == NULL ||
+      weather->source == NULL)
     {
       return -1;
     }
 
   if (weather_metric(parent, host, margin, stats_y, card_w, "Sky", 0x80cbc3,
-                     &g_sky) != 0 ||
+                     &weather->sky) != 0 ||
       weather_metric(parent, host, margin + card_w + host->sx(10), stats_y,
-                     card_w, "Range", 0xf5c66e, &g_range) != 0 ||
+                     card_w, "Range", 0xf5c66e, &weather->range) != 0 ||
       weather_metric(parent, host, margin, stats_y + host->sy(68), card_w,
-                     "Humidity", 0x8aa8d8, &g_humidity) != 0 ||
+                     "Humidity", 0x8aa8d8, &weather->humidity) != 0 ||
       weather_metric(parent, host, margin + card_w + host->sx(10),
                      stats_y + host->sy(68), card_w, "Wind", 0xf08d88,
-                     &g_wind) != 0)
+                     &weather->wind) != 0)
     {
       return -1;
     }
 
-  smart_band_weather_app_update(host);
+  weather->mounted = true;
+  weather_render(weather, host);
   return 0;
 }
+
+const smart_band_app_ops_t smart_band_weather_app_ops =
+{
+  .context_size = sizeof(weather_context_t),
+  .init = weather_init,
+  .mount = weather_mount,
+  .unmount = weather_unmount,
+  .tick = NULL,
+  .render = weather_render
+};

@@ -3,32 +3,44 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
-static lv_obj_t *g_stage;
-static lv_obj_t *g_count;
-static lv_obj_t *g_hint;
-static lv_obj_t *g_reset_note;
-static const lv_font_t *g_float_font;
-static lv_coord_t g_float_start_y;
-static int g_merit;
-static uint32_t g_last_tap_tick;
+#define WOODEN_FISH_ACTION_KNOCK 1u
+#define WOODEN_FISH_ACTION_RESET 2u
+#define WOODEN_FISH_ACTION_COUNT 2
 
-static void wooden_fish_update_count(void)
+typedef enum
 {
-  char value[32];
+  WOODEN_FISH_HINT_READY = 0,
+  WOODEN_FISH_HINT_FIRST,
+  WOODEN_FISH_HINT_TOO_FAST,
+  WOODEN_FISH_HINT_SPEED,
+  WOODEN_FISH_HINT_STEADY
+} wooden_fish_hint_t;
 
-  snprintf(value, sizeof(value), "Merit %d", g_merit);
-  if (g_count != NULL)
-    {
-      lv_label_set_text(g_count, value);
-    }
-}
-
-void smart_band_wooden_fish_app_update(const smart_band_app_host_t *host)
+typedef struct
 {
-  (void)host;
-  wooden_fish_update_count();
-}
+  int merit;
+  uint32_t last_tap_ms;
+  bool has_last_tap;
+  uint32_t speed_per_minute;
+  wooden_fish_hint_t hint;
+  bool show_reset_note;
+  bool animate_merit;
+
+  lv_obj_t *stage;
+  lv_obj_t *count;
+  lv_obj_t *hint_label;
+  lv_obj_t *reset_note;
+  const lv_font_t *float_font;
+  lv_coord_t float_start_y;
+  bool mounted;
+  smart_band_app_event_binding_t bindings[WOODEN_FISH_ACTION_COUNT];
+} wooden_fish_context_t;
+
+_Static_assert(sizeof(wooden_fish_context_t) <=
+               SMART_BAND_APP_CONTEXT_CAPACITY,
+               "wooden fish app context exceeds runtime capacity");
 
 static void merit_anim_y_cb(void *obj, int32_t value)
 {
@@ -50,36 +62,37 @@ static void merit_anim_ready_cb(lv_anim_t *anim)
     }
 }
 
-static void show_merit_animation(void)
+static void show_merit_animation(wooden_fish_context_t *context)
 {
   lv_obj_t *label;
   lv_anim_t move_anim;
   lv_anim_t fade_anim;
 
-  if (g_stage == NULL || g_float_font == NULL)
+  if (context->stage == NULL || context->float_font == NULL)
     {
       return;
     }
 
-  label = lv_label_create(g_stage);
+  label = lv_label_create(context->stage);
   if (label == NULL)
     {
       return;
     }
 
   lv_label_set_text(label, "Merit +1");
-  lv_obj_set_style_text_font(label, g_float_font, 0);
+  lv_obj_set_style_text_font(label, context->float_font, 0);
   lv_obj_set_style_text_color(label, lv_color_hex(0xd99a32), 0);
   lv_obj_set_style_text_opa(label, LV_OPA_COVER, 0);
   lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
   lv_obj_set_style_pad_all(label, 0, 0);
-  lv_obj_set_pos(label, 0, g_float_start_y);
-  lv_obj_set_size(label, lv_obj_get_width(g_stage), 28);
+  lv_obj_set_pos(label, 0, context->float_start_y);
+  lv_obj_set_size(label, lv_obj_get_width(context->stage), 28);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
 
   lv_anim_init(&move_anim);
   lv_anim_set_var(&move_anim, label);
-  lv_anim_set_values(&move_anim, g_float_start_y, g_float_start_y - 42);
+  lv_anim_set_values(&move_anim, context->float_start_y,
+                     context->float_start_y - 42);
   lv_anim_set_exec_cb(&move_anim, merit_anim_y_cb);
   lv_anim_set_time(&move_anim, 760);
   lv_anim_set_path_cb(&move_anim, lv_anim_path_ease_out);
@@ -96,89 +109,145 @@ static void show_merit_animation(void)
   lv_anim_start(&fade_anim);
 }
 
-void smart_band_wooden_fish_app_tick(const smart_band_app_host_t *host)
+static const char *wooden_fish_hint_text(const wooden_fish_context_t *context,
+                                         char *buffer, size_t size)
 {
-  (void)host;
-
-  if (g_hint != NULL && g_last_tap_tick != 0 &&
-      lv_tick_get() - g_last_tap_tick > 1200)
+  switch (context->hint)
     {
-      lv_label_set_text(g_hint, "Speed steady");
+      case WOODEN_FISH_HINT_FIRST:
+        return "First knock";
+
+      case WOODEN_FISH_HINT_TOO_FAST:
+        return "Too fast";
+
+      case WOODEN_FISH_HINT_SPEED:
+        snprintf(buffer, size, "Speed %lu/min",
+                 (unsigned long)context->speed_per_minute);
+        return buffer;
+
+      case WOODEN_FISH_HINT_STEADY:
+        return "Speed steady";
+
+      case WOODEN_FISH_HINT_READY:
+      default:
+        return "Ready to knock";
     }
 }
 
-static void update_speed_hint(uint32_t now)
+static void wooden_fish_render(void *opaque,
+                               const smart_band_app_host_t *host)
 {
-  char text[40];
+  wooden_fish_context_t *context = opaque;
+  char count[32];
+  char hint[40];
+
+  (void)host;
+  if (context == NULL || !context->mounted)
+    {
+      return;
+    }
+
+  snprintf(count, sizeof(count), "Merit %d", context->merit);
+  if (context->count != NULL)
+    {
+      lv_label_set_text(context->count, count);
+    }
+
+  if (context->hint_label != NULL)
+    {
+      lv_label_set_text(context->hint_label,
+                        wooden_fish_hint_text(context, hint, sizeof(hint)));
+    }
+
+  if (context->reset_note != NULL)
+    {
+      lv_label_set_text(context->reset_note,
+                        context->show_reset_note ?
+                        "Merit becomes your luck" : "");
+    }
+
+  if (context->animate_merit)
+    {
+      context->animate_merit = false;
+      show_merit_animation(context);
+    }
+}
+
+static void wooden_fish_update_speed(wooden_fish_context_t *context,
+                                     uint32_t now_ms)
+{
   uint32_t delta;
 
-  if (g_hint == NULL)
+  if (!context->has_last_tap)
     {
+      context->hint = WOODEN_FISH_HINT_FIRST;
+      context->speed_per_minute = 0;
       return;
     }
 
-  if (g_last_tap_tick == 0)
+  delta = now_ms - context->last_tap_ms;
+  if (delta < 220u)
     {
-      lv_label_set_text(g_hint, "First knock");
+      context->hint = WOODEN_FISH_HINT_TOO_FAST;
+      context->speed_per_minute = 0;
       return;
     }
 
-  delta = now - g_last_tap_tick;
-  if (delta < 220)
-    {
-      lv_label_set_text(g_hint, "Too fast");
-      return;
-    }
-
-  snprintf(text, sizeof(text), "Speed %lu/min",
-           (unsigned long)(60000u / delta));
-  lv_label_set_text(g_hint, text);
+  context->hint = WOODEN_FISH_HINT_SPEED;
+  context->speed_per_minute = 60000u / delta;
 }
 
 static void fish_cb(lv_event_t *event)
 {
-  uintptr_t action = (uintptr_t)lv_event_get_user_data(event);
-  uint32_t now = lv_tick_get();
+  smart_band_app_event_binding_t *binding =
+    (smart_band_app_event_binding_t *)lv_event_get_user_data(event);
+  wooden_fish_context_t *context;
+  uint32_t now_ms;
 
-  if (action == 1)
+  if (binding == NULL || binding->context == NULL)
     {
-      g_merit++;
-      update_speed_hint(now);
-      g_last_tap_tick = now;
-      if (g_reset_note != NULL)
-        {
-          lv_label_set_text(g_reset_note, "");
-        }
-
-      wooden_fish_update_count();
-      show_merit_animation();
       return;
     }
 
-  g_merit = 0;
-  g_last_tap_tick = 0;
-  if (g_hint != NULL)
+  context = binding->context;
+  if (binding->action == WOODEN_FISH_ACTION_KNOCK)
     {
-      lv_label_set_text(g_hint, "Ready to knock");
+      now_ms = lv_tick_get();
+      context->merit++;
+      wooden_fish_update_speed(context, now_ms);
+      context->last_tap_ms = now_ms;
+      context->show_reset_note = false;
+      context->animate_merit = true;
+      context->has_last_tap = true;
+    }
+  else if (binding->action == WOODEN_FISH_ACTION_RESET)
+    {
+      context->merit = 0;
+      context->last_tap_ms = 0;
+      context->has_last_tap = false;
+      context->speed_per_minute = 0;
+      context->hint = WOODEN_FISH_HINT_READY;
+      context->show_reset_note = true;
+      context->animate_merit = false;
+    }
+  else
+    {
+      return;
     }
 
-  if (g_reset_note != NULL)
-    {
-      lv_label_set_text(g_reset_note, "Merit becomes your luck");
-    }
-
-  wooden_fish_update_count();
+  wooden_fish_render(context, NULL);
 }
 
-static int add_tappable(lv_obj_t *obj)
+static int add_tappable(lv_obj_t *obj,
+                        smart_band_app_event_binding_t *binding)
 {
-  if (obj == NULL)
+  if (obj == NULL || binding == NULL)
     {
       return -1;
     }
 
   lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(obj, fish_cb, LV_EVENT_CLICKED, (void *)1);
+  lv_obj_add_event_cb(obj, fish_cb, LV_EVENT_CLICKED, binding);
   return 0;
 }
 
@@ -198,10 +267,45 @@ static lv_obj_t *create_part(const smart_band_app_host_t *host,
   return part;
 }
 
-int smart_band_wooden_fish_app_build(lv_obj_t *parent,
-                                     const smart_band_app_host_t *host)
+static int wooden_fish_init(void *opaque)
 {
-  lv_coord_t center = host->screen_w / 2;
+  wooden_fish_context_t *context = opaque;
+
+  if (context == NULL)
+    {
+      return -1;
+    }
+
+  memset(context, 0, sizeof(*context));
+  context->hint = WOODEN_FISH_HINT_READY;
+  return 0;
+}
+
+static void wooden_fish_unmount(void *opaque)
+{
+  wooden_fish_context_t *context = opaque;
+
+  if (context == NULL)
+    {
+      return;
+    }
+
+  context->stage = NULL;
+  context->count = NULL;
+  context->hint_label = NULL;
+  context->reset_note = NULL;
+  context->float_font = NULL;
+  context->float_start_y = 0;
+  context->mounted = false;
+  context->animate_merit = false;
+  memset(context->bindings, 0, sizeof(context->bindings));
+}
+
+static int wooden_fish_mount(void *opaque, lv_obj_t *parent,
+                             const smart_band_app_host_t *host)
+{
+  wooden_fish_context_t *context = opaque;
+  lv_coord_t center;
   lv_obj_t *head;
   lv_obj_t *body;
   lv_obj_t *belly;
@@ -211,31 +315,40 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
   lv_obj_t *knock;
   lv_obj_t *reset;
 
-  g_stage = parent;
-  g_count = NULL;
-  g_hint = NULL;
-  g_reset_note = NULL;
-  g_float_font = host->font_20();
-  g_float_start_y = host->sy(56);
-  g_last_tap_tick = 0;
-
-  g_count = host->create_label(parent, "Merit 0", host->font_20(),
-                               lv_color_hex(0x293b53),
-                               LV_TEXT_ALIGN_CENTER);
-  g_hint = host->create_label(parent, "Ready to knock", host->font_12(),
-                              lv_color_hex(0x6f8790),
-                              LV_TEXT_ALIGN_CENTER);
-  g_reset_note = host->create_label(parent, "", host->font_12(),
-                                    lv_color_hex(0xd99a32),
-                                    LV_TEXT_ALIGN_CENTER);
-  if (g_count == NULL || g_hint == NULL || g_reset_note == NULL)
+  if (context == NULL || parent == NULL || host == NULL)
     {
       return -1;
     }
 
-  host->place_label(g_count, host->sx(18), host->sy(2),
+  wooden_fish_unmount(context);
+  center = host->screen_w / 2;
+  context->stage = parent;
+  context->float_font = host->font_20();
+  context->float_start_y = host->sy(56);
+  context->bindings[0].context = context;
+  context->bindings[0].action = WOODEN_FISH_ACTION_KNOCK;
+  context->bindings[1].context = context;
+  context->bindings[1].action = WOODEN_FISH_ACTION_RESET;
+
+  context->count = host->create_label(parent, "Merit 0", host->font_20(),
+                                      lv_color_hex(0x293b53),
+                                      LV_TEXT_ALIGN_CENTER);
+  context->hint_label =
+    host->create_label(parent, "Ready to knock", host->font_12(),
+                       lv_color_hex(0x6f8790), LV_TEXT_ALIGN_CENTER);
+  context->reset_note = host->create_label(parent, "", host->font_12(),
+                                           lv_color_hex(0xd99a32),
+                                           LV_TEXT_ALIGN_CENTER);
+  if (context->count == NULL || context->hint_label == NULL ||
+      context->reset_note == NULL)
+    {
+      wooden_fish_unmount(context);
+      return -1;
+    }
+
+  host->place_label(context->count, host->sx(18), host->sy(2),
                     host->screen_w - host->sx(36), host->sy(28));
-  host->place_label(g_hint, host->sx(18), host->sy(30),
+  host->place_label(context->hint_label, host->sx(18), host->sy(30),
                     host->screen_w - host->sx(36), host->sy(20));
 
   if (create_part(host, parent, center - host->sx(94), host->sy(243),
@@ -254,6 +367,7 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                   host->sx(132), host->sy(18), 0xf3ead7,
                   LV_RADIUS_CIRCLE) == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -265,6 +379,7 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                       host->sx(30));
   if (body == NULL || belly == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -275,6 +390,7 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                   host->sx(34), host->sx(34), 0x9b6947,
                   LV_RADIUS_CIRCLE) == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -285,8 +401,10 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                       host->sx(68), host->sy(30), 0xe0b98f,
                       LV_RADIUS_CIRCLE);
   if (head == NULL || snout == NULL ||
-      add_tappable(head) != 0 || add_tappable(body) != 0)
+      add_tappable(head, &context->bindings[0]) != 0 ||
+      add_tappable(body, &context->bindings[0]) != 0)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -312,6 +430,7 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                   host->sx(32), host->sy(18), 0x8f6043,
                   LV_RADIUS_CIRCLE) == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -323,6 +442,7 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
                             0xc58d5c, host->sx(12));
   if (hammer_handle == NULL || hammer_head == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
@@ -331,22 +451,49 @@ int smart_band_wooden_fish_app_build(lv_obj_t *parent,
   lv_obj_set_style_border_width(hammer_head, 1, 0);
   lv_obj_set_style_border_color(hammer_head, lv_color_hex(0x8d5d42), 0);
 
-  host->place_label(g_reset_note, host->sx(18), host->sy(278),
+  host->place_label(context->reset_note, host->sx(18), host->sy(278),
                     host->screen_w - host->sx(36), host->sy(20));
 
-  knock = host->create_action_button(parent, "Knock",
-                                     center - host->sx(112), host->sy(308),
-                                     host->sx(96), host->sy(38),
-                                     lv_color_hex(0xf5c66e), fish_cb, 1);
-  reset = host->create_action_button(parent, "Reset",
-                                     center + host->sx(16), host->sy(308),
-                                     host->sx(96), host->sy(38),
-                                     lv_color_hex(0x6f8790), fish_cb, 2);
+  knock = host->create_action_button(
+    parent, "Knock", center - host->sx(112), host->sy(308), host->sx(96),
+    host->sy(38), lv_color_hex(0xf5c66e), fish_cb,
+    (uintptr_t)&context->bindings[0]);
+  reset = host->create_action_button(
+    parent, "Reset", center + host->sx(16), host->sy(308), host->sx(96),
+    host->sy(38), lv_color_hex(0x6f8790), fish_cb,
+    (uintptr_t)&context->bindings[1]);
   if (knock == NULL || reset == NULL)
     {
+      wooden_fish_unmount(context);
       return -1;
     }
 
-  wooden_fish_update_count();
+  context->mounted = true;
   return 0;
 }
+
+static bool wooden_fish_tick(void *opaque, uint32_t now_ms)
+{
+  wooden_fish_context_t *context = opaque;
+
+  if (context == NULL || !context->has_last_tap ||
+      context->hint == WOODEN_FISH_HINT_STEADY ||
+      now_ms - context->last_tap_ms <= 1200u)
+    {
+      return false;
+    }
+
+  context->hint = WOODEN_FISH_HINT_STEADY;
+  context->speed_per_minute = 0;
+  return true;
+}
+
+const smart_band_app_ops_t smart_band_wooden_fish_app_ops =
+{
+  .context_size = sizeof(wooden_fish_context_t),
+  .init = wooden_fish_init,
+  .mount = wooden_fish_mount,
+  .unmount = wooden_fish_unmount,
+  .tick = wooden_fish_tick,
+  .render = wooden_fish_render
+};

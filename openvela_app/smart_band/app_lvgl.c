@@ -3,6 +3,8 @@
 #include "icon_assets.h"
 #include "sensor_bridge.h"
 #include "smart_band_apps.h"
+#include "ui/lvgl/components.h"
+#include "ui/lvgl/watch_pages.h"
 #include "watch_model.h"
 
 #include <stdint.h>
@@ -11,9 +13,6 @@
 #include <string.h>
 #include <time.h>
 
-#define DESIGN_W 330
-#define DESIGN_H 626
-#define CARD_COUNT 4
 #define SMART_BAND_DEFAULT_TZ "CST-8"
 #define SMART_BAND_SWIPE_CLICK_GUARD_MS 300
 
@@ -22,42 +21,10 @@ typedef struct
   lv_obj_t *root;
   lv_obj_t *watch;
   lv_obj_t *screen;
-  lv_obj_t *face_page;
-  lv_obj_t *heart_page;
-  lv_obj_t *steps_page;
+  smart_band_ui_components_t components;
+  smart_band_watch_pages_t watch_pages;
 
   lv_obj_t *dots[SMART_BAND_PAGE_COUNT];
-
-  lv_obj_t *face_date;
-  lv_obj_t *face_hour;
-  lv_obj_t *face_minute;
-  lv_obj_t *face_sleep_value;
-  lv_obj_t *face_heart_value;
-  lv_obj_t *face_stress_value;
-  lv_obj_t *face_weather_value;
-  lv_obj_t *face_battery;
-  lv_obj_t *face_battery_bar;
-  lv_obj_t *face_battery_fill;
-  lv_obj_t *face_battery_cap;
-  lv_obj_t *face_battery_charge;
-
-  lv_obj_t *heart_date;
-  lv_obj_t *heart_value;
-  lv_obj_t *heart_progress;
-  lv_obj_t *heart_status;
-  lv_obj_t *heart_battery;
-  lv_obj_t *heart_source;
-  lv_obj_t *heart_stress;
-
-  lv_obj_t *steps_date;
-  lv_obj_t *steps_value;
-  lv_obj_t *steps_progress;
-  lv_obj_t *steps_goal;
-  lv_obj_t *steps_percent;
-  lv_obj_t *steps_source;
-  lv_obj_t *steps_weather;
-  lv_obj_t *steps_goal_down;
-  lv_obj_t *steps_goal_up;
 
   lv_obj_t *apps_page;
   lv_obj_t *apps_date;
@@ -67,7 +34,7 @@ typedef struct
   lv_obj_t *app_content;
   lv_obj_t *app_back;
 
-  smart_band_app_id_t active_app;
+  smart_band_apps_runtime_t apps;
 
   lv_timer_t *timer;
   smart_band_state_t model;
@@ -92,196 +59,57 @@ static void set_page_visible(lv_obj_t *page, bool visible);
 static void app_icon_cb(lv_event_t *event);
 static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
+static void render_page(void);
 static lv_obj_t *create_action_button(lv_obj_t *parent, const char *text,
                                       lv_coord_t x, lv_coord_t y,
                                       lv_coord_t w, lv_coord_t h,
                                       lv_color_t color, lv_event_cb_t cb,
                                       uintptr_t data);
 
-static const lv_font_t *font_12(void)
-{
-#if LV_FONT_MONTSERRAT_12
-  return &lv_font_montserrat_12;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static const lv_font_t *font_14(void)
-{
-#if LV_FONT_MONTSERRAT_14
-  return &lv_font_montserrat_14;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static const lv_font_t *font_16(void)
-{
-#if LV_FONT_MONTSERRAT_16
-  return &lv_font_montserrat_16;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static const lv_font_t *font_20(void)
-{
-#if LV_FONT_MONTSERRAT_20
-  return &lv_font_montserrat_20;
-#elif LV_FONT_MONTSERRAT_16
-  return &lv_font_montserrat_16;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static const lv_font_t *font_32(void)
-{
-#if LV_FONT_MONTSERRAT_32
-  return &lv_font_montserrat_32;
-#elif LV_FONT_MONTSERRAT_20
-  return &lv_font_montserrat_20;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static const lv_font_t *font_time(void)
-{
-#if LV_FONT_MONTSERRAT_48
-  return &lv_font_montserrat_48;
-#elif LV_FONT_MONTSERRAT_32
-  return &lv_font_montserrat_32;
-#else
-  return LV_FONT_DEFAULT;
-#endif
-}
-
-static lv_coord_t sx(int value)
-{
-  return (lv_coord_t)((value * (int)g_ui.screen_w) / DESIGN_W);
-}
-
-static lv_coord_t sy(int value)
-{
-  return (lv_coord_t)((value * (int)g_ui.screen_h) / DESIGN_H);
-}
-
-static lv_coord_t min_coord(lv_coord_t a, lv_coord_t b)
-{
-  return a < b ? a : b;
-}
-
-static lv_coord_t max_coord(lv_coord_t a, lv_coord_t b)
-{
-  return a > b ? a : b;
-}
-
-static lv_coord_t abs_coord(lv_coord_t value)
-{
-  return value < 0 ? -value : value;
-}
-
-static void strip_obj(lv_obj_t *obj)
-{
-  lv_obj_remove_style_all(obj);
-  lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-}
-
+static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
+static const lv_font_t *font_14(void) { return smart_band_ui_font_14(); }
+static const lv_font_t *font_16(void) { return smart_band_ui_font_16(); }
+static const lv_font_t *font_20(void) { return smart_band_ui_font_20(); }
+static const lv_font_t *font_32(void) { return smart_band_ui_font_32(); }
+static const lv_font_t *font_time(void) { return smart_band_ui_font_time(); }
+static lv_coord_t sx(int value) { return smart_band_ui_sx(&g_ui.components, value); }
+static lv_coord_t sy(int value) { return smart_band_ui_sy(&g_ui.components, value); }
+static lv_coord_t min_coord(lv_coord_t a, lv_coord_t b) { return smart_band_ui_min(a, b); }
+static lv_coord_t max_coord(lv_coord_t a, lv_coord_t b) { return smart_band_ui_max(a, b); }
+static lv_coord_t abs_coord(lv_coord_t value) { return smart_band_ui_abs(value); }
+static void strip_obj(lv_obj_t *obj) { smart_band_ui_strip_obj(obj); }
 static lv_obj_t *create_box(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
                             lv_coord_t w, lv_coord_t h, lv_color_t color,
                             lv_coord_t radius)
 {
-  lv_obj_t *box = lv_obj_create(parent);
-  if (box == NULL)
-    {
-      return NULL;
-    }
-
-  strip_obj(box);
-  lv_obj_set_pos(box, x, y);
-  lv_obj_set_size(box, w, h);
-  lv_obj_set_style_bg_color(box, color, 0);
-  lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(box, radius, 0);
-  return box;
+  return smart_band_ui_create_box(parent, x, y, w, h, color, radius);
 }
-
 static lv_obj_t *create_label(lv_obj_t *parent, const char *text,
                               const lv_font_t *font, lv_color_t color,
                               lv_text_align_t align)
 {
-  lv_obj_t *label = lv_label_create(parent);
-  if (label == NULL)
-    {
-      return NULL;
-    }
-
-  strip_obj(label);
-  lv_label_set_text(label, text);
-  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-  lv_obj_set_style_text_font(label, font, 0);
-  lv_obj_set_style_text_color(label, color, 0);
-  lv_obj_set_style_text_align(label, align, 0);
-  return label;
+  return smart_band_ui_create_label(parent, text, font, color, align);
 }
-
 static void place_label(lv_obj_t *label, lv_coord_t x, lv_coord_t y,
                         lv_coord_t w, lv_coord_t h)
 {
-  lv_obj_set_pos(label, x, y);
-  lv_obj_set_size(label, w, h);
+  smart_band_ui_place_label(label, x, y, w, h);
 }
-
 static void set_label_text(lv_obj_t *label, const char *text)
 {
-  if (label != NULL && text != NULL)
-    {
-      lv_label_set_text(label, text);
-    }
+  smart_band_ui_set_label_text(label, text);
 }
-
 static void set_label_text_fmt_int(lv_obj_t *label, const char *fmt, int value)
 {
-  char buffer[32];
-  snprintf(buffer, sizeof(buffer), fmt, value);
-  set_label_text(label, buffer);
+  smart_band_ui_set_label_text_fmt_int(label, fmt, value);
 }
-
 static lv_obj_t *create_icon_image(lv_obj_t *parent,
                                    const lv_image_dsc_t *src,
                                    lv_coord_t x, lv_coord_t y,
                                    lv_coord_t size)
 {
-  lv_obj_t *image;
-  uint32_t scale;
-
-  if (src == NULL || size <= 0)
-    {
-      return NULL;
-    }
-
-  image = lv_image_create(parent);
-  if (image == NULL)
-    {
-      return NULL;
-    }
-
-  strip_obj(image);
-  lv_image_set_src(image, src);
-  scale = (uint32_t)((size * LV_SCALE_NONE) / 48);
-  if (scale == 0)
-    {
-      scale = 1;
-    }
-
-  lv_image_set_scale(image, scale);
-  lv_obj_set_pos(image, x, y);
-  lv_obj_set_size(image, size, size);
-  return image;
+  return smart_band_ui_create_icon_image(parent, src, x, y, size);
 }
-
 static void configure_local_time(void)
 {
 #if defined(__NuttX__)
@@ -291,133 +119,22 @@ static void configure_local_time(void)
   tzset();
 }
 
-static const char *metric_source_text(smart_band_metric_t metric)
-{
-  const smart_band_metric_info_t *info =
-    smart_band_state_metric_info(&g_ui.model, metric);
-
-  if (info == NULL ||
-      info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
-    {
-      return "Unavailable";
-    }
-
-  switch (info->source)
-    {
-      case SMART_BAND_DATA_SOURCE_SENSOR:
-        return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
-               "Sensor stale" : "Sensor";
-      case SMART_BAND_DATA_SOURCE_SENSOR_DERIVED:
-        return info->freshness == SMART_BAND_DATA_FRESHNESS_STALE ?
-               "Derived stale" : "Derived";
-      case SMART_BAND_DATA_SOURCE_SIMULATED:
-        return "Model";
-      default:
-        return "Unavailable";
-    }
-}
-
-static bool metric_available(smart_band_metric_t metric)
-{
-  const smart_band_metric_info_t *info =
-    smart_band_state_metric_info(&g_ui.model, metric);
-
-  return info != NULL &&
-         info->freshness != SMART_BAND_DATA_FRESHNESS_UNAVAILABLE;
-}
-
 static void format_temperature(char *buffer, size_t size)
 {
-  const smart_band_metric_info_t *info =
-    smart_band_state_metric_info(&g_ui.model, SMART_BAND_METRIC_TEMPERATURE);
-  const char *suffix = "";
-
-  if (info == NULL ||
-      info->freshness == SMART_BAND_DATA_FRESHNESS_UNAVAILABLE)
-    {
-      snprintf(buffer, size, "--");
-      return;
-    }
-
-  if (info->source == SMART_BAND_DATA_SOURCE_SIMULATED)
-    {
-      suffix = " sim";
-    }
-  else if (info->freshness == SMART_BAND_DATA_FRESHNESS_STALE)
-    {
-      suffix = " stale";
-    }
-
-  snprintf(buffer, size, "%d%s%s", g_ui.model.temperature_c,
-           "\xC2\xB0" "C", suffix);
+  smart_band_ui_format_temperature(&g_ui.model, buffer, size);
 }
-
 static void format_duration(char *buffer, size_t size, int seconds)
 {
-  if (seconds < 0)
-    {
-      seconds = 0;
-    }
-
-  snprintf(buffer, size, "%02d:%02d", seconds / 60, seconds % 60);
+  smart_band_ui_format_duration(buffer, size, seconds);
 }
-
-static void set_temperature_label(lv_obj_t *label)
-{
-  char buffer[32];
-  format_temperature(buffer, sizeof(buffer));
-  set_label_text(label, buffer);
-}
-
 static void format_watch_date(char *buffer, size_t size)
 {
-  static const char *const weekdays[] =
-  {
-    "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
-  };
-  static const char *const months[] =
-  {
-    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
-  };
-
-  struct tm local_now;
-  time_t now = time(NULL);
-
-  if (!smart_band_display_time(now, &local_now))
-    {
-      snprintf(buffer, size, "%s", g_ui.model.date_text);
-      return;
-    }
-
-  snprintf(buffer, size, "%s %02d %s", weekdays[local_now.tm_wday],
-           local_now.tm_mday, months[local_now.tm_mon]);
+  smart_band_ui_format_watch_date(&g_ui.model, buffer, size);
 }
-
-static void split_time_text(char *hour, size_t hour_size, char *minute,
-                            size_t minute_size)
-{
-  if (strlen(g_ui.model.time_text) >= 5 && g_ui.model.time_text[2] == ':')
-    {
-      snprintf(hour, hour_size, "%c%c", g_ui.model.time_text[0],
-               g_ui.model.time_text[1]);
-      snprintf(minute, minute_size, "%c%c", g_ui.model.time_text[3],
-               g_ui.model.time_text[4]);
-      return;
-    }
-
-  snprintf(hour, hour_size, "--");
-  snprintf(minute, minute_size, "--");
-}
-
 static lv_obj_t *create_page(lv_obj_t *parent)
 {
   lv_obj_t *page = lv_obj_create(parent);
-  if (page == NULL)
-    {
-      return NULL;
-    }
-
+  if (page == NULL) return NULL;
   strip_obj(page);
   lv_obj_set_pos(page, 0, 0);
   lv_obj_set_size(page, g_ui.screen_w, g_ui.screen_h);
@@ -425,455 +142,23 @@ static lv_obj_t *create_page(lv_obj_t *parent)
   return page;
 }
 
-static int create_leaf_mark(lv_obj_t *parent, lv_coord_t y)
-{
-  lv_coord_t leaf_w = sx(28);
-  lv_coord_t leaf_h = sy(18);
-  lv_coord_t center = g_ui.screen_w / 2;
-  lv_obj_t *leaf;
-
-  leaf = create_box(parent, center - sx(39), y + sy(10), leaf_w, leaf_h,
-                    lv_color_hex(0x79c5be), LV_RADIUS_CIRCLE);
-  if (leaf == NULL)
-    {
-      return -1;
-    }
-
-  leaf = create_box(parent, center - sx(11), y, leaf_w, leaf_h,
-                    lv_color_hex(0x9dd6d0), LV_RADIUS_CIRCLE);
-  if (leaf == NULL)
-    {
-      return -1;
-    }
-
-  leaf = create_box(parent, center + sx(17), y + sy(10), leaf_w, leaf_h,
-                    lv_color_hex(0x79c5be), LV_RADIUS_CIRCLE);
-  return leaf == NULL ? -1 : 0;
-}
-
-static int create_date_row(lv_obj_t *parent, lv_obj_t **date_label,
-                           lv_coord_t y)
-{
-  lv_coord_t dot = sx(7);
-  lv_coord_t text_w = sx(180);
-  lv_obj_t *left_dot;
-  lv_obj_t *right_dot;
-
-  left_dot = create_box(parent, (g_ui.screen_w - text_w) / 2 - sx(18),
-                        y + sy(7), dot, dot, lv_color_hex(0x77c4bd),
-                        LV_RADIUS_CIRCLE);
-  right_dot = create_box(parent, (g_ui.screen_w + text_w) / 2 + sx(11),
-                         y + sy(7), dot, dot, lv_color_hex(0x77c4bd),
-                         LV_RADIUS_CIRCLE);
-  *date_label = create_label(parent, "WED 08 JUL", font_20(),
-                             lv_color_hex(0x6f8790), LV_TEXT_ALIGN_CENTER);
-
-  if (left_dot == NULL || right_dot == NULL || *date_label == NULL)
-    {
-      return -1;
-    }
-
-  place_label(*date_label, (g_ui.screen_w - text_w) / 2, y, text_w, sy(28));
-  return 0;
-}
-
-static int create_ornament(lv_obj_t *parent, lv_coord_t y)
-{
-  lv_coord_t line_w = sx(86);
-  lv_coord_t line_h = max_coord(sy(3), 2);
-  lv_coord_t center = g_ui.screen_w / 2;
-  lv_obj_t *left;
-  lv_obj_t *right;
-  lv_obj_t *badge;
-  lv_obj_t *icon;
-
-  left = create_box(parent, center - sx(70) - line_w, y + sy(16), line_w,
-                    line_h, lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
-  right = create_box(parent, center + sx(70), y + sy(16), line_w, line_h,
-                     lv_color_hex(0xb9e0dc), LV_RADIUS_CIRCLE);
-  badge = create_box(parent, center - sx(22), y, sx(44), sy(34),
-                     lv_color_hex(0xeff9f7), LV_RADIUS_CIRCLE);
-  if (left == NULL || right == NULL || badge == NULL)
-    {
-      return -1;
-    }
-
-  icon = create_icon_image(badge, &smart_band_icon_heart, sx(7), sy(2),
-                           sx(30));
-
-  if (icon == NULL)
-    {
-      return -1;
-    }
-
-  return 0;
-}
-
-static int create_metric_card(lv_obj_t *parent, lv_coord_t y,
-                              lv_color_t bg_color,
-                              const lv_image_dsc_t *icon_src,
-                              const char *label_text,
-                              lv_color_t label_color, lv_obj_t **value_out)
-{
-  lv_coord_t margin = sx(22);
-  lv_coord_t card_w = g_ui.screen_w - margin * 2;
-  lv_coord_t card_h = sy(72);
-  lv_coord_t icon_size = min_coord(sx(48), card_h - sy(16));
-  lv_coord_t value_x = sx(112);
-  lv_obj_t *card;
-  lv_obj_t *divider;
-  lv_obj_t *icon;
-  lv_obj_t *label;
-
-  card = create_box(parent, margin, y, card_w, card_h, bg_color, sx(24));
-  if (card == NULL)
-    {
-      return -1;
-    }
-
-  lv_obj_set_style_shadow_width(card, sx(12), 0);
-  lv_obj_set_style_shadow_color(card, lv_color_hex(0x374a5b), 0);
-  lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
-  lv_obj_set_style_shadow_offset_y(card, sy(6), 0);
-
-  icon = create_icon_image(card, icon_src, sx(18),
-                           (card_h - icon_size) / 2, icon_size);
-  if (icon == NULL)
-    {
-      return -1;
-    }
-
-  divider = create_box(card, sx(88), (card_h - sy(52)) / 2, 1, sy(52),
-                       lv_color_hex(0xd4dde1), 0);
-  label = create_label(card, label_text, font_14(), label_color,
-                       LV_TEXT_ALIGN_LEFT);
-  *value_out = create_label(card, "--", font_20(), lv_color_hex(0x293b53),
-                            LV_TEXT_ALIGN_LEFT);
-
-  if (divider == NULL || label == NULL || *value_out == NULL)
-    {
-      return -1;
-    }
-
-  place_label(label, value_x, sy(14), card_w - value_x - sx(16), sy(20));
-  place_label(*value_out, value_x, sy(38), card_w - value_x - sx(16),
-              sy(28));
-  return 0;
-}
-
 static int create_face_page(void)
 {
-  const lv_font_t *time_font = g_ui.compact_band ? font_32() : font_time();
-  lv_coord_t time_y = g_ui.compact_band ? sy(102) : sy(114);
-  lv_coord_t time_h = g_ui.compact_band ? sy(64) : sy(78);
-  lv_coord_t hour_w = g_ui.compact_band ? sx(112) : sx(122);
-  lv_coord_t minute_x = g_ui.compact_band ? sx(178) : sx(184);
-  lv_coord_t cards_y = g_ui.compact_band ? sy(246) : sy(260);
-  lv_coord_t card_gap = sy(12);
-  lv_coord_t card_h = sy(72);
-  lv_coord_t dot = g_ui.compact_band ? sx(10) : sx(14);
-  lv_coord_t colon_x;
-  lv_obj_t *time_row;
-  lv_obj_t *colon_one;
-  lv_obj_t *colon_two;
-  lv_coord_t battery_x;
-  lv_coord_t battery_y;
-  lv_coord_t battery_w;
-  lv_coord_t battery_h;
-
-  g_ui.face_page = create_page(g_ui.screen);
-  if (g_ui.face_page == NULL || create_leaf_mark(g_ui.face_page, sy(32)) != 0 ||
-      create_date_row(g_ui.face_page, &g_ui.face_date, sy(78)) != 0)
-    {
-      return -1;
-    }
-
-  time_row = lv_obj_create(g_ui.face_page);
-  if (time_row == NULL)
-    {
-      return -1;
-    }
-
-  strip_obj(time_row);
-  lv_obj_set_pos(time_row, sx(22), time_y);
-  lv_obj_set_size(time_row, g_ui.screen_w - sx(44), time_h);
-  lv_obj_set_style_bg_opa(time_row, LV_OPA_TRANSP, 0);
-  colon_x = (g_ui.screen_w - sx(44)) / 2 - dot / 2;
-
-  g_ui.face_hour = create_label(time_row, "--", time_font,
-                                lv_color_hex(0x00796c), LV_TEXT_ALIGN_RIGHT);
-  g_ui.face_minute = create_label(time_row, "--", time_font,
-                                  lv_color_hex(0x293b53), LV_TEXT_ALIGN_LEFT);
-  colon_one = create_box(time_row, colon_x,
-                         time_h / 2 - sy(g_ui.compact_band ? 12 : 18),
-                         dot, dot, lv_color_hex(0x79c5be),
-                         LV_RADIUS_CIRCLE);
-  colon_two = create_box(time_row, colon_x,
-                         time_h / 2 + sy(g_ui.compact_band ? 8 : 8),
-                         dot, dot, lv_color_hex(0x79c5be),
-                         LV_RADIUS_CIRCLE);
-
-  if (g_ui.face_hour == NULL || g_ui.face_minute == NULL ||
-      colon_one == NULL || colon_two == NULL ||
-      create_ornament(g_ui.face_page,
-                      g_ui.compact_band ? sy(190) : sy(206)) != 0)
-    {
-      return -1;
-    }
-
-  place_label(g_ui.face_hour, 0, 0, hour_w, time_h);
-  place_label(g_ui.face_minute, minute_x, 0, hour_w, time_h);
-
-  if (create_metric_card(g_ui.face_page, cards_y,
-                         lv_color_hex(0xf2f5ff), &smart_band_icon_sleep,
-                         "Sleep", lv_color_hex(0x8799cf),
-                         &g_ui.face_sleep_value) != 0 ||
-      create_metric_card(g_ui.face_page, cards_y + card_h + card_gap,
-                         lv_color_hex(0xfff0eb), &smart_band_icon_heart,
-                         "Heart Rate", lv_color_hex(0xea7770),
-                         &g_ui.face_heart_value) != 0 ||
-      create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 2,
-                         lv_color_hex(0xeefbf8), &smart_band_icon_stress,
-                         "Stress", lv_color_hex(0x43a79e),
-                         &g_ui.face_stress_value) != 0 ||
-      create_metric_card(g_ui.face_page, cards_y + (card_h + card_gap) * 3,
-                         lv_color_hex(0xfff6e2), &smart_band_icon_weather,
-                         "Weather", lv_color_hex(0xe8ae46),
-                         &g_ui.face_weather_value) != 0)
-    {
-      return -1;
-    }
-
-  g_ui.face_battery = create_label(g_ui.face_page, "--%", font_14(),
-                                   lv_color_hex(0x1f3438),
-                                   LV_TEXT_ALIGN_LEFT);
-  g_ui.face_battery_bar =
-    create_box(g_ui.face_page, 0, 0, sx(1), sy(1), lv_color_hex(0xffffff),
-               sx(4));
-  g_ui.face_battery_fill =
-    create_box(g_ui.face_battery_bar, 0, 0, sx(1), sy(1),
-               lv_color_hex(0x6ccbc0), sx(2));
-  g_ui.face_battery_charge =
-    create_label(g_ui.face_battery_bar, LV_SYMBOL_CHARGE, font_12(),
-                 lv_color_hex(0x1d3a34), LV_TEXT_ALIGN_CENTER);
-  if (g_ui.face_battery == NULL || g_ui.face_battery_bar == NULL ||
-      g_ui.face_battery_fill == NULL || g_ui.face_battery_charge == NULL)
-    {
-      return -1;
-    }
-
-  battery_w = sx(g_ui.compact_band ? 38 : 42);
-  battery_h = max_coord(sy(g_ui.compact_band ? 16 : 18), 14);
-  battery_x = g_ui.screen_w - sx(g_ui.compact_band ? 100 : 110);
-  battery_y = g_ui.compact_band ? sy(18) : sy(22);
-  lv_obj_set_pos(g_ui.face_battery_bar, battery_x, battery_y);
-  lv_obj_set_size(g_ui.face_battery_bar, battery_w, battery_h);
-  lv_obj_set_style_bg_color(g_ui.face_battery_bar, lv_color_hex(0xffffff), 0);
-  lv_obj_set_style_bg_opa(g_ui.face_battery_bar, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(g_ui.face_battery_bar, 2, 0);
-  lv_obj_set_style_border_color(g_ui.face_battery_bar,
-                                lv_color_hex(0x1f3438), 0);
-  lv_obj_set_style_pad_all(g_ui.face_battery_bar, 0, 0);
-
-  lv_obj_set_pos(g_ui.face_battery_fill, sx(3), sy(3));
-  lv_obj_set_size(g_ui.face_battery_fill, battery_w - sx(6),
-                  battery_h - sy(6));
-  place_label(g_ui.face_battery_charge, 0, 0, battery_w, battery_h);
-
-  g_ui.face_battery_cap =
-    create_box(g_ui.face_page, battery_x + battery_w + sx(2),
-               battery_y + (battery_h - sy(8)) / 2, sx(4), sy(8),
-               lv_color_hex(0x1f3438), sx(2));
-  if (g_ui.face_battery_cap == NULL)
-    {
-      return -1;
-    }
-
-  place_label(g_ui.face_battery, battery_x + battery_w + sx(10),
-              battery_y - sy(1), sx(58), battery_h + sy(4));
-  lv_obj_add_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
-  return 0;
-}
-
-static lv_obj_t *create_detail_hero(lv_obj_t *page, lv_color_t hero_bg,
-                                    const lv_image_dsc_t *icon_src,
-                                    lv_obj_t **value_out,
-                                    lv_obj_t **progress_out)
-{
-  lv_coord_t margin = sx(22);
-  lv_coord_t hero_y = sy(154);
-  lv_coord_t hero_w = g_ui.screen_w - margin * 2;
-  lv_coord_t hero_h = sy(190);
-  lv_coord_t icon_size = sx(68);
-  lv_obj_t *hero;
-  lv_obj_t *icon;
-
-  hero = create_box(page, margin, hero_y, hero_w, hero_h, hero_bg, sx(32));
-  if (hero == NULL)
-    {
-      return NULL;
-    }
-
-  lv_obj_set_style_shadow_width(hero, sx(18), 0);
-  lv_obj_set_style_shadow_color(hero, lv_color_hex(0x374a5b), 0);
-  lv_obj_set_style_shadow_opa(hero, LV_OPA_20, 0);
-  lv_obj_set_style_shadow_offset_y(hero, sy(10), 0);
-
-  icon = create_icon_image(hero, icon_src, (hero_w - icon_size) / 2,
-                           sy(18), icon_size);
-  if (icon == NULL)
-    {
-      return NULL;
-    }
-
-  *value_out = create_label(hero, "--", font_32(), lv_color_hex(0x293b53),
-                            LV_TEXT_ALIGN_CENTER);
-  *progress_out = lv_bar_create(hero);
-  if (*value_out == NULL || *progress_out == NULL)
-    {
-      return NULL;
-    }
-
-  strip_obj(*progress_out);
-  place_label(*value_out, sx(18), sy(106), hero_w - sx(36), sy(42));
-  lv_obj_set_pos(*progress_out, sx(52), sy(158));
-  lv_obj_set_size(*progress_out, hero_w - sx(104), sy(8));
-  lv_obj_set_style_radius(*progress_out, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(*progress_out, lv_color_hex(0xdbeeea), 0);
-  lv_obj_set_style_bg_opa(*progress_out, LV_OPA_COVER, 0);
-  lv_obj_set_style_bg_color(*progress_out, lv_color_hex(0x79c5be),
-                            LV_PART_INDICATOR);
-  lv_obj_set_style_radius(*progress_out, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
-  lv_bar_set_range(*progress_out, 0, 100);
-  return hero;
-}
-
-static int create_mini_card(lv_obj_t *page, int col, int row,
-                            const char *title, lv_obj_t **value_out)
-{
-  lv_coord_t margin = sx(22);
-  lv_coord_t gap = sx(12);
-  lv_coord_t card_w = (g_ui.screen_w - margin * 2 - gap) / 2;
-  lv_coord_t card_h = sy(76);
-  lv_coord_t x = margin + col * (card_w + gap);
-  lv_coord_t y = sy(374) + row * (card_h + sy(12));
-  lv_obj_t *card;
-  lv_obj_t *title_label;
-
-  card = create_box(page, x, y, card_w, card_h, lv_color_hex(0xffffff),
-                    sx(20));
-  if (card == NULL)
-    {
-      return -1;
-    }
-
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_border_color(card, lv_color_hex(0xe7eff0), 0);
-
-  title_label = create_label(card, title, font_12(), lv_color_hex(0x7d9298),
-                             LV_TEXT_ALIGN_LEFT);
-  *value_out = create_label(card, "--", font_20(), lv_color_hex(0x293b53),
-                            LV_TEXT_ALIGN_LEFT);
-  if (title_label == NULL || *value_out == NULL)
-    {
-      return -1;
-    }
-
-  place_label(title_label, sx(14), sy(12), card_w - sx(28), sy(18));
-  place_label(*value_out, sx(14), sy(36), card_w - sx(28), sy(28));
-  return 0;
+  return smart_band_watch_pages_build_face(&g_ui.watch_pages, g_ui.screen,
+                                           &g_ui.components,
+                                           g_ui.compact_band);
 }
 
 static int create_heart_page(void)
 {
-  lv_obj_t *title;
-
-  g_ui.heart_page = create_page(g_ui.screen);
-  if (g_ui.heart_page == NULL ||
-      create_leaf_mark(g_ui.heart_page, sy(32)) != 0 ||
-      create_date_row(g_ui.heart_page, &g_ui.heart_date, sy(78)) != 0)
-    {
-      return -1;
-    }
-
-  title = create_label(g_ui.heart_page, "Heart Rate", font_20(),
-                       lv_color_hex(0x5a7680), LV_TEXT_ALIGN_CENTER);
-  if (title == NULL)
-    {
-      return -1;
-    }
-
-  place_label(title, sx(22), sy(112), g_ui.screen_w - sx(44), sy(28));
-
-  if (create_detail_hero(g_ui.heart_page, lv_color_hex(0xfff0eb),
-                         &smart_band_icon_heart,
-                         &g_ui.heart_value,
-                         &g_ui.heart_progress) == NULL ||
-      create_mini_card(g_ui.heart_page, 0, 0, "Resting",
-                       &g_ui.heart_status) != 0 ||
-       create_mini_card(g_ui.heart_page, 1, 0, "Source",
-                       &g_ui.heart_source) != 0 ||
-      create_mini_card(g_ui.heart_page, 0, 1, "Battery",
-                       &g_ui.heart_battery) != 0 ||
-      create_mini_card(g_ui.heart_page, 1, 1, "Stress",
-                       &g_ui.heart_stress) != 0)
-    {
-      return -1;
-    }
-
-  return 0;
+  return smart_band_watch_pages_build_heart(&g_ui.watch_pages, g_ui.screen,
+                                            &g_ui.components);
 }
 
 static int create_steps_page(void)
 {
-  lv_obj_t *title;
-
-  g_ui.steps_page = create_page(g_ui.screen);
-  if (g_ui.steps_page == NULL ||
-      create_leaf_mark(g_ui.steps_page, sy(32)) != 0 ||
-      create_date_row(g_ui.steps_page, &g_ui.steps_date, sy(78)) != 0)
-    {
-      return -1;
-    }
-
-  title = create_label(g_ui.steps_page, "Activity", font_20(),
-                       lv_color_hex(0x5a7680), LV_TEXT_ALIGN_CENTER);
-  if (title == NULL)
-    {
-      return -1;
-    }
-
-  place_label(title, sx(22), sy(112), g_ui.screen_w - sx(44), sy(28));
-
-  if (create_detail_hero(g_ui.steps_page, lv_color_hex(0xeefbf8),
-                         &smart_band_icon_steps,
-                         &g_ui.steps_value,
-                         &g_ui.steps_progress) == NULL ||
-      create_mini_card(g_ui.steps_page, 0, 0, "Goal",
-                       &g_ui.steps_goal) != 0 ||
-      create_mini_card(g_ui.steps_page, 1, 0, "Progress",
-                       &g_ui.steps_percent) != 0 ||
-      create_mini_card(g_ui.steps_page, 0, 1, "Source",
-                       &g_ui.steps_source) != 0 ||
-      create_mini_card(g_ui.steps_page, 1, 1, "Weather",
-                       &g_ui.steps_weather) != 0)
-    {
-      return -1;
-    }
-
-  g_ui.steps_goal_down =
-    create_action_button(g_ui.steps_page, "-", sx(104), sy(346), sx(42),
-                         sy(24), lv_color_hex(0x8eb6d8), step_goal_cb, 0);
-  g_ui.steps_goal_up =
-    create_action_button(g_ui.steps_page, "+", g_ui.screen_w - sx(146),
-                         sy(346), sx(42), sy(24), lv_color_hex(0x80cbc3),
-                         step_goal_cb, 1);
-  if (g_ui.steps_goal_down == NULL || g_ui.steps_goal_up == NULL)
-    {
-      return -1;
-    }
-
-  return 0;
+  return smart_band_watch_pages_build_steps(&g_ui.watch_pages, g_ui.screen,
+                                            &g_ui.components, step_goal_cb);
 }
 
 static lv_obj_t *create_plain_layer(lv_obj_t *parent, lv_coord_t x,
@@ -1000,7 +285,7 @@ static void update_active_app(void)
 {
   smart_band_app_host_t host = make_app_host();
 
-  smart_band_app_update(g_ui.active_app, &host);
+  smart_band_app_render(&g_ui.apps, &host);
 }
 
 static void open_app(smart_band_app_id_t id)
@@ -1014,46 +299,18 @@ static void open_app(smart_band_app_id_t id)
     }
 
   host = make_app_host();
-  smart_band_app_unmount(g_ui.active_app);
+  smart_band_app_unmount(&g_ui.apps);
   lv_obj_clean(g_ui.app_content);
-  g_ui.active_app = id;
   set_label_text(g_ui.app_title, def->title);
 
-  if (smart_band_app_build(id, g_ui.app_content, &host) != 0)
+  if (smart_band_app_mount(&g_ui.apps, id, g_ui.app_content, &host) != 0)
     {
-      smart_band_app_unmount(id);
       lv_obj_clean(g_ui.app_content);
-      g_ui.active_app = SMART_BAND_APP_NONE;
       set_label_text(g_ui.app_title, "App failed");
     }
 
   set_page_visible(g_ui.apps_launcher, false);
   set_page_visible(g_ui.app_detail, true);
-}
-
-static const lv_image_dsc_t *app_icon_for_id(smart_band_app_id_t id)
-{
-  switch (id)
-    {
-      case SMART_BAND_APP_WEATHER:
-        return &smart_band_icon_weather;
-      case SMART_BAND_APP_CALCULATOR:
-        return &smart_band_icon_calculator;
-      case SMART_BAND_APP_TIMER:
-        return &smart_band_icon_timer;
-      case SMART_BAND_APP_MUSIC:
-        return &smart_band_icon_game2048;
-      case SMART_BAND_APP_STOPWATCH:
-        return &smart_band_icon_stopwatch;
-      case SMART_BAND_APP_MINES:
-        return &smart_band_icon_mines;
-      case SMART_BAND_APP_TETRIS:
-        return &smart_band_icon_tetris;
-      case SMART_BAND_APP_WOODEN_FISH:
-        return &smart_band_icon_wooden_fish;
-      default:
-        return NULL;
-    }
 }
 
 static int create_launcher_card(lv_obj_t *parent,
@@ -1086,7 +343,7 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_event_cb(card, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
 
-  icon = create_icon_image(card, app_icon_for_id(def->id), sx(8), sy(7),
+  icon = create_icon_image(card, def->icon, sx(8), sy(7),
                            sx(48));
   if (icon == NULL)
     {
@@ -1113,7 +370,8 @@ static int create_launcher_card(lv_obj_t *parent,
 
 static int create_apps_page(void)
 {
-  const smart_band_app_def_t *apps = smart_band_apps_catalog();
+  size_t app_count;
+  const smart_band_app_def_t *apps = smart_band_apps_catalog(&app_count);
   lv_obj_t *title;
   lv_coord_t margin = sx(18);
   lv_coord_t gap_x = sx(10);
@@ -1124,8 +382,8 @@ static int create_apps_page(void)
 
   g_ui.apps_page = create_page(g_ui.screen);
   if (g_ui.apps_page == NULL ||
-      create_leaf_mark(g_ui.apps_page, sy(22)) != 0 ||
-      create_date_row(g_ui.apps_page, &g_ui.apps_date, sy(64)) != 0)
+      smart_band_watch_page_build_header(g_ui.apps_page, &g_ui.components,
+                                         &g_ui.apps_date, sy(22), sy(64)) != 0)
     {
       return -1;
     }
@@ -1153,10 +411,10 @@ static int create_apps_page(void)
   lv_obj_set_style_bg_grad_dir(g_ui.app_detail, LV_GRAD_DIR_VER, 0);
   lv_obj_set_style_bg_opa(g_ui.app_detail, LV_OPA_COVER, 0);
 
-  for (int i = 0; i < SMART_BAND_APP_COUNT; i++)
+  for (size_t i = 0; i < app_count; i++)
     {
-      int row = i / 2;
-      int col = i % 2;
+      lv_coord_t row = (lv_coord_t)(i / 2u);
+      lv_coord_t col = (lv_coord_t)(i % 2u);
 
       if (create_launcher_card(g_ui.apps_launcher, &apps[i],
                                margin + col * (card_w + gap_x),
@@ -1185,7 +443,6 @@ static int create_apps_page(void)
   place_label(g_ui.app_title, sx(72), sy(34), g_ui.screen_w - sx(144),
               sy(30));
   set_page_visible(g_ui.app_detail, false);
-  g_ui.active_app = SMART_BAND_APP_NONE;
   return 0;
 }
 
@@ -1295,6 +552,8 @@ static int create_ui_tree(lv_obj_t *root)
       g_ui.screen = root;
       g_ui.screen_w = root_w;
       g_ui.screen_h = root_h;
+      smart_band_ui_components_init(&g_ui.components, g_ui.screen_w,
+                                    g_ui.screen_h);
       lv_obj_set_style_bg_color(root, lv_color_hex(0xffffff), 0);
       lv_obj_set_style_bg_grad_color(root, lv_color_hex(0xfffcf6), 0);
       lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_VER, 0);
@@ -1307,9 +566,9 @@ static int create_ui_tree(lv_obj_t *root)
         }
 
       enable_touch_navigation(g_ui.screen);
-      enable_touch_navigation_tree(g_ui.face_page);
-      enable_touch_navigation_tree(g_ui.heart_page);
-      enable_touch_navigation_tree(g_ui.steps_page);
+      enable_touch_navigation_tree(g_ui.watch_pages.face_page);
+      enable_touch_navigation_tree(g_ui.watch_pages.heart_page);
+      enable_touch_navigation_tree(g_ui.watch_pages.steps_page);
       enable_touch_navigation_tree(g_ui.apps_launcher);
       return 0;
     }
@@ -1344,6 +603,8 @@ static int create_ui_tree(lv_obj_t *root)
   strip_obj(g_ui.screen);
   g_ui.screen_w = watch_w - 6;
   g_ui.screen_h = watch_h - 6;
+  smart_band_ui_components_init(&g_ui.components, g_ui.screen_w,
+                                g_ui.screen_h);
   lv_obj_set_size(g_ui.screen, g_ui.screen_w, g_ui.screen_h);
   lv_obj_center(g_ui.screen);
   lv_obj_set_style_bg_color(g_ui.screen, lv_color_hex(0xffffff), 0);
@@ -1362,9 +623,9 @@ static int create_ui_tree(lv_obj_t *root)
     }
 
   enable_touch_navigation(g_ui.screen);
-  enable_touch_navigation_tree(g_ui.face_page);
-  enable_touch_navigation_tree(g_ui.heart_page);
-  enable_touch_navigation_tree(g_ui.steps_page);
+  enable_touch_navigation_tree(g_ui.watch_pages.face_page);
+  enable_touch_navigation_tree(g_ui.watch_pages.heart_page);
+  enable_touch_navigation_tree(g_ui.watch_pages.steps_page);
   enable_touch_navigation_tree(g_ui.apps_launcher);
   return 0;
 }
@@ -1399,9 +660,12 @@ static void set_page_visible(lv_obj_t *page, bool visible)
 
 static void update_page_visibility(void)
 {
-  set_page_visible(g_ui.face_page, g_ui.model.page == SMART_BAND_PAGE_FACE);
-  set_page_visible(g_ui.heart_page, g_ui.model.page == SMART_BAND_PAGE_HEART);
-  set_page_visible(g_ui.steps_page, g_ui.model.page == SMART_BAND_PAGE_STEPS);
+  set_page_visible(g_ui.watch_pages.face_page,
+                   g_ui.model.page == SMART_BAND_PAGE_FACE);
+  set_page_visible(g_ui.watch_pages.heart_page,
+                   g_ui.model.page == SMART_BAND_PAGE_HEART);
+  set_page_visible(g_ui.watch_pages.steps_page,
+                   g_ui.model.page == SMART_BAND_PAGE_STEPS);
   set_page_visible(g_ui.apps_page, g_ui.model.page == SMART_BAND_PAGE_APPS);
 
   update_dots();
@@ -1415,157 +679,23 @@ static void switch_to_page(smart_band_page_t page)
     }
 
   g_ui.model.page = page;
-  update_page_visibility();
+  render_page();
 }
 
 static void update_face(void)
 {
-  char hour[3];
-  char minute[3];
-  char date_text[20];
-  char value[32];
-  lv_coord_t battery_w;
-  lv_coord_t battery_h;
-  lv_coord_t battery_pad_x;
-  lv_coord_t battery_pad_y;
-  lv_coord_t fill_w;
-  lv_coord_t fill_h;
-  lv_color_t battery_color;
-  bool battery_available = metric_available(SMART_BAND_METRIC_BATTERY);
-
-  split_time_text(hour, sizeof(hour), minute, sizeof(minute));
-  format_watch_date(date_text, sizeof(date_text));
-
-  set_label_text(g_ui.face_hour, hour);
-  set_label_text(g_ui.face_minute, minute);
-  set_label_text(g_ui.face_date, date_text);
-  set_label_text(g_ui.face_sleep_value, "7h 48m");
-  if (metric_available(SMART_BAND_METRIC_HEART_RATE))
-    {
-      set_label_text_fmt_int(g_ui.face_heart_value, "%d bpm",
-                             g_ui.model.heart_rate);
-    }
-  else
-    {
-      set_label_text(g_ui.face_heart_value, "-- bpm");
-    }
-  set_label_text(g_ui.face_stress_value, "Low");
-  set_temperature_label(g_ui.face_weather_value);
-
-  if (battery_available)
-    {
-      snprintf(value, sizeof(value), "%d%%", g_ui.model.battery_percent);
-    }
-  else
-    {
-      snprintf(value, sizeof(value), "--");
-    }
-  set_label_text(g_ui.face_battery, value);
-
-  battery_w = sx(g_ui.compact_band ? 38 : 42);
-  battery_h = max_coord(sy(g_ui.compact_band ? 16 : 18), 14);
-  battery_pad_x = sx(3);
-  battery_pad_y = sy(3);
-  fill_h = max_coord(battery_h - battery_pad_y * 2, 2);
-  fill_w = battery_available ?
-           ((battery_w - battery_pad_x * 2) *
-            g_ui.model.battery_percent) / 100 : 0;
-  if (battery_available && g_ui.model.battery_percent > 0 && fill_w < 2)
-    {
-      fill_w = 2;
-    }
-
-  battery_color = !battery_available ?
-                  lv_color_hex(0xc5d0d3) :
-                  (g_ui.model.battery_percent <= 20 ?
-                  lv_color_hex(0xea7770) :
-                  (g_ui.model.battery_charging ?
-                   lv_color_hex(0x6cd66f) :
-                   lv_color_hex(0x6ccbc0)));
-  lv_obj_set_size(g_ui.face_battery_fill, fill_w, fill_h);
-  lv_obj_set_style_bg_color(g_ui.face_battery_fill, battery_color, 0);
-  if (battery_available && g_ui.model.battery_charging)
-    {
-      lv_obj_clear_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
-    }
-  else
-    {
-      lv_obj_add_flag(g_ui.face_battery_charge, LV_OBJ_FLAG_HIDDEN);
-    }
+  smart_band_watch_pages_render_face(&g_ui.watch_pages, &g_ui.components,
+                                     &g_ui.model, g_ui.compact_band);
 }
 
 static void update_heart_detail(void)
 {
-  char date_text[20];
-  char value[32];
-  bool heart_available = metric_available(SMART_BAND_METRIC_HEART_RATE);
-  int progress = heart_available ? (g_ui.model.heart_rate * 100) / 135 : 0;
-
-  if (progress > 100)
-    {
-      progress = 100;
-    }
-
-  format_watch_date(date_text, sizeof(date_text));
-  if (heart_available)
-    {
-      snprintf(value, sizeof(value), "%d bpm", g_ui.model.heart_rate);
-    }
-  else
-    {
-      snprintf(value, sizeof(value), "-- bpm");
-    }
-
-  set_label_text(g_ui.heart_date, date_text);
-  set_label_text(g_ui.heart_value, value);
-  lv_bar_set_value(g_ui.heart_progress, progress, LV_ANIM_ON);
-  set_label_text(g_ui.heart_status, heart_available ? "62" : "--");
-  set_label_text(g_ui.heart_source,
-                 metric_source_text(SMART_BAND_METRIC_HEART_RATE));
-  if (metric_available(SMART_BAND_METRIC_BATTERY))
-    {
-      set_label_text_fmt_int(g_ui.heart_battery, "%d%%",
-                             g_ui.model.battery_percent);
-    }
-  else
-    {
-      set_label_text(g_ui.heart_battery, "--");
-    }
-  set_label_text(g_ui.heart_stress, "Low");
+  smart_band_watch_pages_render_heart(&g_ui.watch_pages, &g_ui.model);
 }
 
 static void update_steps_detail(void)
 {
-  char date_text[20];
-  char value[32];
-  bool steps_available = metric_available(SMART_BAND_METRIC_STEPS);
-  int progress = steps_available ? smart_band_step_progress(&g_ui.model) : 0;
-
-  format_watch_date(date_text, sizeof(date_text));
-  if (steps_available)
-    {
-      snprintf(value, sizeof(value), "%d", g_ui.model.steps);
-    }
-  else
-    {
-      snprintf(value, sizeof(value), "--");
-    }
-
-  set_label_text(g_ui.steps_date, date_text);
-  set_label_text(g_ui.steps_value, value);
-  lv_bar_set_value(g_ui.steps_progress, progress, LV_ANIM_ON);
-  set_label_text_fmt_int(g_ui.steps_goal, "%d", g_ui.model.step_goal);
-  if (steps_available)
-    {
-      set_label_text_fmt_int(g_ui.steps_percent, "%d%%", progress);
-    }
-  else
-    {
-      set_label_text(g_ui.steps_percent, "--");
-    }
-  set_label_text(g_ui.steps_source,
-                 metric_source_text(SMART_BAND_METRIC_STEPS));
-  set_temperature_label(g_ui.steps_weather);
+  smart_band_watch_pages_render_steps(&g_ui.watch_pages, &g_ui.model);
 }
 
 static void update_apps_page(void)
@@ -1579,10 +709,24 @@ static void update_apps_page(void)
 
 static void render_page(void)
 {
-  update_face();
-  update_heart_detail();
-  update_steps_detail();
-  update_apps_page();
+  switch (g_ui.model.page)
+    {
+      case SMART_BAND_PAGE_FACE:
+        update_face();
+        break;
+      case SMART_BAND_PAGE_HEART:
+        update_heart_detail();
+        break;
+      case SMART_BAND_PAGE_STEPS:
+        update_steps_detail();
+        break;
+      case SMART_BAND_PAGE_APPS:
+        update_apps_page();
+        break;
+      default:
+        break;
+    }
+
   update_page_visibility();
 }
 
@@ -1605,8 +749,7 @@ static void app_back_cb(lv_event_t *event)
 {
   (void)event;
 
-  smart_band_app_unmount(g_ui.active_app);
-  g_ui.active_app = SMART_BAND_APP_NONE;
+  smart_band_app_unmount(&g_ui.apps);
   if (g_ui.app_content != NULL)
     {
       lv_obj_clean(g_ui.app_content);
@@ -1629,15 +772,15 @@ static void step_goal_cb(lv_event_t *event)
 
 static void timer_cb(lv_timer_t *timer)
 {
-  smart_band_app_host_t host;
   time_t now;
 
   (void)timer;
   now = time(NULL);
   smart_band_state_tick(&g_ui.model, now);
   smart_band_sensor_bridge_update_at(&g_ui.sensors, &g_ui.model, now);
-  host = make_app_host();
-  smart_band_apps_tick(g_ui.active_app, &host);
+  smart_band_apps_tick_at(&g_ui.apps,
+                          g_ui.model.page == SMART_BAND_PAGE_APPS,
+                          lv_tick_get());
 
   render_page();
 }
@@ -1645,13 +788,13 @@ static void timer_cb(lv_timer_t *timer)
 static void next_page(void)
 {
   smart_band_next_page(&g_ui.model);
-  update_page_visibility();
+  render_page();
 }
 
 static void prev_page(void)
 {
   smart_band_prev_page(&g_ui.model);
-  update_page_visibility();
+  render_page();
 }
 
 static void page_drag_cb(lv_event_t *event)
@@ -1778,14 +921,23 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   lv_obj_set_size(owned_root, root_w, root_h);
 
   g_ui.root = owned_root;
-  g_ui.active_app = SMART_BAND_APP_NONE;
   configure_local_time();
   smart_band_state_init(&g_ui.model, time(NULL));
   smart_band_sensor_bridge_init(&g_ui.sensors);
   g_ui.sensors_initialized = true;
 
+  if (smart_band_apps_init(&g_ui.apps) != 0)
+    {
+      smart_band_sensor_bridge_deinit(&g_ui.sensors);
+      g_ui.sensors_initialized = false;
+      lv_obj_del(owned_root);
+      g_ui.root = NULL;
+      return -1;
+    }
+
   if (create_ui_tree(owned_root) != 0)
     {
+      smart_band_apps_deinit(&g_ui.apps);
       smart_band_sensor_bridge_deinit(&g_ui.sensors);
       g_ui.sensors_initialized = false;
       lv_obj_del(owned_root);
@@ -1796,6 +948,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   g_ui.timer = lv_timer_create(timer_cb, 1000, NULL);
   if (g_ui.timer == NULL)
     {
+      smart_band_apps_deinit(&g_ui.apps);
       smart_band_sensor_bridge_deinit(&g_ui.sensors);
       g_ui.sensors_initialized = false;
       lv_obj_del(owned_root);
@@ -1824,7 +977,7 @@ void smart_band_lvgl_destroy(void)
 
   if (g_ui.root != NULL)
     {
-      smart_band_app_unmount(g_ui.active_app);
+      smart_band_apps_deinit(&g_ui.apps);
       if (lv_obj_is_valid(g_ui.root))
         {
           lv_obj_del(g_ui.root);
@@ -1835,5 +988,4 @@ void smart_band_lvgl_destroy(void)
 
   g_ui.watch = NULL;
   g_ui.screen = NULL;
-  g_ui.active_app = SMART_BAND_APP_NONE;
 }
