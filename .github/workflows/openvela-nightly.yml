@@ -231,8 +231,9 @@ jobs:
           test -n "$emulator_remote"
           emulator_remote_url="$(git -C "$emulator_root" remote get-url \
             "$emulator_remote")"
+          emulator_https_base="${OPENVELA_EMULATOR_URL%.git}"
           case "$emulator_remote_url" in
-            "$OPENVELA_EMULATOR_URL"|"$OPENVELA_EMULATOR_URL.git"|\
+            "$OPENVELA_EMULATOR_URL"|"$emulator_https_base"|\
             git@github.com:open-vela/prebuilts_emulator_linux-x86_64.git)
               ;;
             *)
