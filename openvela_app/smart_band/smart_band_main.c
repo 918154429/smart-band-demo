@@ -65,6 +65,8 @@ int main(int argc, char *argv[])
       return 1;
     }
 
+  printf("smart_band: UI ready\n");
+  fflush(stdout);
   smart_band_lv_nuttx_uv_loop(&ui_loop, &result);
 
   smart_band_lvgl_destroy();

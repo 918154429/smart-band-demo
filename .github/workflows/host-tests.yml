@@ -144,9 +144,12 @@ jobs:
         run: |
           test "$(git ls-files -s scripts/reproduce_openvela_demo.sh | awk '{print $1}')" = 100755
           test "$(git ls-files -s scripts/roll_emulator_sensors.sh | awk '{print $1}')" = 100755
+          test "$(git ls-files -s scripts/smoke_openvela_emulator.py | awk '{print $1}')" = 100755
           test "$(git ls-files -s skills/openvela-smart-band-reproduce/scripts/reproduce.sh | awk '{print $1}')" = 100755
       - name: Validate shell syntax
         run: bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh
+      - name: Validate emulator smoke harness
+        run: python3 tests/test_emulator_smoke.py
       - name: Verify reproduction failure rollback
         run: bash scripts/test_reproduce_failure.sh
       - name: Validate application registry and 2048 rename

@@ -90,6 +90,19 @@ At the NSH prompt:
 smart_band
 ```
 
+For a non-interactive Linux runtime check, run:
+
+```bash
+python3 "$SMART_BAND_DEMO_ROOT/scripts/smoke_openvela_emulator.py" \
+  --openvela-root "$OPENVELA_ROOT" \
+  --evidence-dir /tmp/smart-band-emulator-smoke
+```
+
+This drives the real NSH terminal over a pseudo-terminal, checks the emulator
+console, requires the native `smart_band: UI ready` marker, and verifies the
+application PID twice. The pinned goldfish configuration does not enable ADB
+shell, so an ADB device listing alone is not runtime proof.
+
 ## Validation
 
 Run these checks before reporting success:
