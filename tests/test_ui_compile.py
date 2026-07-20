@@ -94,7 +94,7 @@ def compile_and_run() -> None:
             ]
         else:
             command = [
-                compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                 "-pedantic", f"-I{FAKE_LVGL_DIR}", f"-I{INCLUDE_DIR}",
                 *sources, "-o", str(output),
             ]

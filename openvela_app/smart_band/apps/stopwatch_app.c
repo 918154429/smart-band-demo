@@ -99,7 +99,7 @@ static void stopwatch_render(void *context,
                              const smart_band_app_host_t *host)
 {
   stopwatch_context_t *stopwatch = context;
-  char value[16];
+  char value[32];
 
   (void)host;
   if (stopwatch == NULL || !stopwatch->view.mounted)
