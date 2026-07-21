@@ -244,6 +244,27 @@ class NativeE2ETest(unittest.TestCase):
         pressed_x = [int(command.split()[2]) for command in commands[:-1]]
         self.assertEqual(pressed_x, sorted(pressed_x, reverse=True))
 
+    def test_pointer_click_pumps_frame_between_down_and_up(self) -> None:
+        events: list[tuple[str, object]] = []
+
+        def send_pointer(name: str, point: tuple[int, int], pressed: bool) -> None:
+            events.append(("pointer", (name, point, pressed)))
+
+        class Child:
+            def pump(self, seconds: float) -> None:
+                events.append(("pump", seconds))
+
+        E2E.send_pointer_click(send_pointer, Child(), "apply", (640, 700))
+
+        self.assertEqual(
+            events,
+            [
+                ("pointer", ("apply-down", (640, 700), True)),
+                ("pump", E2E.POINTER_CLICK_HOLD_SECONDS),
+                ("pointer", ("apply-up", (640, 700), False)),
+            ],
+        )
+
     def test_required_checks_include_cleanup_and_pixel_transitions(self) -> None:
         checks = {name: True for name in E2E.REQUIRED_CHECKS}
         self.assertTrue(E2E.all_required_checks_pass(checks))
