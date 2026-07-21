@@ -26,4 +26,12 @@ config LVX_DEMO_SMART_BAND_USE_SENSORS
 		subsystems are enabled. If disabled, sensor_bridge.c builds as a
 		no-op provider and the watch model uses explicit simulation mode.
 
+config LVX_DEMO_SMART_BAND_STORAGE_PATH
+	string "Smart band persistent storage directory"
+	default ""
+	---help---
+		Existing writable directory used by the versioned A/B storage
+		backend. An empty value keeps the explicit no-op backend. The
+		application never creates or guesses a board partition path.
+
 endif

@@ -30,8 +30,13 @@ CORE_SOURCES = [
     APP_DIR / "services" / "clock.c",
     APP_DIR / "services" / "capabilities.c",
     APP_DIR / "services" / "runtime.c",
+    APP_DIR / "services" / "storage_codec.c",
+    APP_DIR / "services" / "store.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
+    APP_DIR / "platform" / "storage" / "storage_fault.c",
+    APP_DIR / "platform" / "storage" / "storage_memory.c",
+    APP_DIR / "platform" / "storage" / "storage_file.c",
     APP_DIR / "logic" / "calculator_model.c",
     APP_DIR / "logic" / "game_2048_model.c",
     APP_DIR / "logic" / "mines_model.c",
@@ -49,6 +54,14 @@ NEW_RUNTIME_SOURCES = [
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
 ]
 
+NEW_STORAGE_SOURCES = [
+    APP_DIR / "services" / "storage_codec.c",
+    APP_DIR / "services" / "store.c",
+    APP_DIR / "platform" / "storage" / "storage_fault.c",
+    APP_DIR / "platform" / "storage" / "storage_memory.c",
+    APP_DIR / "platform" / "storage" / "storage_file.c",
+]
+
 
 @dataclass(frozen=True)
 class CoverageTarget:
@@ -56,9 +69,16 @@ class CoverageTarget:
     test_source: Path
     production_sources: tuple[Path, ...]
     include_dirs: tuple[Path, ...] = ()
+    needs_temp_directory: bool = False
 
 
 TARGETS = [
+    CoverageTarget(
+        "storage_core",
+        Path(__file__).with_name("storage_core_test.c"),
+        tuple(NEW_STORAGE_SOURCES),
+        needs_temp_directory=True,
+    ),
     CoverageTarget(
         "runtime_core",
         Path(__file__).with_name("runtime_core_test.c"),
@@ -67,6 +87,10 @@ TARGETS = [
             APP_DIR / "sensor_bridge.c",
             APP_DIR / "smart_band_apps.c",
             *NEW_RUNTIME_SOURCES,
+            APP_DIR / "services" / "storage_codec.c",
+            APP_DIR / "services" / "store.c",
+            APP_DIR / "platform" / "storage" / "storage_fault.c",
+            APP_DIR / "platform" / "storage" / "storage_memory.c",
         ),
         (FAKE_LVGL_DIR,),
     ),
@@ -148,7 +172,12 @@ def compile_and_run(gcc: str, build_root: Path, target: CoverageTarget) -> None:
     ]
     print(f"coverage compile [{target.name}]:", " ".join(command), flush=True)
     subprocess.run(command, cwd=target_dir, check=True)
-    subprocess.run([str(output)], cwd=target_dir, check=True)
+    run_command = [str(output)]
+    if target.needs_temp_directory:
+        runtime_directory = target_dir / "runtime-data"
+        runtime_directory.mkdir()
+        run_command.append(str(runtime_directory))
+    subprocess.run(run_command, cwd=target_dir, check=True)
 
 
 def run_gcovr(build_root: Path) -> None:
@@ -189,7 +218,7 @@ def run_gcovr(build_root: Path) -> None:
         "--gcov-executable",
         require_tool("gcov"),
     ]
-    for source in NEW_RUNTIME_SOURCES:
+    for source in [*NEW_RUNTIME_SOURCES, *NEW_STORAGE_SOURCES]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [
             *runtime_base_command,

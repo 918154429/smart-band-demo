@@ -44,8 +44,11 @@ packages/demos/smart_band_basic
 - `services/event_queue.c`：无堆分配的定长优先级队列、metrics/tick 合并和满载淘汰。
 - `services/event_inbox.c`：外部 callback 使用的带锁定长 inbox，UI tick 串行化到主队列。
 - `services/clock.c` / `services/capabilities.c`：可注入墙钟/单调钟及平台能力基线。
+- `services/storage_codec.c`：固定 36-byte little-endian header、CRC32 和严格 frame 解码。
+- `services/store.c`：按 record spec 管理 A/B slot、generation、migration、恢复与降级状态。
 - `platform/platform_noop.c`：storage、power、haptic、sync 的显式 unavailable 后端。
 - `platform/loopback/sync_loopback.c`：固定 8 x 64 bytes 内存 sync transport。
+- `platform/storage/*.c`：固定内存与 file backend，以及可重复的第 N 次存储故障注入。
 - `ui/lvgl/components.c`：缩放、字体、标签、卡片、图标和格式化等通用 helper。
 - `ui/lvgl/watch_pages.c`：表盘、心率和计步页面的 view 创建与按需渲染。
 - `watch_model.c`：基础模型、时间、模拟数据、步数目标等逻辑。
@@ -196,6 +199,23 @@ Q1-C 的最终自动化验收还覆盖 compact/framed 主 UI 和 8 个 lazy app 
 Linux GCC/gcov 总行覆盖率为 `90.9% (1388/1527)`，7 个 Q1-C 新生产源文件各自不低于
 90%。固定版本 openvela fresh/incremental 构建和 native Heart Rate 旅程均通过，结果见
 `docs/q1c-runtime-platform-20260720.md`。
+
+Q1-S 将持久化格式冻结为 36-byte little-endian header，字段包含 `SBST` magic、format、
+record type、schema、payload length、64-bit generation、payload CRC32 和 header CRC32，
+最大 payload 为 512 bytes。store 每种 record 使用两个显式 object ID；commit 写入另一槽、
+flush 后回读并重新解码验证。读取时优先最高可消费 generation，允许旧 schema 经类型化
+migration 转换；单槽损坏或新槽不支持时回退，双槽损坏或同代冲突时返回默认值并暴露
+degraded 状态。不确定的 read error 会在任何 write 之前终止 commit。
+
+memory/file backend 和故障层覆盖 EIO、ENOSPC、EROFS、短写、截断、腐坏和 interrupted
+mixed image。file backend 使用独立数字对象文件并执行 `fsync/_commit`，不依赖 rename；
+配置目录必须预先存在。host 结果不证明目标板文件系统的原子性或断电 durability。runtime
+同步读取一个空 checkpoint record 以接线能力；已证明存储错误不会中止 UI 初始化，但未做
+慢或永久阻塞 backend 的时延隔离，实际 backend 必须保持有界、可响应。
+
+独立 Linux GCC/gcov + gcovr 8.6 结果为总体 `92.2% (2125/2305)`；storage codec、store、
+fault、memory、file 分别为 `100%`、`95.9%`、`93.3%`、`93.5%`、`91.4%`。完整 Q1-S
+证据见 `docs/q1s-versioned-storage-20260721.md`。
 
 ## 9. 后续维护建议
 

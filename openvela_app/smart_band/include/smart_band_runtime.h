@@ -7,6 +7,7 @@
 #include "smart_band_clock.h"
 #include "smart_band_event.h"
 #include "smart_band_platform.h"
+#include "smart_band_store.h"
 #include "watch_model.h"
 
 #include <stdbool.h>
@@ -15,6 +16,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_A UINT32_C(0x00010000)
+#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_B UINT32_C(0x00010001)
 
 typedef struct
 {
@@ -27,9 +31,11 @@ typedef struct
   smart_band_clock_sample_t last_clock;
   smart_band_capabilities_t capabilities;
   smart_band_platform_t platform;
+  smart_band_store_t storage;
   uint32_t dirty;
   bool initialized;
   bool sensors_initialized;
+  bool storage_initialized;
 } smart_band_runtime_t;
 
 typedef uint32_t smart_band_dirty_flags_t;

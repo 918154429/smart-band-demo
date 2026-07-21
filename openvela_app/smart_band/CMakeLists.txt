@@ -22,8 +22,13 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     services/clock.c
     services/capabilities.c
     services/runtime.c
+    services/storage_codec.c
+    services/store.c
     platform/platform_noop.c
     platform/loopback/sync_loopback.c
+    platform/storage/storage_memory.c
+    platform/storage/storage_file.c
+    platform/storage/storage_fault.c
     app_lvgl.c
     ui/lvgl/components.c
     ui/lvgl/watch_pages.c
