@@ -1110,7 +1110,7 @@ def run_journey(args: argparse.Namespace) -> int:
 
         send_picker_pointer("next-down", picker_points["next"], True)
         send_picker_pointer("next-up", picker_points["next"], False)
-        child.pump(0.2)
+        child.pump(args.ui_settle_seconds)
         picker_activity_image, picker_activity_record = capture_screenshot(
             console, evidence_dir, "watch-face-picker-activity"
         )
@@ -1207,7 +1207,7 @@ def run_journey(args: argparse.Namespace) -> int:
 
         send_picker_pointer("minimal-next-down", picker_points["next"], True)
         send_picker_pointer("minimal-next-up", picker_points["next"], False)
-        child.pump(0.2)
+        child.pump(args.ui_settle_seconds)
         picker_minimal_image, picker_minimal_record = capture_screenshot(
             console, evidence_dir, "watch-face-picker-minimal"
         )
