@@ -208,6 +208,14 @@ def main() -> None:
         build_root = Path(temp)
         output = compile_test(compiler, family, environment, build_root)
         if family == "msvc":
+            coverage_tool = find_open_cpp_coverage()
+            if coverage_tool is None:
+                print(
+                    "sync_protocol.c coverage deferred to the unified GCC "
+                    "coverage gate",
+                    flush=True,
+                )
+                return
             coverage = run_msvc_coverage(output, build_root)
         else:
             coverage = run_gcc_coverage(compiler, build_root)

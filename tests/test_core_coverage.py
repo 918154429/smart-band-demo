@@ -40,6 +40,12 @@ CORE_SOURCES = [
     APP_DIR / "logic" / "calculator_model.c",
     APP_DIR / "logic" / "game_2048_model.c",
     APP_DIR / "logic" / "mines_model.c",
+    APP_DIR / "logic" / "step_normalizer.c",
+    APP_DIR / "logic" / "workout_model.c",
+    APP_DIR / "logic" / "notification_model.c",
+    APP_DIR / "logic" / "notification_demo.c",
+    APP_DIR / "logic" / "power_policy.c",
+    APP_DIR / "services" / "sync_protocol.c",
     APP_DIR / "apps" / "timer_app.c",
     APP_DIR / "apps" / "stopwatch_app.c",
 ]
@@ -60,6 +66,15 @@ NEW_STORAGE_SOURCES = [
     APP_DIR / "platform" / "storage" / "storage_fault.c",
     APP_DIR / "platform" / "storage" / "storage_memory.c",
     APP_DIR / "platform" / "storage" / "storage_file.c",
+]
+
+NEW_W1_SOURCES = [
+    APP_DIR / "logic" / "step_normalizer.c",
+    APP_DIR / "logic" / "workout_model.c",
+    APP_DIR / "logic" / "notification_model.c",
+    APP_DIR / "logic" / "notification_demo.c",
+    APP_DIR / "logic" / "power_policy.c",
+    APP_DIR / "services" / "sync_protocol.c",
 ]
 
 
@@ -123,6 +138,32 @@ TARGETS = [
             APP_DIR / "apps" / "stopwatch_app.c",
         ),
         (FAKE_LVGL_DIR,),
+    ),
+    CoverageTarget(
+        "workout_core",
+        Path(__file__).with_name("workout_core_test.c"),
+        (
+            APP_DIR / "logic" / "step_normalizer.c",
+            APP_DIR / "logic" / "workout_model.c",
+        ),
+    ),
+    CoverageTarget(
+        "notification_core",
+        Path(__file__).with_name("notification_core_test.c"),
+        (
+            APP_DIR / "logic" / "notification_model.c",
+            APP_DIR / "logic" / "notification_demo.c",
+        ),
+    ),
+    CoverageTarget(
+        "power_policy",
+        Path(__file__).with_name("power_policy_test.c"),
+        (APP_DIR / "logic" / "power_policy.c",),
+    ),
+    CoverageTarget(
+        "sync_protocol",
+        Path(__file__).with_name("sync_protocol_test.c"),
+        (APP_DIR / "services" / "sync_protocol.c",),
     ),
 ]
 
@@ -218,7 +259,7 @@ def run_gcovr(build_root: Path) -> None:
         "--gcov-executable",
         require_tool("gcov"),
     ]
-    for source in [*NEW_RUNTIME_SOURCES, *NEW_STORAGE_SOURCES]:
+    for source in [*NEW_RUNTIME_SOURCES, *NEW_STORAGE_SOURCES, *NEW_W1_SOURCES]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [
             *runtime_base_command,

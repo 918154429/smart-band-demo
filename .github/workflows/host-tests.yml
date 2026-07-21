@@ -144,6 +144,61 @@ jobs:
       - name: Compile and run production app logic tests
         run: python tests/test_app_logic.py
 
+  production-watch-face-registry:
+    name: Watch face registry (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Compile and run watch face registry tests
+        run: python tests/test_watch_face_registry.py
+
+  production-w1-pure-cores:
+    name: ${{ matrix.target.name }} (${{ matrix.toolchain.os }}, ${{ matrix.toolchain.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: Workout core
+            script: tests/test_workout_core.py
+          - name: Notification core
+            script: tests/test_notification_core.py
+          - name: Power policy
+            script: tests/test_power_policy.py
+          - name: Sync protocol
+            script: tests/test_sync_protocol.py
+        toolchain:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.toolchain.os }}
+    env:
+      CC: ${{ matrix.toolchain.compiler }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Compile and run W1 pure core tests
+        run: python ${{ matrix.target.script }}
+
   production-core-coverage:
     name: Production C core line coverage
     runs-on: ubuntu-latest
@@ -224,6 +279,7 @@ jobs:
             services/runtime.c \
             services/storage_codec.c \
             services/store.c \
+            services/sync_protocol.c \
             platform/platform_noop.c \
             platform/loopback/sync_loopback.c \
             platform/storage/storage_fault.c \
@@ -233,7 +289,14 @@ jobs:
             logic/calculator_model.c \
             logic/game_2048_model.c \
             logic/mines_model.c \
+            logic/step_normalizer.c \
+            logic/workout_model.c \
+            logic/notification_model.c \
+            logic/notification_demo.c \
+            logic/power_policy.c \
             ui/lvgl/components.c \
+            ui/lvgl/faces/lotus_face.c \
+            ui/lvgl/faces/watch_face_registry.c \
             ui/lvgl/watch_pages.c; do
             grep -q "$source" openvela_app/smart_band/CMakeLists.txt
             grep -q "$source" openvela_app/smart_band/Makefile
