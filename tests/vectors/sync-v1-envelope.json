@@ -1,0 +1,23 @@
+{
+  "name": "sync-v1-envelope-data-example",
+  "source": "Header and payload bytes were hand-assembled from the v1 table; CRC was independently checked with Python binascii.crc_hqx(data, 0xffff).",
+  "protocol": {
+    "major": 1,
+    "minor": 0
+  },
+  "fields": {
+    "type": 1,
+    "flags": 3,
+    "status": 0,
+    "transaction_id": "0x12345678",
+    "sequence": "0x0201",
+    "chunk_index": "0x0403"
+  },
+  "payload_hex": "de ad be ef",
+  "crc16": "0xa6c8",
+  "frame_hex": "53 42 01 00 01 03 00 00 04 00 78 56 34 12 01 02 03 04 de ad be ef c8 a6",
+  "standard_crc_check": {
+    "ascii": "123456789",
+    "crc16": "0x29b1"
+  }
+}
