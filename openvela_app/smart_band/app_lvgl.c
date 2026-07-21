@@ -43,6 +43,7 @@ typedef struct
   smart_band_watch_face_picker_t face_picker;
   smart_band_watch_pages_t watch_pages;
 
+  lv_obj_t *dots_row;
   lv_obj_t *dots[SMART_BAND_PAGE_COUNT];
 
   lv_obj_t *apps_page;
@@ -627,6 +628,7 @@ static void close_system_view(void)
   smart_band_workout_view_unmount(&g_ui.workout_view);
   smart_band_history_view_unmount(&g_ui.history_view);
   g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
+  set_page_visible(g_ui.dots_row, true);
   set_label_text(g_ui.app_title, "Apps");
   set_page_visible(g_ui.app_detail, false);
   set_page_visible(g_ui.apps_launcher, true);
@@ -641,6 +643,7 @@ static void open_system_view(smart_band_system_view_t system_view)
   smart_band_history_view_unmount(&g_ui.history_view);
   lv_obj_clean(g_ui.app_content);
   g_ui.system_view = system_view;
+  set_page_visible(g_ui.dots_row, false);
   if (system_view == SMART_BAND_SYSTEM_VIEW_WORKOUT)
     {
       set_label_text(g_ui.app_title, "Workout");
@@ -660,6 +663,7 @@ static void open_system_view(smart_band_system_view_t system_view)
       smart_band_workout_view_unmount(&g_ui.workout_view);
       smart_band_history_view_unmount(&g_ui.history_view);
       g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
+      set_page_visible(g_ui.dots_row, true);
       set_label_text(g_ui.app_title, "View failed");
     }
 
@@ -895,22 +899,23 @@ static int create_dots(void)
   lv_coord_t gap = sx(10);
   lv_coord_t row_w = dot * SMART_BAND_PAGE_COUNT +
                      gap * (SMART_BAND_PAGE_COUNT - 1);
-  lv_obj_t *row = lv_obj_create(g_ui.screen);
+  g_ui.dots_row = lv_obj_create(g_ui.screen);
 
-  if (row == NULL)
+  if (g_ui.dots_row == NULL)
     {
       return -1;
     }
 
-  strip_obj(row);
-  lv_obj_set_size(row, row_w, sy(20));
-  lv_obj_align(row, LV_ALIGN_BOTTOM_MID, 0, -sy(22));
-  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  strip_obj(g_ui.dots_row);
+  lv_obj_set_size(g_ui.dots_row, row_w, sy(20));
+  lv_obj_align(g_ui.dots_row, LV_ALIGN_BOTTOM_MID, 0, -sy(22));
+  lv_obj_set_style_bg_opa(g_ui.dots_row, LV_OPA_TRANSP, 0);
 
   for (int i = 0; i < SMART_BAND_PAGE_COUNT; i++)
     {
-      g_ui.dots[i] = create_box(row, i * (dot + gap), sy(4), dot, dot,
-                                lv_color_hex(0xc2d3d1), LV_RADIUS_CIRCLE);
+      g_ui.dots[i] = create_box(g_ui.dots_row, i * (dot + gap), sy(4), dot,
+                                dot, lv_color_hex(0xc2d3d1),
+                                LV_RADIUS_CIRCLE);
       if (g_ui.dots[i] == NULL)
         {
           return -1;

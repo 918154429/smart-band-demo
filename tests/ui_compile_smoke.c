@@ -28,6 +28,7 @@ typedef struct
   lv_obj_t *steps;
   lv_obj_t *apps;
   lv_obj_t *launcher;
+  lv_obj_t *dots_row;
 } ui_tree_t;
 
 static unsigned int g_event_calls;
@@ -76,6 +77,33 @@ static lv_coord_t absolute_y(lv_obj_t *object)
   return y;
 }
 
+static lv_obj_t *find_dots_row(lv_obj_t *screen)
+{
+  uint32_t child_count = lv_obj_get_child_count(screen);
+
+  for (uint32_t index = 0; index < child_count; index++)
+    {
+      lv_obj_t *candidate = lv_obj_get_child(screen, (int32_t)index);
+      uint32_t dot_count = lv_obj_get_child_count(candidate);
+      bool dots = dot_count == 4u;
+
+      for (uint32_t dot_index = 0; dots && dot_index < dot_count; dot_index++)
+        {
+          lv_obj_t *dot = lv_obj_get_child(candidate, (int32_t)dot_index);
+
+          dots = fake_lvgl_obj_has_flag(dot, LV_OBJ_FLAG_CLICKABLE) &&
+                 fake_lvgl_obj_text(dot)[0] == '\0';
+        }
+
+      if (dots)
+        {
+          return candidate;
+        }
+    }
+
+  return NULL;
+}
+
 static int inspect_ui_tree(ui_tree_t *tree)
 {
   lv_obj_t *sleep = fake_lvgl_find_text(lv_scr_act(), "Sleep", 0);
@@ -99,9 +127,10 @@ static int inspect_ui_tree(ui_tree_t *tree)
   tree->apps = ancestor(apps, 1);
   tree->launcher = ancestor(calculator, 2);
   tree->screen = fake_lvgl_obj_parent(tree->steps);
+  tree->dots_row = find_dots_row(tree->screen);
   return tree->face != NULL && tree->heart != NULL && tree->steps != NULL &&
          tree->apps != NULL && tree->launcher != NULL && tree->screen != NULL &&
-         tree->picker != NULL ?
+         tree->picker != NULL && tree->dots_row != NULL ?
          0 : -1;
 }
 
@@ -477,7 +506,9 @@ static int test_workout_and_history_system_views(void)
   static_events = fake_lvgl_live_event_count();
   workout = fake_lvgl_find_text(tree.launcher, "Workout", 0);
   CHECK(workout != NULL);
+  CHECK(!fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   fake_lvgl_send_event(workout, LV_EVENT_CLICKED);
+  CHECK(fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_find_text(tree.apps, "Choose a workout", 0) != NULL);
   walk = fake_lvgl_find_text(tree.apps, "Walk", 0);
   CHECK(walk != NULL);
@@ -501,9 +532,11 @@ static int test_workout_and_history_system_views(void)
   back = fake_lvgl_find_text(tree.apps, "<", 0);
   CHECK(back != NULL);
   fake_lvgl_send_event(back, LV_EVENT_CLICKED);
+  CHECK(!fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_live_object_count() == static_objects);
   CHECK(fake_lvgl_live_event_count() == static_events);
   fake_lvgl_send_event(workout, LV_EVENT_CLICKED);
+  CHECK(fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_find_text(tree.apps, "Active", 0) != NULL);
 
   finish = fake_lvgl_find_text(tree.apps, "Finish", 0);
@@ -524,17 +557,20 @@ static int test_workout_and_history_system_views(void)
   done = fake_lvgl_find_text(tree.apps, "Done", 0);
   CHECK(done != NULL);
   fake_lvgl_send_event(done, LV_EVENT_CLICKED);
+  CHECK(!fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_live_object_count() == static_objects);
   CHECK(fake_lvgl_live_event_count() == static_events);
 
   history = fake_lvgl_find_text(tree.launcher, "History", 0);
   CHECK(history != NULL);
   fake_lvgl_send_event(history, LV_EVENT_CLICKED);
+  CHECK(fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_find_text(tree.apps, "7-day steps", 0) != NULL);
   CHECK(fake_lvgl_find_text(tree.apps, "Latest Walk", 0) != NULL);
   back = fake_lvgl_find_text(tree.apps, "<", 0);
   CHECK(back != NULL);
   fake_lvgl_send_event(back, LV_EVENT_CLICKED);
+  CHECK(!fake_lvgl_obj_has_flag(tree.dots_row, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_live_object_count() == static_objects);
   CHECK(fake_lvgl_live_event_count() == static_events);
   smart_band_lvgl_destroy();
