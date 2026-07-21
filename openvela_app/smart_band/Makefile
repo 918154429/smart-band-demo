@@ -14,6 +14,7 @@ CSRCS += platform/storage/storage_memory.c platform/storage/storage_file.c
 CSRCS += platform/storage/storage_fault.c
 CSRCS += logic/calculator_model.c logic/game_2048_model.c logic/mines_model.c
 CSRCS += ui/lvgl/components.c ui/lvgl/watch_pages.c
+CSRCS += ui/lvgl/faces/lotus_face.c ui/lvgl/faces/watch_face_registry.c
 CSRCS += apps/weather_app.c apps/calculator_app.c apps/timer_app.c
 CSRCS += apps/game_2048_app.c apps/stopwatch_app.c
 CSRCS += apps/mines_app.c apps/tetris_app.c
