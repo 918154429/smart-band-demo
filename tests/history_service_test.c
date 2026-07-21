@@ -23,6 +23,56 @@
 
 static smart_band_storage_memory_t g_memory;
 
+typedef struct
+{
+  smart_band_storage_t underlying;
+  bool unavailable;
+} recoverable_storage_t;
+
+static smart_band_platform_result_t recoverable_read(
+  void *opaque, uint32_t object_id, void *buffer, size_t capacity,
+  size_t *actual_size)
+{
+  recoverable_storage_t *context = opaque;
+
+  if (context->unavailable)
+    {
+      if (actual_size != NULL)
+        {
+          *actual_size = 0u;
+        }
+      return SMART_BAND_PLATFORM_UNAVAILABLE;
+    }
+  return context->underlying.ops->read(
+    context->underlying.context, object_id, buffer, capacity, actual_size);
+}
+
+static smart_band_platform_result_t recoverable_write(
+  void *opaque, uint32_t object_id, const void *buffer, size_t size)
+{
+  recoverable_storage_t *context = opaque;
+
+  return context->unavailable ? SMART_BAND_PLATFORM_UNAVAILABLE :
+         context->underlying.ops->write(context->underlying.context,
+                                        object_id, buffer, size);
+}
+
+static smart_band_platform_result_t recoverable_flush(void *opaque)
+{
+  recoverable_storage_t *context = opaque;
+
+  return context->unavailable ? SMART_BAND_PLATFORM_UNAVAILABLE :
+         context->underlying.ops->flush(context->underlying.context);
+}
+
+static const smart_band_storage_ops_t g_recoverable_storage_ops =
+{
+  recoverable_read,
+  recoverable_write,
+  recoverable_flush,
+  NULL
+};
+
 static smart_band_workout_session_t make_session(uint32_t id)
 {
   smart_band_workout_session_t session;
@@ -435,6 +485,93 @@ static int test_recovered_snapshot_cannot_overwrite_newer_generation(void)
   return 0;
 }
 
+static int test_temporary_unavailable_merges_persisted_history(void)
+{
+  smart_band_storage_memory_t memory;
+  smart_band_storage_t underlying;
+  recoverable_storage_t recoverable;
+  smart_band_storage_t storage;
+  smart_band_store_t store;
+  smart_band_store_t pending_store;
+  smart_band_store_t clean_store;
+  smart_band_history_t history;
+  smart_band_history_t pending;
+  smart_band_history_t clean;
+  smart_band_daily_summary_t days[3];
+  smart_band_workout_session_t session = make_session(1u);
+  smart_band_workout_session_t loaded_session;
+
+  CHECK(smart_band_storage_memory_init(&memory, &underlying) ==
+        SMART_BAND_PLATFORM_OK);
+  memset(&recoverable, 0, sizeof(recoverable));
+  recoverable.underlying = underlying;
+  memset(&storage, 0, sizeof(storage));
+  storage.ops = &g_recoverable_storage_ops;
+  storage.context = &recoverable;
+
+  CHECK(smart_band_store_init(&store, &storage) == 0);
+  CHECK(smart_band_history_init(&history, &store) == 0);
+  CHECK(smart_band_history_add_daily(
+          &history, 22000, 10u, 2u, 300u, 100u, true, 2u,
+          SMART_BAND_HISTORY_SOURCE_SENSOR,
+          SMART_BAND_HISTORY_DAY_RECOVERY_GAP));
+  CHECK(smart_band_history_add_daily(
+          &history, 22001, 4u, 1u, 100u, 80u, true, 1u,
+          SMART_BAND_HISTORY_SOURCE_SENSOR, 0u));
+  CHECK(smart_band_history_flush_daily(&history) == SMART_BAND_STORE_OK);
+  CHECK(smart_band_history_append_session(&history, &session) ==
+        SMART_BAND_STORE_OK);
+  smart_band_store_deinit(&store);
+
+  recoverable.unavailable = true;
+  CHECK(smart_band_store_init(&pending_store, &storage) == 0);
+  CHECK(smart_band_history_init(&pending, &pending_store) == 0);
+  CHECK(pending.storage_reload_pending);
+  CHECK(pending.daily_count == 0u && pending.session_count == 0u);
+  CHECK(smart_band_history_recover_storage(NULL) == SMART_BAND_STORE_INVALID);
+  CHECK(smart_band_history_recover_storage(&pending) ==
+        SMART_BAND_STORE_UNAVAILABLE);
+  CHECK(smart_band_history_add_daily(
+          &pending, 22000, 5u, 3u, 200u, 120u, true, 3u,
+          SMART_BAND_HISTORY_SOURCE_DERIVED, 0u));
+  CHECK(smart_band_history_add_daily(
+          &pending, 22002, 7u, 1u, 150u, 90u, true, 1u,
+          SMART_BAND_HISTORY_SOURCE_SIMULATION, 0u));
+
+  recoverable.unavailable = false;
+  CHECK(smart_band_history_recover_storage(&pending) == SMART_BAND_STORE_OK);
+  CHECK(!pending.storage_reload_pending);
+  CHECK(smart_band_history_latest_days(&pending, days, 3u) == 3u);
+  CHECK(days[0].day_key == 22000 && days[0].steps == 15u);
+  CHECK(days[0].heart_weighted_bpm_seconds == 560u);
+  CHECK(days[0].heart_duration_seconds == 5u);
+  CHECK(days[0].heart_min_bpm == 100u && days[0].heart_max_bpm == 120u);
+  CHECK((days[0].source_flags & SMART_BAND_HISTORY_SOURCE_SENSOR) != 0u);
+  CHECK((days[0].source_flags & SMART_BAND_HISTORY_SOURCE_DERIVED) != 0u);
+  CHECK((days[0].flags & SMART_BAND_HISTORY_DAY_RECOVERY_GAP) != 0u);
+  CHECK((days[0].flags & SMART_BAND_HISTORY_DAY_OVERFLOW) == 0u);
+  CHECK(days[1].day_key == 22001 && days[1].steps == 4u);
+  CHECK(days[2].day_key == 22002 && days[2].steps == 7u);
+  CHECK(smart_band_history_latest_sessions(
+          &pending, &loaded_session, 1u) == 1u);
+  CHECK(smart_band_history_session_equal(&loaded_session, &session));
+  CHECK(pending.next_session_id == 2u);
+  CHECK(smart_band_history_flush_daily(&pending) == SMART_BAND_STORE_OK);
+  smart_band_store_deinit(&pending_store);
+
+  CHECK(smart_band_store_init(&clean_store, &storage) == 0);
+  CHECK(smart_band_history_init(&clean, &clean_store) == 0);
+  CHECK(smart_band_history_latest_days(&clean, days, 3u) == 3u);
+  CHECK(days[0].steps == 15u && days[2].steps == 7u);
+  CHECK(smart_band_history_latest_sessions(
+          &clean, &loaded_session, 1u) == 1u);
+  CHECK(smart_band_history_session_equal(&loaded_session, &session));
+  CHECK(smart_band_history_latest_days(NULL, days, 3u) == 0u);
+  CHECK(smart_band_history_latest_sessions(&clean, NULL, 1u) == 0u);
+  smart_band_store_deinit(&clean_store);
+  return 0;
+}
+
 static int test_invalid_overflow_and_transaction_boundaries(void)
 {
   static const smart_band_store_record_spec_t checkpoint_spec =
@@ -513,6 +650,7 @@ int main(void)
   CHECK(test_capacity_persistence_and_idempotence() == 0);
   CHECK(test_history_write_faults_preserve_old_complete_data() == 0);
   CHECK(test_recovered_snapshot_cannot_overwrite_newer_generation() == 0);
+  CHECK(test_temporary_unavailable_merges_persisted_history() == 0);
   CHECK(test_invalid_overflow_and_transaction_boundaries() == 0);
   puts("smart band history service tests passed");
   return 0;

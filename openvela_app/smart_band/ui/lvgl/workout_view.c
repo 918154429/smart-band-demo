@@ -647,9 +647,9 @@ static void render_summary(smart_band_workout_view_t *view,
                            const smart_band_workout_view_state_t *state)
 {
   const smart_band_workout_snapshot_t *snapshot = &state->snapshot;
-  char text[48];
-  char distance[24];
-  char calories[24];
+  char text[72];
+  char distance[32];
+  char calories[32];
 
   (void)snprintf(text, sizeof(text), "%s complete", mode_text(snapshot->mode));
   set_text(view->summary_mode, text);
