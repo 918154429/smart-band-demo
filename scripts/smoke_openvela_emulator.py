@@ -726,11 +726,56 @@ def main() -> int:
             selected_activity = (
                 "watch face selected id=1 name=Activity Rings" in selection_output
             )
+
+            send_pointer("minimal-hold-down", points["hold"], True)
+            child.pump(0.75)
+            send_pointer("minimal-hold-up", points["hold"], False)
+            child.pump(0.3)
+            picker_from_activity = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker-from-activity",
+            )
+
+            send_pointer("minimal-next-down", points["next"], True)
+            send_pointer("minimal-next-up", points["next"], False)
+            child.pump(0.2)
+            picker_minimal = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker-minimal",
+            )
+
+            minimal_selection_start = len(child.transcript)
+            send_pointer("minimal-apply-down", points["apply"], True)
+            send_pointer("minimal-apply-up", points["apply"], False)
+            child.pump(0.4)
+            minimal_screen = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-minimal",
+            )
+            minimal_selection_output = bytes(
+                child.transcript[minimal_selection_start:]
+            ).decode("utf-8", errors="replace")
+            selected_minimal = (
+                "watch face selected id=2 name=Minimal Digital"
+                in minimal_selection_output
+            )
             images_changed = (
                 screenshot is not None
                 and screenshot["sha256"] != picker_screen["sha256"]
                 and picker_screen["sha256"] != picker_activity["sha256"]
                 and picker_activity["sha256"] != activity_screen["sha256"]
+                and activity_screen["sha256"] != picker_from_activity["sha256"]
+                and picker_from_activity["sha256"] != picker_minimal["sha256"]
+                and picker_minimal["sha256"] != minimal_screen["sha256"]
             )
             if not all(command["ok"] for command in commands):
                 raise SmokeFailure("one or more picker input events were rejected")
@@ -738,6 +783,8 @@ def main() -> int:
                 raise SmokeFailure("picker journey screenshots did not change")
             if not selected_activity:
                 raise SmokeFailure("picker did not select Activity Rings")
+            if not selected_minimal:
+                raise SmokeFailure("picker did not select Minimal Digital")
             picker_journey = {
                 "points": points,
                 "commands": commands,
@@ -745,6 +792,10 @@ def main() -> int:
                 "activity_preview": picker_activity,
                 "activity_face": activity_screen,
                 "selected_activity": selected_activity,
+                "picker_from_activity": picker_from_activity,
+                "minimal_preview": picker_minimal,
+                "minimal_face": minimal_screen,
+                "selected_minimal": selected_minimal,
                 "images_changed": images_changed,
             }
 

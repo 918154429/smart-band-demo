@@ -47,7 +47,7 @@ COMPACT_WATCH_FACE_REFERENCE = (
 COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
     "battery": (235, 13, 319, 29),
     "date": (111, 62, 226, 79),
-    "time": (104, 85, 243, 115),
+    "time": (103, 85, 243, 115),
     "sleep_value": (135, 219, 225, 237),
     "heart_value": (135, 283, 225, 305),
     "stress_value": (135, 348, 225, 366),
@@ -1192,6 +1192,89 @@ def run_journey(args: argparse.Namespace) -> int:
             activity_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
             "Apply did not visibly mount Activity Rings",
         )
+
+        send_picker_pointer("minimal-hold-down", picker_points["hold"], True)
+        child.pump(0.75)
+        send_picker_pointer("minimal-hold-up", picker_points["hold"], False)
+        child.pump(0.3)
+        picker_from_activity_image, picker_from_activity_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker-from-activity"
+        )
+        picker_from_activity_difference = region_difference(
+            activity_image, picker_from_activity_image, PAGE_TRANSITION_REGION
+        )
+
+        send_picker_pointer("minimal-next-down", picker_points["next"], True)
+        send_picker_pointer("minimal-next-up", picker_points["next"], False)
+        child.pump(0.2)
+        picker_minimal_image, picker_minimal_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker-minimal"
+        )
+        picker_minimal_difference = region_difference(
+            picker_from_activity_image, picker_minimal_image, PAGE_TRANSITION_REGION
+        )
+
+        minimal_selection_start = len(child.transcript)
+        send_picker_pointer("minimal-apply-down", picker_points["apply"], True)
+        send_picker_pointer("minimal-apply-up", picker_points["apply"], False)
+        child.pump(0.4)
+        minimal_image, minimal_record = capture_screenshot(
+            console, evidence_dir, "watch-face-minimal"
+        )
+        minimal_difference = region_difference(
+            picker_minimal_image, minimal_image, PAGE_TRANSITION_REGION
+        )
+        minimal_selection_output = bytes(
+            child.transcript[minimal_selection_start:]
+        ).decode("utf-8", errors="replace")
+        minimal_selected = (
+            "watch face selected id=2 name=Minimal Digital"
+            in minimal_selection_output
+        )
+        journey["watch_face_picker"]["selected_faces"] = ["activity", "minimal"]
+        journey["watch_face_picker"]["minimal_structured_marker"] = minimal_selected
+        journey["screenshots"]["watch_face_picker_from_activity"] = (
+            picker_from_activity_record
+        )
+        journey["screenshots"]["watch_face_picker_minimal"] = picker_minimal_record
+        journey["screenshots"]["watch_face_minimal"] = minimal_record
+        journey["pixel_transitions"]["picker_from_activity"] = (
+            picker_from_activity_difference
+        )
+        journey["pixel_transitions"]["picker_minimal_preview"] = (
+            picker_minimal_difference
+        )
+        journey["pixel_transitions"]["minimal_face"] = minimal_difference
+        require_check(
+            checks,
+            "picker_from_activity_pixels",
+            picker_from_activity_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "long press did not open the picker from Activity Rings",
+        )
+        require_check(
+            checks,
+            "picker_minimal_preview_pixels",
+            picker_minimal_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "picker did not visibly preview Minimal Digital",
+        )
+        require_check(
+            checks,
+            "minimal_face_png",
+            minimal_record["console_ok"] and minimal_record["nonblank"],
+            "Minimal Digital screenshot failed validation",
+        )
+        require_check(
+            checks,
+            "minimal_face_selected",
+            minimal_selected,
+            "picker did not emit the structured Minimal Digital selection",
+        )
+        require_check(
+            checks,
+            "minimal_face_pixels",
+            minimal_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "Apply did not visibly mount Minimal Digital",
+        )
         checkpoint("swipe")
 
         swipe_attempts = []
@@ -1219,7 +1302,7 @@ def run_journey(args: argparse.Namespace) -> int:
                 console, evidence_dir, f"heart-model-attempt-{attempt:02d}"
             )
             attempt_difference = region_difference(
-                watch_image, attempt_image, PAGE_TRANSITION_REGION
+                minimal_image, attempt_image, PAGE_TRANSITION_REGION
             )
             attempt_title = golden_region_record(attempt_image, "heart_page_title")
             swipe_attempts.append(

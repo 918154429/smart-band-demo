@@ -1,11 +1,41 @@
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#  define _POSIX_C_SOURCE 200809L
+#endif
+
+#if defined(_WIN32) && !defined(_CRT_SECURE_NO_WARNINGS)
+#  define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "smart_band_storage_backend.h"
 #include "smart_band_storage_codec.h"
 #include "smart_band_store.h"
 #include "smart_band_watch_face_settings.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#  include <direct.h>
+#  include <io.h>
+#  include <process.h>
+#  include <windows.h>
+#  define TEST_GETPID _getpid
+#  define TEST_MKDIR(path) _mkdir(path)
+#  define TEST_RMDIR(path) _rmdir(path)
+#  define TEST_UNLINK(path) _unlink(path)
+#else
+#  include <sys/stat.h>
+#  include <unistd.h>
+#  define TEST_GETPID getpid
+#  define TEST_MKDIR(path) mkdir((path), 0700)
+#  define TEST_RMDIR(path) rmdir(path)
+#  define TEST_UNLINK(path) unlink(path)
+#endif
 
 #define CHECK(condition)                                                     \
   do                                                                         \
@@ -226,6 +256,101 @@ static int test_write_flush_failures_and_invalid_arguments(void)
   return 0;
 }
 
+static int count_open_file_descriptors(void)
+{
+#ifdef _WIN32
+  DWORD count = 0;
+
+  if (!GetProcessHandleCount(GetCurrentProcess(), &count))
+    {
+      return -1;
+    }
+  return count > INT_MAX ? -1 : (int)count;
+#else
+  int count = 0;
+  int descriptor;
+  long configured_limit = sysconf(_SC_OPEN_MAX);
+  int limit = configured_limit > 0 && configured_limit < 4096 ?
+              (int)configured_limit : 4096;
+
+  for (descriptor = 0; descriptor < limit; descriptor++)
+    {
+      errno = 0;
+      if (fcntl(descriptor, F_GETFD) != -1 || errno != EBADF)
+        {
+          count++;
+        }
+    }
+  return count;
+#endif
+}
+
+static int test_file_backend_switch_soak_has_no_fd_growth(void)
+{
+  smart_band_storage_file_t file_backend;
+  smart_band_storage_t storage;
+  smart_band_store_t store;
+  char directory[SMART_BAND_STORAGE_FILE_PATH_CAPACITY];
+  char slot_a[SMART_BAND_STORAGE_FILE_PATH_CAPACITY];
+  char slot_b[SMART_BAND_STORAGE_FILE_PATH_CAPACITY];
+  const char *temp_root;
+  int before;
+  int after;
+  int iteration;
+  int written;
+
+#ifdef _WIN32
+  temp_root = getenv("TEMP");
+  if (temp_root == NULL || temp_root[0] == '\0')
+    {
+      temp_root = ".";
+    }
+  written = snprintf(directory, sizeof(directory), "%s\\smart-band-face-fd-%ld",
+                     temp_root, (long)TEST_GETPID());
+#else
+  temp_root = "/tmp";
+  written = snprintf(directory, sizeof(directory), "%s/smart-band-face-fd-%ld",
+                     temp_root, (long)TEST_GETPID());
+#endif
+  CHECK(written > 0 && (size_t)written < sizeof(directory));
+  written = snprintf(slot_a, sizeof(slot_a), "%s/object-%08lx.bin",
+                     directory,
+                     (unsigned long)SMART_BAND_WATCH_FACE_SETTINGS_SLOT_A);
+  CHECK(written > 0 && (size_t)written < sizeof(slot_a));
+  written = snprintf(slot_b, sizeof(slot_b), "%s/object-%08lx.bin",
+                     directory,
+                     (unsigned long)SMART_BAND_WATCH_FACE_SETTINGS_SLOT_B);
+  CHECK(written > 0 && (size_t)written < sizeof(slot_b));
+
+  (void)TEST_UNLINK(slot_a);
+  (void)TEST_UNLINK(slot_b);
+  (void)TEST_RMDIR(directory);
+  CHECK(TEST_MKDIR(directory) == 0);
+  CHECK(smart_band_storage_file_init(&file_backend, directory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  CHECK(smart_band_store_init(&store, &storage) == 0);
+
+  before = count_open_file_descriptors();
+  CHECK(before >= 0);
+  for (iteration = 0; iteration < 100; iteration++)
+    {
+      smart_band_watch_face_id_t selected = (smart_band_watch_face_id_t)(
+        iteration % SMART_BAND_WATCH_FACE_COUNT);
+      CHECK(smart_band_watch_face_settings_commit(&store, selected, NULL) ==
+            SMART_BAND_STORE_OK);
+    }
+  after = count_open_file_descriptors();
+  CHECK(after == before);
+  printf("watch_face_settings_fd_soak iterations=100 before=%d after=%d\n",
+         before, after);
+
+  smart_band_store_deinit(&store);
+  CHECK(TEST_UNLINK(slot_a) == 0);
+  CHECK(TEST_UNLINK(slot_b) == 0);
+  CHECK(TEST_RMDIR(directory) == 0);
+  return 0;
+}
+
 int main(void)
 {
   CHECK(test_default_commit_and_reload() == 0);
@@ -233,5 +358,6 @@ int main(void)
   CHECK(test_schema_migration_and_future_fallback() == 0);
   CHECK(test_invalid_payloads() == 0);
   CHECK(test_write_flush_failures_and_invalid_arguments() == 0);
+  CHECK(test_file_backend_switch_soak_has_no_fd_growth() == 0);
   return 0;
 }
