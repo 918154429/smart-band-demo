@@ -65,16 +65,24 @@ class Q3NativeHarnessTest(unittest.TestCase):
         self.assertEqual(states[0]["elapsed_ms"], 1)
 
     def test_local_points_map_into_framed_emulator(self) -> None:
-        self.assertEqual(Q3.local_point(0, 0), Q3.SCREEN_ORIGIN)
-        self.assertEqual(Q3.local_point(335, 479), (807, 639))
         self.assertEqual(
-            Q3.local_point(*Q3.WORKOUT_LAUNCHER_POINT), (562, 337)
+            Q3.framed_screen_geometry(1280, 800), ((453, 43), (373, 714))
         )
         self.assertEqual(
-            Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (718, 337)
+            Q3.framed_screen_geometry(336, 480), ((0, 0), (336, 480))
+        )
+        self.assertEqual(Q3.local_point(0, 0), Q3.SCREEN_ORIGIN)
+        self.assertEqual(Q3.local_point(335, 479), (824, 755))
+        self.assertEqual(
+            Q3.local_point(*Q3.WORKOUT_LAUNCHER_POINT), (552, 306)
+        )
+        self.assertEqual(
+            Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (726, 306)
         )
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.local_point(336, 100)
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.framed_screen_geometry(0, 800)
 
     def test_settings_reject_unsafe_or_non_gate_values(self) -> None:
         Q3.validate_settings(settings())

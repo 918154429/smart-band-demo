@@ -21,8 +21,7 @@ from typing import Any, Callable
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = "cmake_out/vela_goldfish-arm64-v8a-ap"
 DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
-SCREEN_ORIGIN = (472, 160)
-SCREEN_SIZE = (336, 480)
+REFERENCE_SCREEN_SIZE = (336, 480)
 WORKOUT_LAUNCHER_POINT = (90, 177)
 HISTORY_LAUNCHER_POINT = (246, 177)
 Q3_MARKER = "smart_band:q3:v1"
@@ -52,6 +51,30 @@ def load_module(name: str, path: Path):
 
 NATIVE = load_module("q3_native_base", ROOT / "scripts" / "run_native_e2e.py")
 SMOKE = NATIVE.SMOKE
+
+
+def framed_screen_geometry(
+    width: int, height: int
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    if width <= 0 or height <= 0:
+        raise Q3NativeFailure("display dimensions must be positive")
+    if width <= 540 and height <= 540:
+        return (0, 0), (width, height)
+
+    watch_height = max(min(height - 48, 720), 360)
+    watch_width = (watch_height * 194) // 368
+    if watch_width > width - 48:
+        watch_width = width - 48
+        watch_height = (watch_width * 368) // 194
+    return (
+        ((width - watch_width) // 2 + 3, (height - watch_height) // 2 + 3),
+        (watch_width - 6, watch_height - 6),
+    )
+
+
+SCREEN_ORIGIN, SCREEN_SIZE = framed_screen_geometry(
+    NATIVE.EXPECTED_WIDTH, NATIVE.EXPECTED_HEIGHT
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,9 +114,15 @@ def validate_settings(args: argparse.Namespace) -> None:
 
 
 def local_point(x: int, y: int) -> tuple[int, int]:
-    if not 0 <= x < SCREEN_SIZE[0] or not 0 <= y < SCREEN_SIZE[1]:
+    if (
+        not 0 <= x < REFERENCE_SCREEN_SIZE[0]
+        or not 0 <= y < REFERENCE_SCREEN_SIZE[1]
+    ):
         raise Q3NativeFailure(f"local touch point is outside screen: {(x, y)}")
-    return SCREEN_ORIGIN[0] + x, SCREEN_ORIGIN[1] + y
+    return (
+        SCREEN_ORIGIN[0] + (x * SCREEN_SIZE[0]) // REFERENCE_SCREEN_SIZE[0],
+        SCREEN_ORIGIN[1] + (y * SCREEN_SIZE[1]) // REFERENCE_SCREEN_SIZE[1],
+    )
 
 
 def parse_q3_marker(line: str) -> dict[str, int] | None:
