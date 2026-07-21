@@ -1,0 +1,442 @@
+{
+  "app_ui_ready_seconds": 0.331212,
+  "checks": {
+    "attributed_process_cleanup": true,
+    "console_ping": true,
+    "fixed_output_unchanged": true,
+    "nsh_ready": true,
+    "port_cleanup": true,
+    "port_preflight": true,
+    "process_cleanup": true,
+    "runtime_input_cleanup": true,
+    "runtime_staged_isolated": true,
+    "uorb_heart_node": true,
+    "watch_face_png": true,
+    "watch_face_static_masked_golden": false
+  },
+  "cleanup": {
+    "attributed_processes": {
+      "absent": true,
+      "actions": [],
+      "baseline": [],
+      "initial": [],
+      "remaining": [],
+      "run_id": "57e1596aef5ea3b1cd87253766938498",
+      "supported": true
+    },
+    "console_kill_response": "OK: killing emulator, bye bye\r\nOK",
+    "console_port_available": true,
+    "log": "cleanup.txt",
+    "process_group_absent": true,
+    "runtime_inputs": {
+      "already_missing": [],
+      "errors": [],
+      "inventory": [
+        {
+          "bytes": 103975,
+          "path": ".config"
+        },
+        {
+          "bytes": 65536,
+          "path": "build.avd/data/misc/pstore/pstore.bin"
+        },
+        {
+          "bytes": 26,
+          "path": "config.ini"
+        },
+        {
+          "bytes": 514,
+          "path": "emu-launch-params.txt"
+        },
+        {
+          "bytes": 3513,
+          "path": "hardware-qemu.ini"
+        },
+        {
+          "bytes": 6,
+          "path": "hardware-qemu.ini.lock"
+        },
+        {
+          "bytes": 0,
+          "path": "multiinstance.lock"
+        },
+        {
+          "bytes": 66114392,
+          "path": "nuttx"
+        },
+        {
+          "bytes": 0,
+          "path": "read-snapshot.txt"
+        },
+        {
+          "bytes": 6,
+          "path": "snapshot.lock.lock"
+        },
+        {
+          "bytes": 25,
+          "path": "system/build.prop"
+        },
+        {
+          "bytes": 268435456,
+          "path": "vela_data.bin"
+        },
+        {
+          "bytes": 1024,
+          "path": "vela_system.bin"
+        },
+        {
+          "bytes": 3,
+          "path": "version_num.cache"
+        }
+      ],
+      "passed": true,
+      "removed": [
+        ".config",
+        "nuttx",
+        "vela_system.bin",
+        "vela_data.bin"
+      ],
+      "tree_removed": true
+    }
+  },
+  "completed_at_utc": "2026-07-21T08:52:20.690048+00:00",
+  "console": {
+    "ping": "I am alive!\r\nOK"
+  },
+  "console_port": 5564,
+  "emulator_command": [
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela/emulator.sh",
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output",
+    "-no-window",
+    "-no-audio",
+    "-accel",
+    "off",
+    "-port",
+    "5564",
+    "-skin",
+    "xiaomi_smart_screen_10",
+    "-skindir",
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/skins"
+  ],
+  "emulator_process": {
+    "pgid": 27570,
+    "pid": 27570
+  },
+  "evidence_dir": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e",
+  "evidence_manifest": "evidence.sha256",
+  "failure": {
+    "message": "Lotus watch face changed outside reviewed dynamic masks",
+    "traceback": "failure.txt",
+    "type": "NativeE2EFailure"
+  },
+  "fixed_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap",
+  "golden_regions": {},
+  "harness": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/run_native_e2e.py",
+    "sha256": "087e50be36b95ebd49fe66488f28cac6aeebe2f5876e1b266dd72d70478c7c0b"
+  },
+  "nsh": {
+    "heart_rate_node": true,
+    "ready": true
+  },
+  "openvela_root": "/home/runner/work/smart-band-demo/smart-band-demo/openvela",
+  "phase": "complete",
+  "pixel_transitions": {},
+  "process_attribution": {
+    "baseline": [],
+    "environment": "SMART_BAND_NATIVE_E2E_RUN_ID",
+    "executables": [
+      "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/linux-x86_64/emulator",
+      "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/linux-x86_64/qemu/linux-x86_64/qemu-system-aarch64-headless"
+    ],
+    "run_id": "57e1596aef5ea3b1cd87253766938498",
+    "runtime_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output"
+  },
+  "rendered_metric_state": {},
+  "run_id": "57e1596aef5ea3b1cd87253766938498",
+  "runtime": {
+    "config_ini": {
+      "content": "hw.sensors.heart_rate=yes\n",
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/config.ini"
+    },
+    "files": {
+      ".config": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10143710,
+          "mtime_ns": 1784623448444294382,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "source_after": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10143710,
+          "mtime_ns": 1784623448444294382,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 9885706,
+          "mtime_ns": 1784623448444294382,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "staged_after": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 9885706,
+          "mtime_ns": 1784623448444294382,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        }
+      },
+      "nuttx": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 66114392,
+          "device": 2049,
+          "inode": 10143740,
+          "mtime_ns": 1784623907723668541,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "396b18d1435f4e99731c4c44f91d1909425ae818feb76bcf6c980758d0f0b11a"
+        },
+        "source_after": {
+          "bytes": 66114392,
+          "device": 2049,
+          "inode": 10143740,
+          "mtime_ns": 1784623907723668541,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "396b18d1435f4e99731c4c44f91d1909425ae818feb76bcf6c980758d0f0b11a"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 66114392,
+          "device": 2049,
+          "inode": 9885707,
+          "mtime_ns": 1784623907723668541,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/nuttx",
+          "sha256": "396b18d1435f4e99731c4c44f91d1909425ae818feb76bcf6c980758d0f0b11a"
+        },
+        "staged_after": {
+          "bytes": 66114392,
+          "device": 2049,
+          "inode": 9885707,
+          "mtime_ns": 1784623907723668541,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/nuttx",
+          "sha256": "396b18d1435f4e99731c4c44f91d1909425ae818feb76bcf6c980758d0f0b11a"
+        }
+      },
+      "vela_data.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10143745,
+          "mtime_ns": 1784623893717641384,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "da9b28b9f414832b207b1283760b7da1b7d8768d0a2136c5778e3abfe9d1fa48"
+        },
+        "source_after": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10143745,
+          "mtime_ns": 1784623893717641384,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "da9b28b9f414832b207b1283760b7da1b7d8768d0a2136c5778e3abfe9d1fa48"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 9885709,
+          "mtime_ns": 1784623893717641384,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_data.bin",
+          "sha256": "da9b28b9f414832b207b1283760b7da1b7d8768d0a2136c5778e3abfe9d1fa48"
+        },
+        "staged_after": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 9885709,
+          "mtime_ns": 1784623893717641384,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_data.bin",
+          "sha256": "da9b28b9f414832b207b1283760b7da1b7d8768d0a2136c5778e3abfe9d1fa48"
+        }
+      },
+      "vela_system.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10143744,
+          "mtime_ns": 1784623893134640275,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "389820f8b0fb27369897734e1c8fa8148ba5615c8e8b40a21d83b2df9191d18d"
+        },
+        "source_after": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10143744,
+          "mtime_ns": 1784623893134640275,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "389820f8b0fb27369897734e1c8fa8148ba5615c8e8b40a21d83b2df9191d18d"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 9885708,
+          "mtime_ns": 1784623893134640275,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_system.bin",
+          "sha256": "389820f8b0fb27369897734e1c8fa8148ba5615c8e8b40a21d83b2df9191d18d"
+        },
+        "staged_after": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 9885708,
+          "mtime_ns": 1784623893134640275,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_system.bin",
+          "sha256": "389820f8b0fb27369897734e1c8fa8148ba5615c8e8b40a21d83b2df9191d18d"
+        }
+      }
+    },
+    "runtime_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output",
+    "source_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap"
+  },
+  "screenshots": {
+    "watch_face": {
+      "bytes": 50207,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        0,
+        12,
+        16,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face.png",
+      "sha256": "d75d1370467fc681505938596454380dcbf28230c77e1cda1e24b3e0d7c27f84",
+      "unique_rgba_colors": 1882,
+      "width": 1280
+    }
+  },
+  "smoke_helper": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/smoke_openvela_emulator.py",
+    "sha256": "f0bb64107f5c399b7fde0d947e996d876cab103bf5a72e73ee4033b6d4c95e4b"
+  },
+  "started_at_utc": "2026-07-21T08:52:07.398833+00:00",
+  "status": "failed",
+  "watch_face_masked_comparison": {
+    "candidate_path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face.png",
+    "candidate_sha256": "d75d1370467fc681505938596454380dcbf28230c77e1cda1e24b3e0d7c27f84",
+    "changed_pixels": 3,
+    "changed_ratio": 3.031e-06,
+    "compared_pixels": 989920,
+    "compared_ratio": 0.966719,
+    "exact_match_outside_masks": false,
+    "height": 800,
+    "masked_pixels": 34080,
+    "masks": [
+      {
+        "name": "battery",
+        "region": [
+          700,
+          60,
+          805,
+          92
+        ]
+      },
+      {
+        "name": "date",
+        "region": [
+          570,
+          125,
+          710,
+          158
+        ]
+      },
+      {
+        "name": "time",
+        "region": [
+          570,
+          175,
+          720,
+          245
+        ]
+      },
+      {
+        "name": "sleep_value",
+        "region": [
+          595,
+          377,
+          725,
+          407
+        ]
+      },
+      {
+        "name": "heart_value",
+        "region": [
+          595,
+          472,
+          725,
+          502
+        ]
+      },
+      {
+        "name": "stress_value",
+        "region": [
+          595,
+          567,
+          725,
+          597
+        ]
+      },
+      {
+        "name": "weather_value",
+        "region": [
+          595,
+          662,
+          725,
+          692
+        ]
+      }
+    ],
+    "max_channel_delta": 66,
+    "mean_absolute_rgba_delta": 0.000115666,
+    "mismatch_bounds": [
+      720,
+      199,
+      721,
+      202
+    ],
+    "reference_path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/docs/evidence/q1v-native-e2e-watch-face-20260720.png",
+    "reference_sha256": "3196411357d75f424813a442065206943cf76dbb91baa5759128f520d8c01dfe",
+    "width": 1280
+  }
+}

@@ -35,7 +35,7 @@ WATCH_FACE_REFERENCE = (
 WATCH_FACE_DYNAMIC_MASKS = {
     "battery": (700, 60, 805, 92),
     "date": (570, 125, 710, 158),
-    "time": (570, 175, 720, 245),
+    "time": (570, 175, 725, 245),
     "sleep_value": (595, 377, 725, 407),
     "heart_value": (595, 472, 725, 502),
     "stress_value": (595, 567, 725, 597),
