@@ -123,6 +123,10 @@ Q1-C central runtime、事件、时钟、能力、platform adapters 与 fake LVG
 
 ## 5. 下一独立切片：Q2 第一段
 
+若采用多对话并行开发，必须先读取 `docs/parallel/README.md`。第一波最多同时启动五个
+独立 worktree：Q2 registry/Lotus 为唯一 UI owner，Q3-Q6 只做互不接线的纯 C core；统一
+接线和 native/openvela Gate 必须等待五个实现对话停止写入后再单独执行。
+
 只做表盘 registry 与现有 Lotus 表盘迁移：
 
 1. 冻结现有 Lotus UI 的结构化状态、交互与 native golden。

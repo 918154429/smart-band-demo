@@ -385,4 +385,5 @@ golden ROI。两者都拒绝覆盖非空 evidence 目录并保留结构化失败
 - [openvela 复现说明](docs/openvela-runbook.md)
 - [实现过程说明](docs/implementation-notes.md)
 - [Q1-S 版本化存储与故障恢复](docs/q1s-versioned-storage-20260721.md)
+- [第一波五对话并行开发任务包](docs/parallel/README.md)
 - [第三方依赖声明](THIRD_PARTY_NOTICES.md)
