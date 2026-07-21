@@ -24,7 +24,7 @@ DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
 LAYOUT_SIZE = (330, 626)
 WORKOUT_LAUNCHER_POINT = (90, 177)
 HISTORY_LAUNCHER_POINT = (246, 177)
-START_WALK_POINT = (90, 388)
+START_WALK_POINT = (90, 365)
 SESSION_PRIMARY_POINT = (62, 596)
 SESSION_FINISH_POINT = (168, 596)
 RECOVERY_RESUME_POINT = (90, 579)
@@ -561,6 +561,9 @@ def run(args: argparse.Namespace) -> int:
         active_boot.start(create_storage=True)
         check("boot1_pid", bool(active_boot.app_pid()), "boot1 app is not alive")
         open_workout(active_boot.console, active_boot.child, evidence_dir)
+        result["screenshots"]["selection"] = screenshot(
+            active_boot, "q3-selection"
+        )
         click(active_boot.console, active_boot.child, evidence_dir, "start-walk",
               local_point(*START_WALK_POINT))
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,

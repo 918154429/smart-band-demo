@@ -90,7 +90,7 @@ class Q3NativeHarnessTest(unittest.TestCase):
         self.assertEqual(
             Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (731, 244)
         )
-        self.assertEqual(Q3.local_point(*Q3.START_WALK_POINT), (554, 485))
+        self.assertEqual(Q3.local_point(*Q3.START_WALK_POINT), (554, 459))
         self.assertEqual(
             Q3.local_point(*Q3.SESSION_PRIMARY_POINT), (523, 722)
         )
