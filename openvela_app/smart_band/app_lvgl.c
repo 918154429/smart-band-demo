@@ -8,7 +8,9 @@
 #include "smart_band_runtime.h"
 #include "smart_band_storage_backend.h"
 #include "smart_band_watch_face.h"
+#include "smart_band_watch_face_settings.h"
 #include "ui/lvgl/components.h"
+#include "ui/lvgl/watch_face_picker.h"
 #include "ui/lvgl/watch_pages.h"
 
 #include <stdint.h>
@@ -19,14 +21,17 @@
 
 #define SMART_BAND_DEFAULT_TZ "CST-8"
 #define SMART_BAND_SWIPE_CLICK_GUARD_MS 300
+#define SMART_BAND_FACE_LONG_PRESS_MS 600
 
 typedef struct
 {
   lv_obj_t *root;
   lv_obj_t *watch;
   lv_obj_t *screen;
+  lv_obj_t *face_host;
   smart_band_ui_components_t components;
   smart_band_watch_face_instance_t watch_face;
+  smart_band_watch_face_picker_t face_picker;
   smart_band_watch_pages_t watch_pages;
 
   lv_obj_t *dots[SMART_BAND_PAGE_COUNT];
@@ -45,9 +50,12 @@ typedef struct
   lv_coord_t screen_w;
   lv_coord_t screen_h;
   lv_point_t press_point;
+  uint32_t press_tick;
   bool press_valid;
   bool page_swipe_consumed;
   uint32_t page_swipe_at;
+  smart_band_watch_face_id_t selected_face;
+  smart_band_store_result_t face_settings_result;
   bool compact_band;
 } smart_band_ui_t;
 
@@ -184,13 +192,127 @@ static lv_obj_t *create_page(lv_obj_t *parent)
 static int create_face_page(void)
 {
   smart_band_watch_face_config_t config;
+  const smart_band_watch_face_descriptor_t *descriptor;
+
+  g_ui.face_host = create_page(g_ui.screen);
+  if (g_ui.face_host == NULL)
+    {
+      return -1;
+    }
 
   config.screen_width = g_ui.screen_w;
   config.screen_height = g_ui.screen_h;
   config.compact_band = g_ui.compact_band;
+  descriptor = smart_band_watch_face_registry_find(g_ui.selected_face);
+  if (descriptor == NULL)
+    {
+      descriptor = smart_band_watch_face_registry_default();
+      g_ui.selected_face = SMART_BAND_WATCH_FACE_LOTUS;
+    }
+
   return smart_band_watch_face_mount(
-    &g_ui.watch_face, smart_band_watch_face_registry_default(), g_ui.screen,
+    &g_ui.watch_face, descriptor, g_ui.face_host,
     &config);
+}
+
+static void current_face_config(smart_band_watch_face_config_t *config)
+{
+  if (config != NULL)
+    {
+      config->screen_width = g_ui.screen_w;
+      config->screen_height = g_ui.screen_h;
+      config->compact_band = g_ui.compact_band;
+    }
+}
+
+static int switch_watch_face(smart_band_watch_face_id_t selected_face)
+{
+  const smart_band_watch_face_descriptor_t *next_descriptor;
+  const smart_band_watch_face_descriptor_t *previous_descriptor;
+  smart_band_watch_face_config_t config;
+
+  next_descriptor = smart_band_watch_face_registry_find(selected_face);
+  if (next_descriptor == NULL || g_ui.face_host == NULL)
+    {
+      return -1;
+    }
+
+  if (g_ui.watch_face.mounted &&
+      g_ui.watch_face.descriptor == next_descriptor)
+    {
+      return 0;
+    }
+
+  previous_descriptor = g_ui.watch_face.descriptor;
+  current_face_config(&config);
+  smart_band_watch_face_unmount(&g_ui.watch_face);
+  if (smart_band_watch_face_mount(&g_ui.watch_face, next_descriptor,
+                                  g_ui.face_host, &config) != 0)
+    {
+      if (previous_descriptor != NULL)
+        {
+          (void)smart_band_watch_face_mount(
+            &g_ui.watch_face, previous_descriptor, g_ui.face_host, &config);
+          smart_band_watch_face_render(&g_ui.watch_face,
+                                       &g_ui.runtime.model);
+          smart_band_watch_face_set_visible(
+            &g_ui.watch_face,
+            g_ui.runtime.model.page == SMART_BAND_PAGE_FACE);
+          enable_touch_navigation_tree(
+            smart_band_watch_face_root(&g_ui.watch_face));
+        }
+
+      return -1;
+    }
+
+  g_ui.selected_face = selected_face;
+  smart_band_watch_face_render(&g_ui.watch_face, &g_ui.runtime.model);
+  smart_band_watch_face_set_visible(
+    &g_ui.watch_face, g_ui.runtime.model.page == SMART_BAND_PAGE_FACE);
+  enable_touch_navigation_tree(smart_band_watch_face_root(&g_ui.watch_face));
+
+  g_ui.face_settings_result = SMART_BAND_STORE_UNAVAILABLE;
+  if (g_ui.runtime.storage_initialized)
+    {
+      g_ui.face_settings_result = smart_band_watch_face_settings_commit(
+        &g_ui.runtime.storage, selected_face, NULL);
+    }
+
+  fprintf(stderr, "smart_band: watch face selected id=%d name=%s storage=%d\n",
+          (int)selected_face, next_descriptor->name,
+          (int)g_ui.face_settings_result);
+
+  return 0;
+}
+
+static void face_picker_apply(void *context,
+                              smart_band_watch_face_id_t selected_face)
+{
+  (void)context;
+
+  if (switch_watch_face(selected_face) != 0)
+    {
+      smart_band_watch_face_picker_set_status_message(
+        &g_ui.face_picker, "Face unavailable");
+      return;
+    }
+
+  smart_band_watch_face_picker_hide(&g_ui.face_picker);
+}
+
+static int create_face_picker(void)
+{
+  int result = smart_band_watch_face_picker_mount(
+    &g_ui.face_picker, g_ui.screen, &g_ui.components, g_ui.selected_face,
+    face_picker_apply, NULL);
+
+  if (result == 0)
+    {
+      enable_touch_navigation_tree(
+        smart_band_watch_face_picker_root(&g_ui.face_picker));
+    }
+
+  return result;
 }
 
 static int create_heart_page(void)
@@ -607,7 +729,8 @@ static int create_ui_tree(lv_obj_t *root)
 
       if (create_background_waves() != 0 || create_face_page() != 0 ||
           create_heart_page() != 0 || create_steps_page() != 0 ||
-          create_apps_page() != 0 || create_dots() != 0)
+          create_apps_page() != 0 || create_dots() != 0 ||
+          create_face_picker() != 0)
         {
           return -1;
         }
@@ -665,7 +788,8 @@ static int create_ui_tree(lv_obj_t *root)
 
   if (create_background_waves() != 0 || create_face_page() != 0 ||
       create_heart_page() != 0 || create_steps_page() != 0 ||
-      create_apps_page() != 0 || create_dots() != 0)
+      create_apps_page() != 0 || create_dots() != 0 ||
+      create_face_picker() != 0)
     {
       return -1;
     }
@@ -885,6 +1009,7 @@ static void page_drag_cb(lv_event_t *event)
   lv_coord_t dx;
   lv_coord_t dy;
   lv_coord_t threshold = max_coord(sx(36), 28);
+  uint32_t press_duration;
 
   if (indev == NULL)
     {
@@ -894,6 +1019,7 @@ static void page_drag_cb(lv_event_t *event)
   if (code == LV_EVENT_PRESSED)
     {
       lv_indev_get_point(indev, &g_ui.press_point);
+      g_ui.press_tick = lv_tick_get();
       g_ui.press_valid = true;
       g_ui.page_swipe_consumed = false;
       return;
@@ -908,6 +1034,39 @@ static void page_drag_cb(lv_event_t *event)
   lv_indev_get_point(indev, &point);
   dx = point.x - g_ui.press_point.x;
   dy = point.y - g_ui.press_point.y;
+  press_duration = lv_tick_elaps(g_ui.press_tick);
+
+  if (smart_band_watch_face_picker_is_visible(&g_ui.face_picker))
+    {
+      if (abs_coord(dx) >= threshold && abs_coord(dx) > abs_coord(dy))
+        {
+          if (dx < 0)
+            {
+              smart_band_watch_face_picker_preview_next(&g_ui.face_picker);
+            }
+          else
+            {
+              smart_band_watch_face_picker_preview_previous(
+                &g_ui.face_picker);
+            }
+
+          g_ui.page_swipe_consumed = true;
+          g_ui.page_swipe_at = lv_tick_get();
+        }
+
+      return;
+    }
+
+  if (g_ui.runtime.model.page == SMART_BAND_PAGE_FACE &&
+      press_duration >= SMART_BAND_FACE_LONG_PRESS_MS &&
+      abs_coord(dx) < threshold && abs_coord(dy) < threshold)
+    {
+      smart_band_watch_face_picker_show(&g_ui.face_picker,
+                                        g_ui.selected_face);
+      g_ui.page_swipe_consumed = true;
+      g_ui.page_swipe_at = lv_tick_get();
+      return;
+    }
 
   if (abs_coord(dx) < threshold || abs_coord(dx) <= abs_coord(dy))
     {
@@ -1013,6 +1172,20 @@ int smart_band_lvgl_create(lv_obj_t *parent)
       return -1;
     }
 
+  g_ui.selected_face = SMART_BAND_WATCH_FACE_LOTUS;
+  g_ui.face_settings_result = SMART_BAND_STORE_UNAVAILABLE;
+  if (g_ui.runtime.storage_initialized)
+    {
+      g_ui.face_settings_result = smart_band_watch_face_settings_load(
+        &g_ui.runtime.storage, &g_ui.selected_face);
+    }
+
+  if (smart_band_watch_face_registry_find(g_ui.selected_face) == NULL)
+    {
+      g_ui.selected_face = SMART_BAND_WATCH_FACE_LOTUS;
+      g_ui.face_settings_result = SMART_BAND_STORE_DEGRADED;
+    }
+
   if (create_ui_tree(owned_root) != 0)
     {
       smart_band_watch_face_unmount(&g_ui.watch_face);
@@ -1045,6 +1218,7 @@ void smart_band_lvgl_destroy(void)
       g_ui.timer = NULL;
     }
 
+  smart_band_watch_face_picker_unmount(&g_ui.face_picker);
   smart_band_runtime_deinit(&g_ui.runtime);
   smart_band_watch_face_unmount(&g_ui.watch_face);
 
@@ -1060,4 +1234,5 @@ void smart_band_lvgl_destroy(void)
 
   g_ui.watch = NULL;
   g_ui.screen = NULL;
+  g_ui.face_host = NULL;
 }

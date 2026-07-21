@@ -47,7 +47,7 @@ COMPACT_WATCH_FACE_REFERENCE = (
 COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
     "battery": (235, 13, 319, 29),
     "date": (111, 62, 226, 79),
-    "time": (104, 85, 243, 115),
+    "time": (103, 85, 243, 115),
     "sleep_value": (135, 219, 225, 237),
     "heart_value": (135, 283, 225, 305),
     "stress_value": (135, 348, 225, 366),
@@ -58,6 +58,7 @@ PAGE_TITLE_REGION = (570, 165, 710, 200)
 HEART_VALUE_REGION = (550, 330, 790, 390)
 SOURCE_LABEL_REGION = (650, 490, 790, 545)
 MIN_CHANGED_PIXELS = 32
+FACE_APPLY_RENDER_SECONDS = 1.0
 MAX_SWIPE_ATTEMPTS = 3
 RUN_ID_ENV = "SMART_BAND_NATIVE_E2E_RUN_ID"
 GOLDEN_REGIONS = {
@@ -86,6 +87,13 @@ REQUIRED_CHECKS = (
     "console_ping",
     "watch_face_png",
     "watch_face_static_masked_golden",
+    "picker_console_ok",
+    "picker_open_png",
+    "picker_open_pixels",
+    "picker_activity_preview_pixels",
+    "activity_face_png",
+    "activity_face_selected",
+    "activity_face_pixels",
     "swipe_console_ok",
     "first_swipe_reached_heart_rate",
     "heart_model_png",
@@ -1070,6 +1078,204 @@ def run_journey(args: argparse.Namespace) -> int:
             watch_comparison["exact_match_outside_masks"],
             "Lotus watch face changed outside reviewed dynamic masks",
         )
+        checkpoint("watch-face-picker")
+
+        picker_points = SMOKE.picker_input_points(EXPECTED_WIDTH, EXPECTED_HEIGHT)
+        picker_commands = []
+
+        def send_picker_pointer(
+            name: str, point: tuple[int, int], pressed: bool
+        ) -> None:
+            command_text = SMOKE.mouse_event_command(point, pressed)
+            response = console.command(command_text, f"console-picker-{name}.txt")
+            picker_commands.append(
+                {
+                    "name": name,
+                    "command": command_text,
+                    "response": response.strip(),
+                    "ok": console_response_ok(response),
+                }
+            )
+
+        send_picker_pointer("hold-down", picker_points["hold"], True)
+        child.pump(0.75)
+        send_picker_pointer("hold-up", picker_points["hold"], False)
+        child.pump(0.3)
+        picker_image, picker_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker"
+        )
+        picker_difference = region_difference(
+            watch_image, picker_image, PAGE_TRANSITION_REGION
+        )
+
+        send_picker_pointer("next-down", picker_points["next"], True)
+        send_picker_pointer("next-up", picker_points["next"], False)
+        child.pump(0.2)
+        picker_activity_image, picker_activity_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker-activity"
+        )
+        picker_activity_difference = region_difference(
+            picker_image, picker_activity_image, PAGE_TRANSITION_REGION
+        )
+
+        selection_start = len(child.transcript)
+        send_picker_pointer("apply-down", picker_points["apply"], True)
+        send_picker_pointer("apply-up", picker_points["apply"], False)
+        child.pump(FACE_APPLY_RENDER_SECONDS)
+        activity_image, activity_record = capture_screenshot(
+            console, evidence_dir, "watch-face-activity"
+        )
+        activity_difference = region_difference(
+            picker_activity_image, activity_image, PAGE_TRANSITION_REGION
+        )
+        selection_output = bytes(child.transcript[selection_start:]).decode(
+            "utf-8", errors="replace"
+        )
+        activity_selected = (
+            "watch face selected id=1 name=Activity Rings" in selection_output
+        )
+        journey["console"]["picker"] = picker_commands
+        journey["watch_face_picker"] = {
+            "points": picker_points,
+            "commands": picker_commands,
+            "selected_face": "activity",
+            "structured_marker": activity_selected,
+        }
+        journey["screenshots"]["watch_face_picker"] = picker_record
+        journey["screenshots"]["watch_face_picker_activity"] = (
+            picker_activity_record
+        )
+        journey["screenshots"]["watch_face_activity"] = activity_record
+        journey["pixel_transitions"]["picker_open"] = picker_difference
+        journey["pixel_transitions"]["picker_activity_preview"] = (
+            picker_activity_difference
+        )
+        journey["pixel_transitions"]["activity_face"] = activity_difference
+        require_check(
+            checks,
+            "picker_console_ok",
+            all(item["ok"] for item in picker_commands),
+            "one or more picker input events were rejected",
+        )
+        require_check(
+            checks,
+            "picker_open_png",
+            picker_record["console_ok"] and picker_record["nonblank"],
+            "watch-face picker screenshot failed validation",
+        )
+        require_check(
+            checks,
+            "picker_open_pixels",
+            picker_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "long press did not visibly open the watch-face picker",
+        )
+        require_check(
+            checks,
+            "picker_activity_preview_pixels",
+            picker_activity_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "picker did not visibly preview Activity Rings",
+        )
+        require_check(
+            checks,
+            "activity_face_png",
+            activity_record["console_ok"] and activity_record["nonblank"],
+            "Activity Rings screenshot failed validation",
+        )
+        require_check(
+            checks,
+            "activity_face_selected",
+            activity_selected,
+            "picker did not emit the structured Activity Rings selection",
+        )
+        require_check(
+            checks,
+            "activity_face_pixels",
+            activity_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "Apply did not visibly mount Activity Rings",
+        )
+
+        send_picker_pointer("minimal-hold-down", picker_points["hold"], True)
+        child.pump(0.75)
+        send_picker_pointer("minimal-hold-up", picker_points["hold"], False)
+        child.pump(0.3)
+        picker_from_activity_image, picker_from_activity_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker-from-activity"
+        )
+        picker_from_activity_difference = region_difference(
+            activity_image, picker_from_activity_image, PAGE_TRANSITION_REGION
+        )
+
+        send_picker_pointer("minimal-next-down", picker_points["next"], True)
+        send_picker_pointer("minimal-next-up", picker_points["next"], False)
+        child.pump(0.2)
+        picker_minimal_image, picker_minimal_record = capture_screenshot(
+            console, evidence_dir, "watch-face-picker-minimal"
+        )
+        picker_minimal_difference = region_difference(
+            picker_from_activity_image, picker_minimal_image, PAGE_TRANSITION_REGION
+        )
+
+        minimal_selection_start = len(child.transcript)
+        send_picker_pointer("minimal-apply-down", picker_points["apply"], True)
+        send_picker_pointer("minimal-apply-up", picker_points["apply"], False)
+        child.pump(FACE_APPLY_RENDER_SECONDS)
+        minimal_image, minimal_record = capture_screenshot(
+            console, evidence_dir, "watch-face-minimal"
+        )
+        minimal_difference = region_difference(
+            picker_minimal_image, minimal_image, PAGE_TRANSITION_REGION
+        )
+        minimal_selection_output = bytes(
+            child.transcript[minimal_selection_start:]
+        ).decode("utf-8", errors="replace")
+        minimal_selected = (
+            "watch face selected id=2 name=Minimal Digital"
+            in minimal_selection_output
+        )
+        journey["watch_face_picker"]["selected_faces"] = ["activity", "minimal"]
+        journey["watch_face_picker"]["minimal_structured_marker"] = minimal_selected
+        journey["screenshots"]["watch_face_picker_from_activity"] = (
+            picker_from_activity_record
+        )
+        journey["screenshots"]["watch_face_picker_minimal"] = picker_minimal_record
+        journey["screenshots"]["watch_face_minimal"] = minimal_record
+        journey["pixel_transitions"]["picker_from_activity"] = (
+            picker_from_activity_difference
+        )
+        journey["pixel_transitions"]["picker_minimal_preview"] = (
+            picker_minimal_difference
+        )
+        journey["pixel_transitions"]["minimal_face"] = minimal_difference
+        require_check(
+            checks,
+            "picker_from_activity_pixels",
+            picker_from_activity_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "long press did not open the picker from Activity Rings",
+        )
+        require_check(
+            checks,
+            "picker_minimal_preview_pixels",
+            picker_minimal_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "picker did not visibly preview Minimal Digital",
+        )
+        require_check(
+            checks,
+            "minimal_face_png",
+            minimal_record["console_ok"] and minimal_record["nonblank"],
+            "Minimal Digital screenshot failed validation",
+        )
+        require_check(
+            checks,
+            "minimal_face_selected",
+            minimal_selected,
+            "picker did not emit the structured Minimal Digital selection",
+        )
+        require_check(
+            checks,
+            "minimal_face_pixels",
+            minimal_difference["changed_pixels"] >= MIN_CHANGED_PIXELS,
+            "Apply did not visibly mount Minimal Digital",
+        )
         checkpoint("swipe")
 
         swipe_attempts = []
@@ -1097,7 +1303,7 @@ def run_journey(args: argparse.Namespace) -> int:
                 console, evidence_dir, f"heart-model-attempt-{attempt:02d}"
             )
             attempt_difference = region_difference(
-                watch_image, attempt_image, PAGE_TRANSITION_REGION
+                minimal_image, attempt_image, PAGE_TRANSITION_REGION
             )
             attempt_title = golden_region_record(attempt_image, "heart_page_title")
             swipe_attempts.append(

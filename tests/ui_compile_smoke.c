@@ -1,6 +1,7 @@
 #include "app_lvgl.h"
 #include "fake_lvgl/fake_lvgl_test.h"
 #include "smart_band_apps.h"
+#include "smart_band_watch_face_id.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@ typedef struct
 {
   lv_obj_t *screen;
   lv_obj_t *face;
+  lv_obj_t *picker;
   lv_obj_t *heart;
   lv_obj_t *steps;
   lv_obj_t *apps;
@@ -70,21 +72,24 @@ static int inspect_ui_tree(ui_tree_t *tree)
   lv_obj_t *apps = fake_lvgl_find_text(lv_scr_act(), "Apps", 0);
   lv_obj_t *calculator =
     fake_lvgl_find_text(lv_scr_act(), "Calculator", 0);
+  lv_obj_t *picker = fake_lvgl_find_text(lv_scr_act(), "Watch faces", 0);
 
   if (tree == NULL || sleep == NULL || resting == NULL || activity == NULL ||
-      apps == NULL || calculator == NULL)
+      apps == NULL || calculator == NULL || picker == NULL)
     {
       return -1;
     }
 
   tree->face = ancestor(sleep, 2);
+  tree->picker = ancestor(picker, 1);
   tree->heart = ancestor(resting, 2);
   tree->steps = ancestor(activity, 1);
   tree->apps = ancestor(apps, 1);
   tree->launcher = ancestor(calculator, 2);
   tree->screen = fake_lvgl_obj_parent(tree->steps);
   return tree->face != NULL && tree->heart != NULL && tree->steps != NULL &&
-         tree->apps != NULL && tree->launcher != NULL && tree->screen != NULL ?
+         tree->apps != NULL && tree->launcher != NULL && tree->screen != NULL &&
+         tree->picker != NULL ?
          0 : -1;
 }
 
@@ -94,6 +99,36 @@ static void swipe_left(lv_obj_t *screen)
   fake_lvgl_send_event(screen, LV_EVENT_PRESSED);
   fake_lvgl_set_pointer(50, 200);
   fake_lvgl_send_event(screen, LV_EVENT_RELEASED);
+}
+
+static void long_press(lv_obj_t *object)
+{
+  fake_lvgl_set_pointer(160, 220);
+  fake_lvgl_send_event(object, LV_EVENT_PRESSED);
+  (void)fake_lvgl_advance_tick(650);
+  fake_lvgl_set_pointer(160, 220);
+  fake_lvgl_send_event(object, LV_EVENT_RELEASED);
+}
+
+static lv_obj_t *active_face_root(smart_band_watch_face_id_t id)
+{
+  lv_obj_t *marker;
+
+  switch (id)
+    {
+      case SMART_BAND_WATCH_FACE_ACTIVITY:
+        marker = fake_lvgl_find_text(lv_scr_act(), "ACTIVITY", 0);
+        break;
+      case SMART_BAND_WATCH_FACE_MINIMAL:
+        marker = fake_lvgl_find_text(lv_scr_act(), "MINIMAL", 0);
+        break;
+      case SMART_BAND_WATCH_FACE_LOTUS:
+      default:
+        marker = fake_lvgl_find_text(lv_scr_act(), "Sleep", 0);
+        return ancestor(marker, 2);
+    }
+
+  return ancestor(marker, 1);
 }
 
 static int navigate_to_apps(ui_tree_t *tree)
@@ -374,6 +409,108 @@ static int test_navigation_and_timer(void)
   return 0;
 }
 
+static int test_watch_face_mount_failure_rollback(void)
+{
+  ui_tree_t tree;
+  lv_obj_t *next;
+  lv_obj_t *apply;
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(inspect_ui_tree(&tree) == 0);
+  long_press(tree.face);
+  CHECK(!fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+  next = fake_lvgl_find_text(tree.picker, "Next", 0);
+  apply = fake_lvgl_find_text(tree.picker, "Apply", 0);
+  CHECK(next != NULL && apply != NULL);
+  fake_lvgl_send_event(next, LV_EVENT_CLICKED);
+  CHECK(fake_lvgl_find_text(tree.picker, "Activity Rings", 0) != NULL);
+
+  fake_lvgl_fail_object_create_at(1);
+  fake_lvgl_send_event(apply, LV_EVENT_CLICKED);
+  CHECK(fake_lvgl_find_text(tree.picker, "Face unavailable", 0) != NULL);
+  CHECK(active_face_root(SMART_BAND_WATCH_FACE_LOTUS) != NULL);
+  CHECK(!fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+
+  fake_lvgl_fail_object_create_at(0);
+  fake_lvgl_send_event(apply, LV_EVENT_CLICKED);
+  CHECK(active_face_root(SMART_BAND_WATCH_FACE_ACTIVITY) != NULL);
+  CHECK(fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+  return 0;
+}
+
+static int test_watch_face_picker_switch_soak(void)
+{
+  size_t object_counts[SMART_BAND_WATCH_FACE_COUNT] = {0, 0, 0};
+  size_t event_counts[SMART_BAND_WATCH_FACE_COUNT] = {0, 0, 0};
+  bool seen[SMART_BAND_WATCH_FACE_COUNT] = {false, false, false};
+  smart_band_watch_face_id_t current = SMART_BAND_WATCH_FACE_LOTUS;
+  ui_tree_t tree;
+  int iteration;
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(inspect_ui_tree(&tree) == 0);
+  CHECK(fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+
+  object_counts[current] = fake_lvgl_live_object_count();
+  event_counts[current] = fake_lvgl_live_event_count();
+  seen[current] = true;
+
+  for (iteration = 0; iteration < 100; iteration++)
+    {
+      lv_obj_t *face = active_face_root(current);
+      lv_obj_t *apply;
+
+      CHECK(face != NULL);
+      long_press(face);
+      CHECK(!fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+      CHECK(fake_lvgl_obj_has_flag(tree.heart, LV_OBJ_FLAG_HIDDEN));
+
+      if (iteration == 0)
+        {
+          swipe_left(tree.picker);
+        }
+      else
+        {
+          lv_obj_t *next = fake_lvgl_find_text(tree.picker, "Next", 0);
+          CHECK(next != NULL);
+          fake_lvgl_send_event(next, LV_EVENT_CLICKED);
+        }
+
+      current = (smart_band_watch_face_id_t)(
+        ((int)current + 1) % SMART_BAND_WATCH_FACE_COUNT);
+      apply = fake_lvgl_find_text(tree.picker, "Apply", 0);
+      CHECK(apply != NULL);
+      fake_lvgl_send_event(apply, LV_EVENT_CLICKED);
+      CHECK(fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
+      CHECK(active_face_root(current) != NULL);
+
+      if (!seen[current])
+        {
+          object_counts[current] = fake_lvgl_live_object_count();
+          event_counts[current] = fake_lvgl_live_event_count();
+          seen[current] = true;
+        }
+      else
+        {
+          CHECK(fake_lvgl_live_object_count() == object_counts[current]);
+          CHECK(fake_lvgl_live_event_count() == event_counts[current]);
+        }
+    }
+
+  CHECK(seen[SMART_BAND_WATCH_FACE_LOTUS]);
+  CHECK(seen[SMART_BAND_WATCH_FACE_ACTIVITY]);
+  CHECK(seen[SMART_BAND_WATCH_FACE_MINIMAL]);
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+  return 0;
+}
+
 static int test_create_destroy_navigation_soak(void)
 {
   static const char *const app_names[SMART_BAND_APP_COUNT] =
@@ -422,6 +559,8 @@ int main(void)
   CHECK(test_timer_failure_retry() == 0);
   CHECK(run_app_mount_failure_sweep() == 0);
   CHECK(test_navigation_and_timer() == 0);
+  CHECK(test_watch_face_mount_failure_rollback() == 0);
+  CHECK(test_watch_face_picker_switch_soak() == 0);
   CHECK(test_create_destroy_navigation_soak() == 0);
   return 0;
 }

@@ -45,6 +45,7 @@ CORE_SOURCES = [
     APP_DIR / "logic" / "notification_model.c",
     APP_DIR / "logic" / "notification_demo.c",
     APP_DIR / "logic" / "power_policy.c",
+    APP_DIR / "logic" / "watch_face_settings.c",
     APP_DIR / "services" / "sync_protocol.c",
     APP_DIR / "apps" / "timer_app.c",
     APP_DIR / "apps" / "stopwatch_app.c",
@@ -75,6 +76,10 @@ NEW_W1_SOURCES = [
     APP_DIR / "logic" / "notification_demo.c",
     APP_DIR / "logic" / "power_policy.c",
     APP_DIR / "services" / "sync_protocol.c",
+]
+
+NEW_WATCH_FACE_SOURCES = [
+    APP_DIR / "logic" / "watch_face_settings.c",
 ]
 
 
@@ -159,6 +164,18 @@ TARGETS = [
         "power_policy",
         Path(__file__).with_name("power_policy_test.c"),
         (APP_DIR / "logic" / "power_policy.c",),
+    ),
+    CoverageTarget(
+        "watch_face_settings",
+        Path(__file__).with_name("watch_face_settings_test.c"),
+        (
+            APP_DIR / "logic" / "watch_face_settings.c",
+            APP_DIR / "services" / "storage_codec.c",
+            APP_DIR / "services" / "store.c",
+            APP_DIR / "platform" / "storage" / "storage_fault.c",
+            APP_DIR / "platform" / "storage" / "storage_memory.c",
+            APP_DIR / "platform" / "storage" / "storage_file.c",
+        ),
     ),
     CoverageTarget(
         "sync_protocol",
@@ -259,7 +276,12 @@ def run_gcovr(build_root: Path) -> None:
         "--gcov-executable",
         require_tool("gcov"),
     ]
-    for source in [*NEW_RUNTIME_SOURCES, *NEW_STORAGE_SOURCES, *NEW_W1_SOURCES]:
+    for source in [
+        *NEW_RUNTIME_SOURCES,
+        *NEW_STORAGE_SOURCES,
+        *NEW_W1_SOURCES,
+        *NEW_WATCH_FACE_SOURCES,
+    ]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [
             *runtime_base_command,

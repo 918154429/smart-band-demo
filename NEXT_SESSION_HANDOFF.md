@@ -2,8 +2,8 @@
 
 更新时间：2026-07-21（Asia/Shanghai）
 
-> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1-V、Q1-C、Q1-S 与
-> W1 汇总 Gate 已全绿；下一主线切片做 Q2 第二段：Activity、Minimal、picker/settings。
+> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1、W1 与 Q2 A Gate
+> 已全绿；下一主线切片进入 Q3：Workout service/UI 与 daily/history 持久化闭环。
 
 ## 1. 仓库、权限与边界
 
@@ -12,8 +12,10 @@
 - 默认分支：`master`
 - Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)，已正常合并。
 - W1 integration PR：[PR11](https://github.com/918154429/smart-band-demo/pull/11)，已正常合并。
+- Q2 PR：[PR12](https://github.com/918154429/smart-band-demo/pull/12)，Gate 已通过，等待普通 merge。
 - Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`；最终证据提交：`9172aef`。
 - W1 功能/门禁提交：`298a5c0`；最终证据提交：`5433b9b`。
+- Q2 功能提交：`07dece8`；门禁修复最终提交：`d7ce79b`。
 - 当前 master 合并基线：`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
   提交、推送、创建/更新/合并 PR。强制推送、历史改写、删除远端分支/标签和正式 release
@@ -157,18 +159,23 @@ run `29816173199`、Browser run `29816173171` 全绿。最终 PR head `5433b9b` 
 - storage load 在 UI tree 创建前同步执行；已证明 returned error 不会中止初始化，但没有
   证明慢或永久阻塞 backend 的时延隔离。backend 必须有界、可响应。
 - degraded 状态在 store 中可观测，本切片未添加用户提示或运行日志遥测。
-- Lotus compact/framed 已证明；其他页面/应用 native 像素、sensor stale/TTL、长时 soak 和
-  所有真机能力仍未证明。
+- Q2 Lotus/Activity/Minimal 与 picker 的 compact/framed framebuffer 已证明；其他功能页面、
+  sensor stale/TTL、长时 soak 和所有真机能力仍未证明。
 
-## 6. 下一独立切片：Q2 第二段
+## 6. Q2 A Gate 已完成
 
-1. 在现有 registry/lazy lifecycle 上新增 Activity 与 Minimal，Lotus 保持默认。
-2. 实现 picker、长按入口、手势仲裁和 100 次用户可见切换压力。
-3. 复用 Q1-S store 保存 selected face，覆盖损坏/旧版本/写失败回退。
-4. 补 GCC/Clang/MSVC、fake LVGL failure sweep、compact/framed native picker journey。
+1. Lotus、Activity、Minimal 共用 registry、lazy lifecycle 与单个 256-byte context。
+2. 600ms 长按 picker、手势仲裁、100 次切换与非空 file backend fd soak 全过。
+3. selected face 复用 Q1-S A/B store，覆盖损坏、旧/未来版本和写/flush 失败。
+4. Host `29824971500`、Browser `29824971555`、fixed openvela `29825089126` 全绿。
+5. 完整证据见 `docs/q2-multi-watch-faces-20260721.md` 与
+   `docs/evidence/q2-gate-summary-20260721.json`。
 
-本切片不接 Workout、History、notification、power 或 BLE。Q3-Q6 下一 adapter/service/UI
-对话必须消费已冻结 pure core，不另写第二套模型。
+## 7. 下一独立切片：Q3 Workout + History
+
+先接现有 step normalizer/Walk/Run pure core 到后台 service，再实现 Workout UI、checkpoint、
+daily record 与 7 天/30 天历史聚合。必须复用 Q1-S store 和已冻结 W1 model，不另写第二套
+步数归一化或 workout 状态机。Q4-Q6 继续保持 pure core ready，不提前交叉接线。
 
 下一会话开场：
 

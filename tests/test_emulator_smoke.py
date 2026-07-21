@@ -79,6 +79,27 @@ class EmulatorSmokeHelpersTest(unittest.TestCase):
             )
             self.assertEqual(EMULATOR_SMOKE.png_dimensions(image), (336, 480))
 
+    def test_picker_points_fit_compact_and_framed_screens(self) -> None:
+        for width, height in ((336, 480), (1280, 800)):
+            points = EMULATOR_SMOKE.picker_input_points(width, height)
+            self.assertEqual(set(points), {"hold", "next", "apply"})
+            for x, y in points.values():
+                self.assertGreaterEqual(x, 0)
+                self.assertLess(x, width)
+                self.assertGreaterEqual(y, 0)
+                self.assertLess(y, height)
+            self.assertLess(points["next"][1], points["apply"][1])
+
+    def test_mouse_event_command_tracks_button_state(self) -> None:
+        self.assertEqual(
+            EMULATOR_SMOKE.mouse_event_command((168, 240), True),
+            "event mouse 168 240 0 1",
+        )
+        self.assertEqual(
+            EMULATOR_SMOKE.mouse_event_command((168, 240), False),
+            "event mouse 168 240 0 0",
+        )
+
 
 @unittest.skipUnless(
     os.name == "posix" and hasattr(os, "openpty"),

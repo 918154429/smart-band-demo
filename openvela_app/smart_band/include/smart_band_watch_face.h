@@ -1,6 +1,7 @@
 #ifndef SMART_BAND_WATCH_FACE_H
 #define SMART_BAND_WATCH_FACE_H
 
+#include "smart_band_watch_face_id.h"
 #include "watch_model.h"
 
 #include <lvgl/lvgl.h>
@@ -13,11 +14,6 @@ extern "C" {
 #endif
 
 #define SMART_BAND_WATCH_FACE_CONTEXT_CAPACITY 256
-
-typedef enum
-{
-  SMART_BAND_WATCH_FACE_LOTUS = 0
-} smart_band_watch_face_id_t;
 
 typedef struct
 {

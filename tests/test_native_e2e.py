@@ -249,6 +249,9 @@ class NativeE2ETest(unittest.TestCase):
         checks["source_label_transition_pixels"] = True
         checks["heart_value_104_bpm_golden"] = False
         self.assertFalse(E2E.all_required_checks_pass(checks))
+        checks["heart_value_104_bpm_golden"] = True
+        checks["activity_face_selected"] = False
+        self.assertFalse(E2E.all_required_checks_pass(checks))
 
     @unittest.skipUnless(os.name == "posix", "POSIX attributed-process cleanup")
     def test_attributed_cleanup_finds_a_detached_run_id_process(self) -> None:

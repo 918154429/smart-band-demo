@@ -59,6 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skin", default="xiaomi_smart_screen_10")
     parser.add_argument("--screenshot-width", type=int)
     parser.add_argument("--screenshot-height", type=int)
+    parser.add_argument("--exercise-watch-face-picker", action="store_true")
     return parser.parse_args()
 
 
@@ -169,19 +170,20 @@ def capture_screenshot(
     evidence_dir: Path,
     expected_width: int,
     expected_height: int,
+    name: str = "watch-face",
 ) -> dict[str, object]:
-    capture_dir = evidence_dir / "raw-watch-face"
+    capture_dir = evidence_dir / f"raw-{name}"
     capture_dir.mkdir()
     response = console.command(
         f"screenrecord screenshot {capture_dir}",
-        "emulator-console-screenshot.txt",
+        f"emulator-console-screenshot-{name}.txt",
     )
     candidates = sorted(capture_dir.rglob("*.png"))
     if len(candidates) != 1:
         raise SmokeFailure(
-            f"expected one watch-face screenshot, found {len(candidates)}"
+            f"expected one {name} screenshot, found {len(candidates)}"
         )
-    destination = evidence_dir / "watch-face.png"
+    destination = evidence_dir / f"{name}.png"
     shutil.copy2(candidates[0], destination)
     width, height = png_dimensions(destination)
     if (width, height) != (expected_width, expected_height):
@@ -197,6 +199,50 @@ def capture_screenshot(
         "height": height,
         "console_ok": re.search(r"(?:^|\r?\n)OK\r?\n?$", response) is not None,
     }
+
+
+def picker_input_points(width: int, height: int) -> dict[str, tuple[int, int]]:
+    if width <= 0 or height <= 0:
+        raise SmokeFailure("picker display dimensions must be positive")
+
+    if width <= 540 and height <= 540:
+        screen_left = 0
+        screen_top = 0
+        screen_width = width
+        screen_height = height
+    else:
+        watch_height = max(min(height - 48, 720), 360)
+        watch_width = (watch_height * 194) // 368
+        if watch_width > width - 48:
+            watch_width = width - 48
+            watch_height = (watch_width * 368) // 194
+        screen_left = (width - watch_width) // 2 + 3
+        screen_top = (height - watch_height) // 2 + 3
+        screen_width = watch_width - 6
+        screen_height = watch_height - 6
+
+    sx = lambda value: (value * screen_width) // 330
+    sy = lambda value: (value * screen_height) // 626
+    margin = sx(20)
+    gap = sx(10)
+    content_width = screen_width - margin * 2
+    half_width = (content_width - gap) // 2
+    button_height = sy(52)
+    next_x = margin + half_width + gap + half_width // 2
+    navigation_y = sy(350) + button_height // 2
+    apply_y = screen_height - sy(72) + button_height // 2
+    return {
+        "hold": (
+            screen_left + screen_width // 2,
+            screen_top + screen_height // 2,
+        ),
+        "next": (screen_left + next_x, screen_top + navigation_y),
+        "apply": (screen_left + next_x, screen_top + apply_y),
+    }
+
+
+def mouse_event_command(point: tuple[int, int], pressed: bool) -> str:
+    return f"event mouse {point[0]} {point[1]} 0 {1 if pressed else 0}"
 
 
 class PtyChild:
@@ -609,6 +655,7 @@ def main() -> int:
             raise SmokeFailure("smart_band did not report successful LVGL UI creation")
 
         screenshot = None
+        picker_journey = None
         if args.screenshot_width is not None:
             screenshot = capture_screenshot(
                 console,
@@ -616,6 +663,141 @@ def main() -> int:
                 args.screenshot_width,
                 args.screenshot_height,
             )
+
+        if args.exercise_watch_face_picker:
+            if args.screenshot_width is None:
+                raise SmokeFailure(
+                    "--exercise-watch-face-picker requires screenshot dimensions"
+                )
+            points = picker_input_points(
+                args.screenshot_width, args.screenshot_height
+            )
+            commands: list[dict[str, object]] = []
+
+            def send_pointer(name: str, point: tuple[int, int], pressed: bool) -> None:
+                command = mouse_event_command(point, pressed)
+                response = console.command(command, f"picker-{name}.txt")
+                commands.append(
+                    {
+                        "name": name,
+                        "command": command,
+                        "ok": re.search(r"(?:^|\r?\n)OK\r?\n?$", response)
+                        is not None,
+                    }
+                )
+
+            send_pointer("hold-down", points["hold"], True)
+            child.pump(0.75)
+            send_pointer("hold-up", points["hold"], False)
+            child.pump(0.3)
+            picker_screen = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker",
+            )
+
+            send_pointer("next-down", points["next"], True)
+            send_pointer("next-up", points["next"], False)
+            child.pump(0.2)
+            picker_activity = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker-activity",
+            )
+
+            selection_start = len(child.transcript)
+            send_pointer("apply-down", points["apply"], True)
+            send_pointer("apply-up", points["apply"], False)
+            child.pump(0.4)
+            activity_screen = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-activity",
+            )
+            selection_output = bytes(child.transcript[selection_start:]).decode(
+                "utf-8", errors="replace"
+            )
+            selected_activity = (
+                "watch face selected id=1 name=Activity Rings" in selection_output
+            )
+
+            send_pointer("minimal-hold-down", points["hold"], True)
+            child.pump(0.75)
+            send_pointer("minimal-hold-up", points["hold"], False)
+            child.pump(0.3)
+            picker_from_activity = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker-from-activity",
+            )
+
+            send_pointer("minimal-next-down", points["next"], True)
+            send_pointer("minimal-next-up", points["next"], False)
+            child.pump(0.2)
+            picker_minimal = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-picker-minimal",
+            )
+
+            minimal_selection_start = len(child.transcript)
+            send_pointer("minimal-apply-down", points["apply"], True)
+            send_pointer("minimal-apply-up", points["apply"], False)
+            child.pump(0.4)
+            minimal_screen = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+                "watch-face-minimal",
+            )
+            minimal_selection_output = bytes(
+                child.transcript[minimal_selection_start:]
+            ).decode("utf-8", errors="replace")
+            selected_minimal = (
+                "watch face selected id=2 name=Minimal Digital"
+                in minimal_selection_output
+            )
+            images_changed = (
+                screenshot is not None
+                and screenshot["sha256"] != picker_screen["sha256"]
+                and picker_screen["sha256"] != picker_activity["sha256"]
+                and picker_activity["sha256"] != activity_screen["sha256"]
+                and activity_screen["sha256"] != picker_from_activity["sha256"]
+                and picker_from_activity["sha256"] != picker_minimal["sha256"]
+                and picker_minimal["sha256"] != minimal_screen["sha256"]
+            )
+            if not all(command["ok"] for command in commands):
+                raise SmokeFailure("one or more picker input events were rejected")
+            if not images_changed:
+                raise SmokeFailure("picker journey screenshots did not change")
+            if not selected_activity:
+                raise SmokeFailure("picker did not select Activity Rings")
+            if not selected_minimal:
+                raise SmokeFailure("picker did not select Minimal Digital")
+            picker_journey = {
+                "points": points,
+                "commands": commands,
+                "picker": picker_screen,
+                "activity_preview": picker_activity,
+                "activity_face": activity_screen,
+                "selected_activity": selected_activity,
+                "picker_from_activity": picker_from_activity,
+                "minimal_preview": picker_minimal,
+                "minimal_face": minimal_screen,
+                "selected_minimal": selected_minimal,
+                "images_changed": images_changed,
+            }
 
         pid_output_1 = child.send_command(
             "pidof smart_band",
@@ -663,6 +845,7 @@ def main() -> int:
             "console_port": args.console_port,
             "skin": args.skin,
             "screenshot": screenshot,
+            "watch_face_picker": picker_journey,
             "nsh_prompt": prompt_text,
             "initial_pids": pids_1,
             "stable_pids": pids_2,
