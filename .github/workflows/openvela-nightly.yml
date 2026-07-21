@@ -368,6 +368,15 @@ jobs:
               --openvela-root "$OPENVELA_ROOT" \
               --evidence-dir "$EVIDENCE_DIR"
 
+      - name: Run audited native screenshot and sensor journey
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          timeout --signal=TERM --kill-after=30s 12m \
+            python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_native_e2e.py" \
+              --openvela-root "$OPENVELA_ROOT" \
+              --evidence-dir "$EVIDENCE_DIR/native-e2e"
+
       - name: Ensure emulator process group is stopped
         if: always()
         shell: bash

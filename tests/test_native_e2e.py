@@ -170,6 +170,40 @@ class NativeE2ETest(unittest.TestCase):
             E2E.region_fingerprint(after, (1, 1, 3, 3))["sha256"], expected
         )
 
+    def test_masked_difference_ignores_only_reviewed_rectangles(self) -> None:
+        width = height = 4
+        reference_pixels = solid_pixels(width, height, (10, 20, 30, 255))
+        candidate_pixels = bytearray(reference_pixels)
+        inside_mask = (1 * width + 1) * 4
+        outside_mask = (3 * width + 3) * 4
+        candidate_pixels[inside_mask : inside_mask + 4] = bytes((100, 20, 30, 255))
+        reference = E2E.PngImage(width, height, bytes(reference_pixels))
+        candidate = E2E.PngImage(width, height, bytes(candidate_pixels))
+
+        ignored = E2E.masked_image_difference(
+            reference, candidate, {"dynamic": (1, 1, 2, 2)}
+        )
+        self.assertTrue(ignored["exact_match_outside_masks"])
+        self.assertEqual(ignored["masked_pixels"], 1)
+        self.assertEqual(ignored["compared_pixels"], 15)
+
+        candidate_pixels[outside_mask : outside_mask + 4] = bytes((10, 99, 30, 255))
+        candidate = E2E.PngImage(width, height, bytes(candidate_pixels))
+        changed = E2E.masked_image_difference(
+            reference, candidate, {"dynamic": (1, 1, 2, 2)}
+        )
+        self.assertFalse(changed["exact_match_outside_masks"])
+        self.assertEqual(changed["changed_pixels"], 1)
+        self.assertEqual(changed["mismatch_bounds"], [3, 3, 4, 4])
+
+    def test_reviewed_watch_face_masks_leave_most_pixels_exact(self) -> None:
+        reference = E2E.decode_png_rgba(E2E.WATCH_FACE_REFERENCE)
+        comparison = E2E.masked_image_difference(
+            reference, reference, E2E.WATCH_FACE_DYNAMIC_MASKS
+        )
+        self.assertTrue(comparison["exact_match_outside_masks"])
+        self.assertGreater(comparison["compared_ratio"], 0.95)
+
     def test_reviewed_native_images_match_only_the_expected_golden_text(self) -> None:
         evidence = ROOT / "docs" / "evidence"
         model = E2E.decode_png_rgba(
