@@ -919,6 +919,83 @@ static int test_initial_unavailable_reloads_existing_baseline(void)
   return 0;
 }
 
+static int test_malformed_checkpoint_and_finalization_boundaries(void)
+{
+  static const smart_band_store_record_spec_t checkpoint_spec =
+  {
+    {SMART_BAND_WORKOUT_CHECKPOINT_SLOT_A,
+     SMART_BAND_WORKOUT_CHECKPOINT_SLOT_B},
+    SMART_BAND_STORAGE_RECORD_RUNTIME_CHECKPOINT, 1, 0,
+    NULL, 0, NULL, NULL
+  };
+  smart_band_storage_memory_t memory;
+  smart_band_storage_t storage;
+  smart_band_store_t store;
+  smart_band_history_t history;
+  smart_band_workout_service_t service;
+  uint8_t bad_magic[8] = {0};
+  uint8_t bad_kind[8] = {0x57, 0x43, 0x50, 0x31, 2, 0, 0, 0};
+  uint8_t bad_live[112] = {0};
+  uint8_t empty[8] = {0x57, 0x43, 0x50, 0x31, 0, 0, 0, 0};
+
+  CHECK(smart_band_storage_memory_init(&memory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  CHECK(smart_band_store_init(&store, &storage) == 0);
+  CHECK(smart_band_history_init(&history, &store) == 0);
+
+  CHECK(smart_band_store_commit(
+          &store, &checkpoint_spec, bad_magic, sizeof(bad_magic), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_workout_service_init(&service, &store, &history, 0u) == 0);
+  CHECK(service.checkpoint_result == SMART_BAND_STORE_DEGRADED);
+  smart_band_workout_service_reset(&service);
+
+  CHECK(smart_band_store_commit(
+          &store, &checkpoint_spec, bad_kind, sizeof(bad_kind), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_workout_service_init(&service, &store, &history, 0u) == 0);
+  CHECK(service.checkpoint_result == SMART_BAND_STORE_DEGRADED);
+  smart_band_workout_service_reset(&service);
+
+  memcpy(bad_live, empty, sizeof(empty));
+  bad_live[4] = 1u;
+  bad_live[104] = UINT8_C(0xe8);
+  bad_live[105] = UINT8_C(0x03);
+  CHECK(smart_band_store_commit(
+          &store, &checkpoint_spec, bad_live, sizeof(bad_live), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_workout_service_init(&service, &store, &history, 0u) == 0);
+  CHECK(service.checkpoint_result == SMART_BAND_STORE_DEGRADED);
+  smart_band_workout_service_reset(&service);
+
+  CHECK(smart_band_store_commit(
+          &store, &checkpoint_spec, empty, sizeof(empty), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_workout_service_init(&service, &store, &history, 0u) == 0);
+  service.phase = SMART_BAND_WORKOUT_SERVICE_PHASE_FINALIZING;
+  CHECK(smart_band_workout_service_checkpoint(&service, 1u) ==
+        SMART_BAND_STORE_OK);
+  CHECK(service.phase == SMART_BAND_WORKOUT_SERVICE_PHASE_READY);
+
+  CHECK(smart_band_workout_service_start(
+          &service, SMART_BAND_WORKOUT_MODE_WALK, 2u,
+          WALL_BASE, true) == SMART_BAND_WORKOUT_SERVICE_OK);
+  CHECK(tick_service(&service, SMART_BAND_STEP_SOURCE_SENSOR, 100u, true,
+                     true, 100u, true, true, 2u) == 0);
+  CHECK(tick_service(&service, SMART_BAND_STEP_SOURCE_SENSOR, 100u, true,
+                     true, 100u, true, true, 3002u) == 0);
+  history.next_session_id = 0u;
+  CHECK(smart_band_workout_service_command(
+          &service, SMART_BAND_WORKOUT_COMMAND_FINISH, 4002u,
+          WALL_BASE + 4, true, false) ==
+        SMART_BAND_WORKOUT_SERVICE_RANGE_ERROR);
+
+  smart_band_workout_service_reset(&service);
+  smart_band_history_reset(&history);
+  smart_band_store_deinit(&store);
+  return 0;
+}
+
 static int test_idle_daily_flush_uses_empty_checkpoint_transaction(void)
 {
   smart_band_storage_memory_t memory;
@@ -1069,6 +1146,7 @@ int main(void)
   CHECK(test_finish_transaction_crash_cut_matrix() == 0);
   CHECK(test_temporary_unavailable_backend_recovers_finalization() == 0);
   CHECK(test_initial_unavailable_reloads_existing_baseline() == 0);
+  CHECK(test_malformed_checkpoint_and_finalization_boundaries() == 0);
   CHECK(test_idle_daily_flush_uses_empty_checkpoint_transaction() == 0);
   CHECK(test_single_tick_spanning_two_midnights_is_split_per_day() == 0);
   CHECK(test_service_api_boundaries() == 0);

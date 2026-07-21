@@ -572,6 +572,50 @@ static int test_temporary_unavailable_merges_persisted_history(void)
   return 0;
 }
 
+static int test_malformed_inner_shards_block_rewrite(void)
+{
+  static const smart_band_store_record_spec_t daily_spec =
+  {
+    {UINT32_C(0x00030000), UINT32_C(0x00030001)},
+    SMART_BAND_STORAGE_RECORD_DAILY_HISTORY, 1, 0,
+    NULL, 0, NULL, NULL
+  };
+  static const smart_band_store_record_spec_t session_spec =
+  {
+    {UINT32_C(0x00040000), UINT32_C(0x00040001)},
+    SMART_BAND_STORAGE_RECORD_WORKOUT_HISTORY, 1, 0,
+    NULL, 0, NULL, NULL
+  };
+  smart_band_storage_memory_t memory;
+  smart_band_storage_t storage;
+  smart_band_store_t store;
+  smart_band_history_t history;
+  smart_band_workout_session_t session = make_session(1u);
+  uint8_t malformed[8] = {0};
+
+  CHECK(smart_band_storage_memory_init(&memory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  CHECK(smart_band_store_init(&store, &storage) == 0);
+  CHECK(smart_band_store_commit(
+          &store, &daily_spec, malformed, sizeof(malformed), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_store_commit(
+          &store, &session_spec, malformed, sizeof(malformed), NULL) ==
+        SMART_BAND_STORE_OK);
+  CHECK(smart_band_history_init(&history, &store) == 0);
+  CHECK(history.last_daily_result == SMART_BAND_STORE_DEGRADED);
+  CHECK(history.last_session_result == SMART_BAND_STORE_DEGRADED);
+  CHECK(history.daily_writes_blocked && history.session_writes_blocked);
+  CHECK(smart_band_history_add_daily(
+          &history, 22000, 1u, 0u, 0u, 0u, false, 0u, 0u, 0u));
+  CHECK(smart_band_history_flush_daily(&history) ==
+        SMART_BAND_STORE_DEGRADED);
+  CHECK(smart_band_history_append_session(&history, &session) ==
+        SMART_BAND_STORE_DEGRADED);
+  smart_band_store_deinit(&store);
+  return 0;
+}
+
 static int test_invalid_overflow_and_transaction_boundaries(void)
 {
   static const smart_band_store_record_spec_t checkpoint_spec =
@@ -651,6 +695,7 @@ int main(void)
   CHECK(test_history_write_faults_preserve_old_complete_data() == 0);
   CHECK(test_recovered_snapshot_cannot_overwrite_newer_generation() == 0);
   CHECK(test_temporary_unavailable_merges_persisted_history() == 0);
+  CHECK(test_malformed_inner_shards_block_rewrite() == 0);
   CHECK(test_invalid_overflow_and_transaction_boundaries() == 0);
   puts("smart band history service tests passed");
   return 0;
