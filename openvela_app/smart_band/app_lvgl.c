@@ -131,13 +131,6 @@ static void emit_q3_diagnostics(void)
       g_ui.diagnostic_tick_gap_max_ms = gap_ms;
     }
   g_ui.diagnostic_last_elapsed_ms = elapsed_ms;
-  if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_NONE &&
-      !smart_band_workout_service_is_live(&g_ui.runtime.workout) &&
-      g_ui.runtime.history.session_count == 0u)
-    {
-      return;
-    }
-
   printf("smart_band:q3:v1 elapsed_ms=%llu page=%u view=%u state=%u "
          "mode=%u active_ms=%llu steps=%llu recovery=%u phase=%u "
          "checkpoint=%d daily=%u sessions=%u daily_store=%d "

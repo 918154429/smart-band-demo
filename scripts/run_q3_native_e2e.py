@@ -29,6 +29,8 @@ STATE_ACTIVE = 2
 STATE_PAUSED = 3
 STATE_FINISHED = 4
 STATE_RECOVERY = 6
+PAGE_APPS = 3
+VIEW_NONE = 0
 VIEW_WORKOUT = 1
 VIEW_HISTORY = 2
 
@@ -169,18 +171,38 @@ def swipe_to_apps(console: Any, child: Any, evidence_dir: Path) -> None:
             if not console_ok(response):
                 raise Q3NativeFailure(f"apps swipe command failed: {response!r}")
         child.pump(0.4)
+    wait_for_state(
+        child,
+        lambda state: state["page"] == PAGE_APPS and state["view"] == VIEW_NONE,
+        4.0,
+        "Apps page",
+    )
 
 
 def open_workout(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
     click(console, evidence_dir, "open-workout", local_point(90, 157))
     child.pump(1.0)
+    wait_for_state(
+        child,
+        lambda state: state["page"] == PAGE_APPS
+        and state["view"] == VIEW_WORKOUT,
+        4.0,
+        "Workout view",
+    )
 
 
 def open_history(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
     click(console, evidence_dir, "open-history", local_point(246, 157))
     child.pump(1.0)
+    wait_for_state(
+        child,
+        lambda state: state["page"] == PAGE_APPS
+        and state["view"] == VIEW_HISTORY,
+        4.0,
+        "History view",
+    )
 
 
 def inject_motion(console: Any, evidence_dir: Path, index: int) -> None:
@@ -352,6 +374,12 @@ class Boot:
             b"smart_band: UI ready", transcript_start, self.args.command_timeout
         )
         self.child.pump(self.args.ui_settle_seconds)
+        wait_for_state(
+            self.child,
+            lambda state: state["view"] == VIEW_NONE,
+            4.0,
+            f"boot {self.index} diagnostics",
+        )
 
     def storage_listing(self, suffix: str) -> str:
         if self.child is None:

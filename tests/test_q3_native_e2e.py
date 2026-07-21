@@ -45,6 +45,8 @@ class Q3NativeHarnessTest(unittest.TestCase):
         self.assertIsNotNone(parsed)
         assert parsed is not None
         self.assertEqual(parsed["state"], Q3.STATE_PAUSED)
+        self.assertEqual(parsed["page"], Q3.PAGE_APPS)
+        self.assertEqual(parsed["view"], Q3.VIEW_WORKOUT)
         self.assertEqual(parsed["steps"], 7)
         self.assertEqual(parsed["objects"], 88)
         self.assertIsNone(Q3.parse_q3_marker(line.replace(" objects=88", "")))
