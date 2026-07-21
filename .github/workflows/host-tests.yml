@@ -167,6 +167,29 @@ jobs:
       - name: Compile and run watch face registry tests
         run: python tests/test_watch_face_registry.py
 
+  production-watch-face-settings:
+    name: Watch face settings (${{ matrix.os }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Compile and run watch face settings tests
+        run: python tests/test_watch_face_settings.py
+
   production-w1-pure-cores:
     name: ${{ matrix.target.name }} (${{ matrix.toolchain.os }}, ${{ matrix.toolchain.compiler }})
     strategy:
@@ -297,8 +320,12 @@ jobs:
             logic/notification_model.c \
             logic/notification_demo.c \
             logic/power_policy.c \
+            logic/watch_face_settings.c \
             ui/lvgl/components.c \
+            ui/lvgl/watch_face_picker.c \
+            ui/lvgl/faces/activity_face.c \
             ui/lvgl/faces/lotus_face.c \
+            ui/lvgl/faces/minimal_face.c \
             ui/lvgl/faces/watch_face_registry.c \
             ui/lvgl/watch_pages.c; do
             grep -q "$source" openvela_app/smart_band/CMakeLists.txt

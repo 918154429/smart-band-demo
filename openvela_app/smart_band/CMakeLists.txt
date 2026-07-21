@@ -21,6 +21,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     logic/notification_model.c
     logic/notification_demo.c
     logic/power_policy.c
+    logic/watch_face_settings.c
     sensor_bridge.c
     services/event_queue.c
     services/event_inbox.c
@@ -37,7 +38,10 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     platform/storage/storage_fault.c
     app_lvgl.c
     ui/lvgl/components.c
+    ui/lvgl/watch_face_picker.c
+    ui/lvgl/faces/activity_face.c
     ui/lvgl/faces/lotus_face.c
+    ui/lvgl/faces/minimal_face.c
     ui/lvgl/faces/watch_face_registry.c
     ui/lvgl/watch_pages.c
     icon_assets.c

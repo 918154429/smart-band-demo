@@ -1,12 +1,16 @@
 #include "smart_band_watch_face.h"
 
+#include "activity_face.h"
 #include "lotus_face.h"
+#include "minimal_face.h"
 
 #include <string.h>
 
 static const smart_band_watch_face_descriptor_t *const g_registry[] =
 {
-  &smart_band_lotus_face
+  &smart_band_lotus_face,
+  &smart_band_activity_face,
+  &smart_band_minimal_face
 };
 
 size_t smart_band_watch_face_registry_count(void)

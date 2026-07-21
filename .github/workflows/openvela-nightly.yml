@@ -369,7 +369,8 @@ jobs:
               --evidence-dir "$EVIDENCE_DIR" \
               --skin xiaomi_smart_band_8_pro \
               --screenshot-width 336 \
-              --screenshot-height 480
+              --screenshot-height 480 \
+              --exercise-watch-face-picker
 
       - name: Compare compact Lotus to the pre-migration native reference
         shell: bash

@@ -21,7 +21,9 @@ SOURCES = [
     APP_DIR / "watch_model.c",
     APP_DIR / "icon_assets.c",
     APP_DIR / "ui" / "lvgl" / "components.c",
+    APP_DIR / "ui" / "lvgl" / "faces" / "activity_face.c",
     APP_DIR / "ui" / "lvgl" / "faces" / "lotus_face.c",
+    APP_DIR / "ui" / "lvgl" / "faces" / "minimal_face.c",
     APP_DIR / "ui" / "lvgl" / "faces" / "watch_face_registry.c",
 ]
 
