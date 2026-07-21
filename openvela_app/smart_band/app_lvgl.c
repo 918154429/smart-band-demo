@@ -7,6 +7,7 @@
 #include "icon_assets.h"
 #include "smart_band_runtime.h"
 #include "smart_band_storage_backend.h"
+#include "smart_band_watch_face.h"
 #include "ui/lvgl/components.h"
 #include "ui/lvgl/watch_pages.h"
 
@@ -25,6 +26,7 @@ typedef struct
   lv_obj_t *watch;
   lv_obj_t *screen;
   smart_band_ui_components_t components;
+  smart_band_watch_face_instance_t watch_face;
   smart_band_watch_pages_t watch_pages;
 
   lv_obj_t *dots[SMART_BAND_PAGE_COUNT];
@@ -181,9 +183,14 @@ static lv_obj_t *create_page(lv_obj_t *parent)
 
 static int create_face_page(void)
 {
-  return smart_band_watch_pages_build_face(&g_ui.watch_pages, g_ui.screen,
-                                           &g_ui.components,
-                                           g_ui.compact_band);
+  smart_band_watch_face_config_t config;
+
+  config.screen_width = g_ui.screen_w;
+  config.screen_height = g_ui.screen_h;
+  config.compact_band = g_ui.compact_band;
+  return smart_band_watch_face_mount(
+    &g_ui.watch_face, smart_band_watch_face_registry_default(), g_ui.screen,
+    &config);
 }
 
 static int create_heart_page(void)
@@ -606,7 +613,8 @@ static int create_ui_tree(lv_obj_t *root)
         }
 
       enable_touch_navigation(g_ui.screen);
-      enable_touch_navigation_tree(g_ui.watch_pages.face_page);
+      enable_touch_navigation_tree(
+        smart_band_watch_face_root(&g_ui.watch_face));
       enable_touch_navigation_tree(g_ui.watch_pages.heart_page);
       enable_touch_navigation_tree(g_ui.watch_pages.steps_page);
       enable_touch_navigation_tree(g_ui.apps_launcher);
@@ -663,7 +671,7 @@ static int create_ui_tree(lv_obj_t *root)
     }
 
   enable_touch_navigation(g_ui.screen);
-  enable_touch_navigation_tree(g_ui.watch_pages.face_page);
+  enable_touch_navigation_tree(smart_band_watch_face_root(&g_ui.watch_face));
   enable_touch_navigation_tree(g_ui.watch_pages.heart_page);
   enable_touch_navigation_tree(g_ui.watch_pages.steps_page);
   enable_touch_navigation_tree(g_ui.apps_launcher);
@@ -700,8 +708,8 @@ static void set_page_visible(lv_obj_t *page, bool visible)
 
 static void update_page_visibility(void)
 {
-  set_page_visible(g_ui.watch_pages.face_page,
-                   g_ui.runtime.model.page == SMART_BAND_PAGE_FACE);
+  smart_band_watch_face_set_visible(
+    &g_ui.watch_face, g_ui.runtime.model.page == SMART_BAND_PAGE_FACE);
   set_page_visible(g_ui.watch_pages.heart_page,
                    g_ui.runtime.model.page == SMART_BAND_PAGE_HEART);
   set_page_visible(g_ui.watch_pages.steps_page,
@@ -726,8 +734,7 @@ static void switch_to_page(smart_band_page_t page)
 
 static void update_face(void)
 {
-  smart_band_watch_pages_render_face(&g_ui.watch_pages, &g_ui.components,
-                                     &g_ui.runtime.model, g_ui.compact_band);
+  smart_band_watch_face_render(&g_ui.watch_face, &g_ui.runtime.model);
 }
 
 static void update_heart_detail(void)
@@ -1008,6 +1015,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
   if (create_ui_tree(owned_root) != 0)
     {
+      smart_band_watch_face_unmount(&g_ui.watch_face);
       smart_band_runtime_deinit(&g_ui.runtime);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
@@ -1017,6 +1025,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   g_ui.timer = lv_timer_create(timer_cb, 1000, NULL);
   if (g_ui.timer == NULL)
     {
+      smart_band_watch_face_unmount(&g_ui.watch_face);
       smart_band_runtime_deinit(&g_ui.runtime);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
@@ -1037,6 +1046,7 @@ void smart_band_lvgl_destroy(void)
     }
 
   smart_band_runtime_deinit(&g_ui.runtime);
+  smart_band_watch_face_unmount(&g_ui.watch_face);
 
   if (g_ui.root != NULL)
     {

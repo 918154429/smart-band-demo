@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import os
 import re
 import select
 import signal
+import shutil
 import socket
+import struct
 import subprocess
 import sys
 import time
@@ -53,6 +56,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--settle-seconds", type=float, default=10.0)
     parser.add_argument("--stability-seconds", type=float, default=5.0)
     parser.add_argument("--console-port", type=int, default=5554)
+    parser.add_argument("--skin", default="xiaomi_smart_screen_10")
+    parser.add_argument("--screenshot-width", type=int)
+    parser.add_argument("--screenshot-height", type=int)
     return parser.parse_args()
 
 
@@ -147,6 +153,50 @@ def validate_runtime_inputs(emulator_script: Path, output_dir: Path) -> None:
     for required in required_inputs:
         if not required.is_file() or required.stat().st_size == 0:
             raise SmokeFailure(f"required emulator input is missing or empty: {required}")
+
+
+def png_dimensions(path: Path) -> tuple[int, int]:
+    header = path.read_bytes()[:24]
+    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SmokeFailure(f"screenshot is not a PNG: {path}")
+    if header[12:16] != b"IHDR":
+        raise SmokeFailure(f"screenshot has no leading IHDR chunk: {path}")
+    return struct.unpack(">II", header[16:24])
+
+
+def capture_screenshot(
+    console: EmulatorConsole,
+    evidence_dir: Path,
+    expected_width: int,
+    expected_height: int,
+) -> dict[str, object]:
+    capture_dir = evidence_dir / "raw-watch-face"
+    capture_dir.mkdir()
+    response = console.command(
+        f"screenrecord screenshot {capture_dir}",
+        "emulator-console-screenshot.txt",
+    )
+    candidates = sorted(capture_dir.rglob("*.png"))
+    if len(candidates) != 1:
+        raise SmokeFailure(
+            f"expected one watch-face screenshot, found {len(candidates)}"
+        )
+    destination = evidence_dir / "watch-face.png"
+    shutil.copy2(candidates[0], destination)
+    width, height = png_dimensions(destination)
+    if (width, height) != (expected_width, expected_height):
+        raise SmokeFailure(
+            f"unexpected screenshot size {width}x{height}; "
+            f"expected {expected_width}x{expected_height}"
+        )
+    return {
+        "path": str(destination),
+        "bytes": destination.stat().st_size,
+        "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
+        "width": width,
+        "height": height,
+        "console_ok": re.search(r"(?:^|\r?\n)OK\r?\n?$", response) is not None,
+    }
 
 
 class PtyChild:
@@ -418,6 +468,14 @@ def log_tail(path: Path, line_count: int = 80) -> str:
 
 def main() -> int:
     args = parse_args()
+    if (args.screenshot_width is None) != (args.screenshot_height is None):
+        raise SmokeFailure(
+            "--screenshot-width and --screenshot-height must be provided together"
+        )
+    if args.screenshot_width is not None and (
+        args.screenshot_width <= 0 or args.screenshot_height <= 0
+    ):
+        raise SmokeFailure("screenshot dimensions must be positive")
     root = args.openvela_root.resolve()
     output_dir = resolve_under(root, args.output_dir).resolve()
     evidence_dir = args.evidence_dir.resolve()
@@ -439,6 +497,8 @@ def main() -> int:
     validate_runtime_inputs(emulator_script, output_dir)
     if not skin_dir.is_dir():
         raise SmokeFailure(f"emulator skin directory is missing: {skin_dir}")
+    if not (skin_dir / args.skin).is_dir():
+        raise SmokeFailure(f"emulator skin is missing: {skin_dir / args.skin}")
     if not qemu_headless.is_file() or not os.access(qemu_headless, os.X_OK):
         raise SmokeFailure(f"headless aarch64 QEMU binary is missing: {qemu_headless}")
 
@@ -469,7 +529,7 @@ def main() -> int:
         "-port",
         str(args.console_port),
         "-skin",
-        "xiaomi_smart_screen_10",
+        args.skin,
         "-skindir",
         str(skin_dir),
     ]
@@ -548,6 +608,15 @@ def main() -> int:
         if "smart_band: UI ready" not in app_output:
             raise SmokeFailure("smart_band did not report successful LVGL UI creation")
 
+        screenshot = None
+        if args.screenshot_width is not None:
+            screenshot = capture_screenshot(
+                console,
+                evidence_dir,
+                args.screenshot_width,
+                args.screenshot_height,
+            )
+
         pid_output_1 = child.send_command(
             "pidof smart_band",
             prompt,
@@ -592,6 +661,8 @@ def main() -> int:
             "boot_seconds": round(boot_seconds, 3),
             "app_ui_ready_seconds": round(app_ui_ready_seconds, 3),
             "console_port": args.console_port,
+            "skin": args.skin,
+            "screenshot": screenshot,
             "nsh_prompt": prompt_text,
             "initial_pids": pids_1,
             "stable_pids": pids_2,

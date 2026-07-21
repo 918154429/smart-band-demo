@@ -29,6 +29,30 @@ DEFAULT_OUTPUT_DIR = "cmake_out/vela_goldfish-arm64-v8a-ap"
 RUNTIME_INPUTS = (".config", "nuttx", "vela_system.bin", "vela_data.bin")
 EXPECTED_WIDTH = 1280
 EXPECTED_HEIGHT = 800
+WATCH_FACE_REFERENCE = (
+    ROOT / "docs" / "evidence" / "q1v-native-e2e-watch-face-20260720.png"
+)
+WATCH_FACE_DYNAMIC_MASKS = {
+    "battery": (700, 60, 805, 92),
+    "date": (570, 125, 710, 158),
+    "time": (570, 175, 725, 245),
+    "sleep_value": (595, 377, 725, 407),
+    "heart_value": (595, 472, 725, 502),
+    "stress_value": (595, 567, 725, 597),
+    "weather_value": (595, 662, 725, 692),
+}
+COMPACT_WATCH_FACE_REFERENCE = (
+    ROOT / "docs" / "evidence" / "w1-reference-native-compact-q1c-20260721.png"
+)
+COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
+    "battery": (235, 13, 319, 29),
+    "date": (111, 62, 226, 79),
+    "time": (104, 85, 243, 115),
+    "sleep_value": (135, 219, 225, 237),
+    "heart_value": (135, 283, 225, 305),
+    "stress_value": (135, 348, 225, 366),
+    "weather_value": (135, 413, 225, 431),
+}
 PAGE_TRANSITION_REGION = (470, 210, 810, 660)
 PAGE_TITLE_REGION = (570, 165, 710, 200)
 HEART_VALUE_REGION = (550, 330, 790, 390)
@@ -61,10 +85,13 @@ REQUIRED_CHECKS = (
     "uorb_heart_node",
     "console_ping",
     "watch_face_png",
+    "watch_face_static_masked_golden",
     "swipe_console_ok",
+    "first_swipe_reached_heart_rate",
     "heart_model_png",
     "page_transition_pixels",
     "heart_page_title_golden",
+    "structured_page_id",
     "sensor_enabled",
     "sensor_set_console_ok",
     "sensor_get_104",
@@ -488,6 +515,73 @@ def region_difference(
             channel_delta_total / (total_pixels * 3), 6
         ),
         "max_channel_delta": max_channel_delta,
+    }
+
+
+def masked_image_difference(
+    reference: PngImage,
+    candidate: PngImage,
+    masks: dict[str, tuple[int, int, int, int]],
+) -> dict[str, Any]:
+    if (reference.width, reference.height) != (candidate.width, candidate.height):
+        raise NativeE2EFailure("cannot compare masked images with different dimensions")
+
+    width = reference.width
+    height = reference.height
+    ignored = bytearray(width * height)
+    mask_records = []
+    for name, region in masks.items():
+        left, top, right, bottom = region
+        if not (0 <= left < right <= width and 0 <= top < bottom <= height):
+            raise NativeE2EFailure(f"invalid watch-face mask {name}: {region}")
+        for y in range(top, bottom):
+            start = y * width + left
+            ignored[start : start + right - left] = b"\x01" * (right - left)
+        mask_records.append({"name": name, "region": list(region)})
+
+    changed = 0
+    channel_delta_total = 0
+    max_channel_delta = 0
+    mismatch_bounds: list[int] | None = None
+    for pixel_index, is_ignored in enumerate(ignored):
+        if is_ignored:
+            continue
+        offset = pixel_index * 4
+        first = reference.pixels[offset : offset + 4]
+        second = candidate.pixels[offset : offset + 4]
+        if first != second:
+            changed += 1
+            x = pixel_index % width
+            y = pixel_index // width
+            if mismatch_bounds is None:
+                mismatch_bounds = [x, y, x + 1, y + 1]
+            else:
+                mismatch_bounds[0] = min(mismatch_bounds[0], x)
+                mismatch_bounds[1] = min(mismatch_bounds[1], y)
+                mismatch_bounds[2] = max(mismatch_bounds[2], x + 1)
+                mismatch_bounds[3] = max(mismatch_bounds[3], y + 1)
+        for channel in range(4):
+            delta = abs(first[channel] - second[channel])
+            channel_delta_total += delta
+            max_channel_delta = max(max_channel_delta, delta)
+
+    masked_pixels = sum(ignored)
+    compared_pixels = width * height - masked_pixels
+    return {
+        "width": width,
+        "height": height,
+        "masks": mask_records,
+        "masked_pixels": masked_pixels,
+        "compared_pixels": compared_pixels,
+        "compared_ratio": round(compared_pixels / (width * height), 6),
+        "changed_pixels": changed,
+        "changed_ratio": round(changed / compared_pixels, 9),
+        "mean_absolute_rgba_delta": round(
+            channel_delta_total / (compared_pixels * 4), 9
+        ),
+        "max_channel_delta": max_channel_delta,
+        "mismatch_bounds": mismatch_bounds,
+        "exact_match_outside_masks": changed == 0,
     }
 
 
@@ -957,6 +1051,25 @@ def run_journey(args: argparse.Namespace) -> int:
             watch_record["console_ok"] and watch_record["nonblank"],
             "watch-face screenshot failed validation",
         )
+        reference_image = decode_png_rgba(WATCH_FACE_REFERENCE)
+        watch_comparison = masked_image_difference(
+            reference_image, watch_image, WATCH_FACE_DYNAMIC_MASKS
+        )
+        watch_comparison.update(
+            {
+                "reference_path": str(WATCH_FACE_REFERENCE),
+                "reference_sha256": sha256_file(WATCH_FACE_REFERENCE),
+                "candidate_path": watch_record["path"],
+                "candidate_sha256": watch_record["sha256"],
+            }
+        )
+        journey["watch_face_masked_comparison"] = watch_comparison
+        require_check(
+            checks,
+            "watch_face_static_masked_golden",
+            watch_comparison["exact_match_outside_masks"],
+            "Lotus watch face changed outside reviewed dynamic masks",
+        )
         checkpoint("swipe")
 
         swipe_attempts = []
@@ -1008,6 +1121,26 @@ def run_journey(args: argparse.Namespace) -> int:
                 break
         journey["console"]["swipe_attempts"] = swipe_attempts
         journey["console"]["swipe"] = swipe_attempts[-1]["commands"]
+        first_swipe_ok = bool(
+            swipe_attempts and swipe_attempts[0]["title_golden"]["matches"]
+        )
+        journey["structured_page"] = {
+            "id": "heart_rate" if first_swipe_ok else "unknown",
+            "source": "reviewed Heart Rate title ROI after first swipe",
+            "passed": first_swipe_ok,
+        }
+        require_check(
+            checks,
+            "first_swipe_reached_heart_rate",
+            first_swipe_ok,
+            "the first horizontal swipe did not reach Heart Rate",
+        )
+        require_check(
+            checks,
+            "structured_page_id",
+            journey["structured_page"]["id"] == "heart_rate",
+            "structured native page ID is not heart_rate",
+        )
         require_check(
             checks,
             "swipe_console_ok",

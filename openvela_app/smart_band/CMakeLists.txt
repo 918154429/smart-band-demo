@@ -16,6 +16,11 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     logic/calculator_model.c
     logic/game_2048_model.c
     logic/mines_model.c
+    logic/step_normalizer.c
+    logic/workout_model.c
+    logic/notification_model.c
+    logic/notification_demo.c
+    logic/power_policy.c
     sensor_bridge.c
     services/event_queue.c
     services/event_inbox.c
@@ -24,6 +29,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     services/runtime.c
     services/storage_codec.c
     services/store.c
+    services/sync_protocol.c
     platform/platform_noop.c
     platform/loopback/sync_loopback.c
     platform/storage/storage_memory.c
@@ -31,6 +37,8 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     platform/storage/storage_fault.c
     app_lvgl.c
     ui/lvgl/components.c
+    ui/lvgl/faces/lotus_face.c
+    ui/lvgl/faces/watch_face_registry.c
     ui/lvgl/watch_pages.c
     icon_assets.c
     smart_band_apps.c

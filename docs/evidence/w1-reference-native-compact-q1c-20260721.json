@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "purpose": "pre-migration compact Lotus native reference for W1-I",
+  "captured_at_utc": "2026-07-21T07:54:02.776590857Z",
+  "source_gate": "Q1-C",
+  "source_openvela_root": "/data/smart-band-q1c-20260720T223937CST/openvela",
+  "source_nuttx_sha256": "88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912",
+  "isolated_runtime_copy": "/data/smart-band-w1-integration-20260721/reference-compact-q1c-runtime",
+  "skin": "xiaomi_smart_band_8_pro",
+  "width": 336,
+  "height": 480,
+  "app_ui_ready_seconds": 0.665,
+  "initial_pids": [13],
+  "stable_pids": [13],
+  "screenshot": {
+    "path": "w1-reference-native-compact-q1c-20260721.png",
+    "bytes": 29761,
+    "sha256": "f573eb822f7d33fb43ccddc46e8046c92925cd91ee194ab022a103df83fb9ba7"
+  },
+  "passed": true
+}

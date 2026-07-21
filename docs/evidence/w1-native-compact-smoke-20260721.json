@@ -1,0 +1,24 @@
+{
+  "app_ui_ready_seconds": 0.238,
+  "boot_seconds": 0.557,
+  "console_port": 5554,
+  "initial_pids": [
+    13
+  ],
+  "nsh_prompt": "goldfish-armv8a-ap> ",
+  "screenshot": {
+    "bytes": 29230,
+    "console_ok": true,
+    "height": 480,
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face.png",
+    "sha256": "3331af8756023429e7ee7997aadcf1828f0a2e63878be5bed69e5b5b565d2fcb",
+    "width": 336
+  },
+  "settle_seconds": 10.0,
+  "skin": "xiaomi_smart_band_8_pro",
+  "stability_seconds": 5.0,
+  "stable_pids": [
+    13
+  ],
+  "status": "passed"
+}
