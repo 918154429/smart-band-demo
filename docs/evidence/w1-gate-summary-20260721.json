@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "gate": "W1-I",
+  "status": "passed",
+  "completed_at": "2026-07-21T17:11:21+08:00",
+  "integration_source_commit": "298a5c0aa45968b341739c3d1c5a3c103f84e2eb",
+  "leaf_commits": {
+    "W1-T1": "dca540a2905ddb83ed9261c61722d5fe1261d8d9",
+    "W1-T2": "4533e741e1312dccb8b21a0bc465edfbbe0104ce",
+    "W1-T3": "dca876cfdd0d250ba69670fafa06f0ed7c34357f",
+    "W1-T4": "02088eed1dc6304b2ae96cf0cec836cdae679695",
+    "W1-T5": "4352778db03eafa2d02018b2d8f02d0cf865ea92"
+  },
+  "ownership_audit_passed": true,
+  "linux_coverage": {
+    "source_commit": "e7df36e218a19e1652fd8b59d9b924f3a5e5fa3e",
+    "root": "/data/smart-band-w1-integration-20260721",
+    "overall": {
+      "covered_lines": 2945,
+      "total_lines": 3134,
+      "percent": 94.0,
+      "required_percent": 85.0
+    },
+    "new_production_sources": {
+      "logic/step_normalizer.c": 99.0,
+      "logic/workout_model.c": 97.6,
+      "logic/notification_model.c": 99.0,
+      "logic/notification_demo.c": 100.0,
+      "logic/power_policy.c": 99.5,
+      "services/sync_protocol.c": 100.0
+    },
+    "required_each_percent": 90.0,
+    "passed": true
+  },
+  "pr_ci": {
+    "pull_request": 11,
+    "host_run_id": 29816173199,
+    "browser_run_id": 29816173171,
+    "passed": true
+  },
+  "fresh_openvela_ci": {
+    "run_id": 29816300149,
+    "source_commit": "298a5c0aa45968b341739c3d1c5a3c103f84e2eb",
+    "artifact": "openvela-fixed-release-29816300149",
+    "artifact_size_bytes": 23861899,
+    "artifact_digest": "sha256:554fac66d9165ad48ae765a25adef855527eb762c78a8c3705076bcf97a11823",
+    "resolved_projects": 214,
+    "artifacts": {
+      "nuttx": {
+        "bytes": 66114392,
+        "sha256": "61aa4877b597bd956e2ab4b34a2dcc913940979362279ffcf9c94f13a39ec051"
+      },
+      ".config": {
+        "bytes": 103975,
+        "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10",
+        "storage_path": ""
+      },
+      "vela_system.bin": {
+        "bytes": 1024,
+        "sha256": "f600f2ed0a4000ae2b96e6ea8d12fa2eff72884c3d95e48161b154c2ed28235f"
+      },
+      "vela_data.bin": {
+        "bytes": 268435456,
+        "sha256": "35044e5a05d861094d2ab0f4c24b67e3b71d91f964249ee45f6e0a4be1a75063"
+      }
+    },
+    "passed": true
+  },
+  "native": {
+    "compact": {
+      "resolution": [336, 480],
+      "compared_pixels": 146971,
+      "compared_ratio": 0.911279,
+      "changed_pixels": 0,
+      "passed": true
+    },
+    "framed": {
+      "resolution": [1280, 800],
+      "compared_pixels": 989570,
+      "compared_ratio": 0.966377,
+      "changed_pixels": 0,
+      "first_swipe_attempts": 1,
+      "structured_page_id": "heart_rate",
+      "value_bpm": 104,
+      "source": "sensor",
+      "freshness": "fresh",
+      "journey_sha256": "ad2439e15795b254854dd6dcc774d92ca5edefa123a38d353f64220aabb474a3",
+      "cleanup_passed": true,
+      "passed": true
+    }
+  },
+  "preserved_failed_openvela_runs": [
+    29812790986,
+    29814087721,
+    29815208311
+  ],
+  "completed_slices": [
+    "Q2 registry and Lotus migration",
+    "Q3-1 step normalizer and workout pure core",
+    "Q4-1 notification pure core",
+    "Q5-1 power policy pure core",
+    "Q6-1 envelope codec core"
+  ],
+  "product_gates_remaining_red": ["Q2", "Q3-B", "Q3-D", "Q4-C", "Q5-E", "Q6-F"]
+}

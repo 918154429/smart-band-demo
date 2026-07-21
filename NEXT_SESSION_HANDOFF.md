@@ -2,8 +2,8 @@
 
 更新时间：2026-07-21（Asia/Shanghai）
 
-> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1-V、Q1-C、Q1-S
-> 已全绿；下一独立切片只做 Q2 第一段：表盘 registry 与现有 Lotus 表盘迁移。
+> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1-V、Q1-C、Q1-S 与
+> W1 汇总 Gate 已全绿；下一主线切片做 Q2 第二段：Activity、Minimal、picker/settings。
 
 ## 1. 仓库、权限与边界
 
@@ -11,6 +11,7 @@
 - GitHub：<https://github.com/918154429/smart-band-demo>
 - 默认分支：`master`
 - Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)，已正常合并。
+- W1 integration PR：[PR11](https://github.com/918154429/smart-band-demo/pull/11)。
 - Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`；最终证据提交：`9172aef`。
 - 当前 master 合并基线：`7a99c8a19049d4a7f06538424e10df66e0a3d2ee`。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
@@ -110,7 +111,41 @@ Q1-C central runtime、事件、时钟、能力、platform adapters 与 fake LVG
 - `docs/q1s-versioned-storage-20260721.md`
 - `docs/evidence/q1s-gate-summary-20260721.json`
 
-## 4. 证据边界
+## 4. W1 第一波完成
+
+五个叶子提交已通过所有权审计并按 T1 -> T5 汇入。完成范围：
+
+- Q2 registry/Lotus lifecycle 与实际 UI 路径。
+- Q3-1 step normalizer 与 Walk/Run pure model。
+- Q4-1 fixed notification queue/demo pure model。
+- Q5-1 ACTIVE/DIMMED/SCREEN_OFF pure policy。
+- Q6-1 stateless v1 envelope codec、CRC 与 golden vector。
+
+独立 Linux coverage 在 `/data/smart-band-w1-integration-20260721`：overall
+`94.0% (2945/3134)`，六个新生产源分别 `97.6%` 到 `100%`，全部 `>=90%`。最终 Host
+run `29816173199`、Browser run `29816173171` 全绿。
+
+最终 fixed openvela run：
+<https://github.com/918154429/smart-band-demo/actions/runs/29816300149>
+
+- source：`298a5c0aa45968b341739c3d1c5a3c103f84e2eb`
+- artifact：`openvela-fixed-release-29816300149`，`23,861,899` bytes
+- digest：`sha256:554fac66d9165ad48ae765a25adef855527eb762c78a8c3705076bcf97a11823`
+- NuttX：`66,114,392` bytes，SHA-256
+  `61aa4877b597bd956e2ab4b34a2dcc913940979362279ffcf9c94f13a39ec051`
+- compact `336x480` mask 外 91.13% 像素零差异。
+- framed `1280x800` mask 外 96.64% 像素零差异；第一次横滑进入 `heart_rate`，
+  `104 bpm`/`Source / Sensor` 与 cleanup 全通过。
+
+完整说明与结构化结论：
+
+- `docs/w1-first-wave-integration-20260721.md`
+- `docs/evidence/w1-gate-summary-20260721.json`
+- `docs/evidence/w1-native-journey-20260721.json`
+
+失败 run `29812790986`、`29814087721`、`29815208311` 及对应 PNG/JSON 均保留。
+
+## 5. 证据边界
 
 - host memory/file fault model 不是真实掉电介质，不证明目标板文件系统原子性、目录项持久化
   或 power-loss durability。
@@ -119,24 +154,18 @@ Q1-C central runtime、事件、时钟、能力、platform adapters 与 fake LVG
 - storage load 在 UI tree 创建前同步执行；已证明 returned error 不会中止初始化，但没有
   证明慢或永久阻塞 backend 的时延隔离。backend 必须有界、可响应。
 - degraded 状态在 store 中可观测，本切片未添加用户提示或运行日志遥测。
-- native sensor stale/TTL、全页面/全应用像素、第二分辨率、长时 soak 和所有真机能力仍未证明。
+- Lotus compact/framed 已证明；其他页面/应用 native 像素、sensor stale/TTL、长时 soak 和
+  所有真机能力仍未证明。
 
-## 5. 下一独立切片：Q2 第一段
+## 6. 下一独立切片：Q2 第二段
 
-若采用多对话并行开发，必须先读取 `docs/parallel/README.md`。第一波最多同时启动五个
-独立 worktree：Q2 registry/Lotus 为唯一 UI owner，Q3-Q6 只做互不接线的纯 C core；统一
-接线和 native/openvela Gate 必须等待五个实现对话停止写入后再单独执行。
+1. 在现有 registry/lazy lifecycle 上新增 Activity 与 Minimal，Lotus 保持默认。
+2. 实现 picker、长按入口、手势仲裁和 100 次用户可见切换压力。
+3. 复用 Q1-S store 保存 selected face，覆盖损坏/旧版本/写失败回退。
+4. 补 GCC/Clang/MSVC、fake LVGL failure sweep、compact/framed native picker journey。
 
-只做表盘 registry 与现有 Lotus 表盘迁移：
-
-1. 冻结现有 Lotus UI 的结构化状态、交互与 native golden。
-2. 定义 `watch_face_ops_t`、descriptor/registry 和受 runtime 管理的 lifecycle。
-3. 把现有表盘实现原样迁入 `face_lotus.c`，保持页面顺序、手势和渲染结果。
-4. 使用 host/fake LVGL 覆盖 mount/unmount、失败回滚、重试和资源零净增长。
-5. 用既有 native harness 证明 Lotus 零视觉与行为回归。
-
-明确不做：Activity、Minimal、picker、settings UI、Workout、History、通知、power、BLE 或其他
-A-G 功能。Q2 后续 settings 必须复用 Q1-S store，不建立第二套持久化。
+本切片不接 Workout、History、notification、power 或 BLE。Q3-Q6 下一 adapter/service/UI
+对话必须消费已冻结 pure core，不另写第二套模型。
 
 下一会话开场：
 
