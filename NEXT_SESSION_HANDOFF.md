@@ -2,162 +2,137 @@
 
 更新时间：2026-07-21（Asia/Shanghai）
 
-> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1-V、Q1-C 已完成；
-> 下一独立切片只做 Q1-S versioned storage/fault backend，不得提前实现 A-G 功能。
+> 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1-V、Q1-C、Q1-S
+> 已全绿；下一独立切片只做 Q2 第一段：表盘 registry 与现有 Lotus 表盘迁移。
 
 ## 1. 仓库、权限与边界
 
 - 本地仓库：`E:\C_Moved_From_C\Users\Lenovo\Desktop\schoolwork\smart-band-demo`
 - GitHub：<https://github.com/918154429/smart-band-demo>
 - 默认分支：`master`
-- Q1-C PR：[PR9](https://github.com/918154429/smart-band-demo/pull/9)，功能/证据提交
-  `5408b86`，merge commit `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
+- Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)
+- Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`。
+- 本文件写入时 PR10 尚待最终证据文档提交和正常合并；合并后必须把此处更新为实际
+  merge commit，不能把 feature commit 当成 master 基线。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
   提交、推送、创建/更新/合并 PR。强制推送、历史改写、删除远端分支/标签和正式 release
   仍需当次明确指示。
-- 当前会话允许子智能体，最多五个，且最多二级委派；该额度和指令不自动延续到新会话，
-  以用户最新指令为准。
+- 当前会话允许子智能体，最多五个，且最多二级委派；额度和指令不自动延续到新会话。
 - 视频、比赛平台提交和正式发布不属于工程路线。
 - 开发板型号/revision 未确认；未经逐次明确批准不得烧录、写 flash 或更改 bootloader。
 
 若使用远端 Ubuntu，所有新工作必须留在 `/data`。不得访问 `/data/codex-audit`、
 `/data/lxd-storage`、`/data/lost+found` 或旧 `/home/ubuntu/...` 项目树。
 
-## 2. 已合并历史
+## 2. 已完成基线
 
-PR1-PR8 已闭环生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实
-openvela build/native smoke 和独立 simulator 证据。最近既有合并基线为：
+PR1-PR9 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
+build/native smoke 和独立 simulator 证据。Q1-C 既有 master 基线为
+`5805fbd`，其中 Q1-C merge commit 为 `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
 
-| PR | Merge commit | 内容 |
-| --- | --- | --- |
-| PR7 | `a41d076c3822165a69db1e48ad2b32c86a3fb09e` | 固定 emulator、NSH/native smoke、清理 |
-| PR8 | `1ddc533cb3096e541fe5cadaed810df39029ebc1` | 独立 simulator 复跑与 artifact 证据 |
+Q0 正式 20 次冷启动与 Q1-V native fresh sensor 证据仍见：
 
-路线图/远端 Q1-C 执行计划提交为 `2afca84`、`28bd52e`。Q0/Q1-V/Q1-C 由 PR9 收口，
-合并提交为 `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
+- `docs/q0-q1v-baseline-20260720.md`
+- `docs/evidence/q0-gate-summary-20260720.json`
+- `docs/evidence/q1v-native-journey-20260720.json`
 
-## 3. Q0 与 Q1-V 基线
-
-Q0 正式证据目录：
-
-```text
-/home/ubuntu/smart-band-sim-20260720-v1/evidence/q0-final-audited-20260720T2034CST
-```
-
-- 20/20 独立冷启动通过；`smart_band -> UI ready` p50 `0.8065s`、p95 `0.821s`、
-  max `0.828s`。
-- NuttX `65,913,280` bytes，SHA-256
-  `5f97a280c2478ab94116be111fecef63cd103ce0612ef14e5513933218091d58`。
-- 每轮输入隔离、run-id、进程/端口/暂存清理、artifact 前后不变和 evidence manifest
-  全部通过。
-
-Q1-V 正式证据目录：
-
-```text
-/home/ubuntu/smart-band-sim-20260720-v1/evidence/q1v-final-audited-20260720T2031CST
-```
-
-- native framebuffer 为 `1280x800` RGBA8；第一次 swipe 进入 Heart Rate。
-- 注入心率 `104` 后，`Heart Rate`、`104 bpm`、`Source / Sensor` 精确 golden ROI 匹配。
-- 结构化状态为 `page=heart_rate, value_bpm=104, source=sensor, freshness=fresh`。
-- 只证明 fresh 帧，不证明停止上报后的 stale/TTL fallback。
-
-本地紧凑证据与说明见 `docs/q0-q1v-baseline-20260720.md` 和 `docs/evidence/`。
-
-## 4. Q1-C 已完成
-
-### 架构与行为
-
-- `smart_band_runtime_t` 统一持有 model、sensor bridge、app registry、event queue/inbox、
-  clock、capabilities 和 platform adapters；周期顺序固定为 model -> sensor -> apps。
-- 主事件队列容量 16、无堆分配，支持 metrics 合并、优先级、同级 FIFO 和关键事件
-  淘汰最旧低优先级事件。
-- 外部 callback 只向带锁定长 inbox 投递；UI tick 排入主队列。runtime deinit 先停 sync
-  transport，再关闭 inbox。
-- 32-bit monotonic clock 可注入且支持 wrap；wall clock 可检测回拨。RTC 启动时无效不会
-  永久禁用能力，后续恢复后墙钟可重新有效。
-- dirty flags 实现 page-specific render，不再每秒无差别刷新所有页面。
-- storage、power、haptic、sync 接口均可注入；默认 explicit no-op。sync loopback 固定
-  `8 x 64` bytes，无堆分配。
-- fake LVGL 已支持对象树、递归清理、文本、flag、event、timer、虚拟 tick/wrap、live
-  counters 和第 N 次 object/timer 创建失败注入。
-- 没有加入 Q1-S codec/schema/CRC/A-B slot，也没有新增 A-G 用户功能。
-
-### 最终远端验证
-
-独立 run：
-
-```text
-/data/smart-band-q1c-20260720T223937CST
-```
-
-- 最终源码快照：`source-q1c-final`
-- 快照 SHA-256：`c2d7fa8757761c3fabbe29e9b7e2f5e37aa381789f90633144a8f44254ee26c3`
-- GCC/gcov `13.3.0` + `gcovr==8.6` 总覆盖率：`90.9%`，`1388/1527`。
-- 新生产源覆盖率：event queue `93.2%`、event inbox `100%`、clock `100%`、
-  capabilities `100%`、runtime `96.6%`、platform no-op `100%`、sync loopback `100%`。
-- compact/framed 主 UI 和全部 8 个 lazy app 的每一个创建调用失败点均验证清理和重试。
-- 1000 次 create/navigation/app mount/tick/back/destroy 后 object/event/timer 零净增长。
-- 214 个 openvela 项目全部固定 SHA；fresh 和 incremental build 均通过。
-- manifest `67df2c52308f2579ac50d0cd7413e7f0e092b83a`
-- `.claude` `ab5f8be8225ce25c2f808fae0085dbf2db8fadf4`
-- emulator `be9cdef6709c2a7aed547c3029d8872c58e5f3f9`
-- emulator tools `37f5024f1d9157b9778d0d9e739ee0fa68743d42`
-
-最终 artifact：
-
-| 文件 | SHA-256 |
-| --- | --- |
-| NuttX (`65,911,432` bytes) | `88d3242eb9605eff3891d5ae215b3ffede4f0f0c80276fa605e890b06770c912` |
-| `.config` | `54c2e65469974193053d057412671054e106c26334c750241d3946f73db13eb0` |
-| `vela_system.bin` | `77ace50ffd23ec79e68e258251bf6bd42697676c0789d5900b772aef7cf2c4bf` |
-| `vela_data.bin` | `8832ff31b9c4ede07a8c2277296c5348e3f37c064404f429aee2552d9874ab85` |
-
-Native E2E：
-
-```text
-/data/smart-band-q1c-20260720T223937CST/evidence/q1c-native-final
-```
-
-- `UI ready`：`0.780311s`。
-- 第一次 swipe 到 Heart Rate；`104 bpm` 与 `Source / Sensor` 精确 golden 匹配。
-- 应用、emulator/QEMU、端口 5700 和 runtime output 清理全部通过。
-
-本机最终矩阵：六组 MSVC `/W4 /WX` 生产 C/UI 门禁；emulator `4 passed + 1 skip`、
-Q0 `14 + 1`、native `13 + 1`，三个 skip 均为 Windows POSIX 预期跳过；Browser `6/6`；
-shell syntax/rollback 通过。
-
-紧凑证据：
+Q1-C central runtime、事件、时钟、能力、platform adapters 与 fake LVGL 证据见：
 
 - `docs/q1c-runtime-platform-20260720.md`
 - `docs/evidence/q1c-gate-summary-20260720.json`
-- `docs/evidence/q1c-native-journey-20260720.json`
-- `docs/evidence/q1c-native-heart-sensor-20260720.png`
 
-## 5. 尚未证明
+## 3. Q1-S 已完成
 
-- Q1-S 的版本化持久化、CRC、A/B slot、migration 和 storage fault recovery。
-- native sensor stale/TTL fallback。
-- 全页面/全部应用 native 像素与交互、第二分辨率和长时 native soak。
-- 两小时/八小时最终长稳。
-- 真机显示、触摸、RTC、存储、传感器、震动、BLE 与功耗。
+### 格式与 store
 
-Browser 仍只做设计参考，不能替代 native 或真机证据。
+- 固定 36-byte little-endian header，magic `SBST`、format `1.0`，最大 payload 512 bytes。
+- 显式 record type、schema major/minor、64-bit generation、header/payload IEEE CRC32；
+  不落盘裸 C struct，严格验证 frame 精确长度。
+- 每种 record 使用两个显式 object ID。commit 读取两槽、写另一槽、flush、回读验证。
+- 单槽损坏/缺失/不支持可回退；双槽损坏或同 generation 冲突降级默认值；不确定 read
+  error 在任何 write 之前终止；`UINT64_MAX` generation 拒绝继续提交。
+- migration 使用类型化 OK/unsupported/buffer-too-small/invalid 结果并校验输出长度。
 
-## 6. 下一独立切片：Q1-S only
+### backend 与 runtime
 
-目标：versioned storage codec 与 fault backend。建议顺序：
+- memory backend 固定 `16 x 4096` bytes，无堆分配。
+- file backend 映射 `object-%08x.bin`，单对象 4096 bytes，上限 16 个 dirty object，
+  `fsync/_commit` flush，不依赖 rename。
+- fault plan 支持第 N 次 EIO、ENOSPC、EROFS、短写、截断、腐坏和 interrupted mixed image。
+- runtime 拥有 store，启动加载固定 runtime-checkpoint A/B record；存储错误不会中止 UI
+  初始化。`LVX_DEMO_SMART_BAND_STORAGE_PATH` 为空时使用 no-op，非空目录必须预先存在。
+- 本切片没有新增任何 A-G 用户功能或历史 payload schema。
 
-1. 冻结 header、record type、schema version、CRC、generation 和 golden vectors。
-2. 实现 memory backend 与可测试 file backend，保持现有 `smart_band_storage_t` 接口。
-3. 采用 A/B slot；若使用 rename，必须先证明目标文件系统的原子语义。
-4. 覆盖短写、EIO、ENOSPC、EROFS、截断、CRC、旧版本、写中断和双槽损坏。
-5. 验证只读旧完整代或新完整代；单槽损坏回退，双槽损坏降级默认，失败不阻塞 UI。
-6. 新增纯逻辑生产代码每个源文件覆盖率 `>=90%`，再做 fake LVGL、Host、openvela 和
-   所需 native 回归。
+### 覆盖率与故障矩阵
 
-明确不做：表盘、Workout、History UI、通知、power policy、协议/BLE 或其他 A-G 功能。
-host memory/file backend 结果不得误报为真机文件系统原子性证据。
+独立 Linux 目录：
+
+```text
+/data/smart-band-q1s-20260721T132034CST
+```
+
+- 最终 coverage snapshot：`source-v6`
+- snapshot archive SHA-256：
+  `1c8fbe9a27793133ce604c29b2472c75509f46313e85acb9c5f07e7e056792ad`
+- coverage log：`evidence/coverage-v6.log`
+- overall `92.2% (2125/2305)`；codec `100%`、store `95.9%`、fault `93.3%`、memory
+  `93.5%`、file `91.4%`，每个 Q1-S 生产源文件均 `>=90%`。
+- 160 个逐字节 crash 切点覆盖空/已占用 inactive slot、generation zero、short write、
+  interrupted mixed image；另覆盖 EIO、ENOSPC、EROFS、truncate、CRC、迁移与读前写保护。
+- v2-v5 的 POSIX 声明、coverage runner 参数和 file coverage 失败证据已保留。
+
+### GitHub/openvela 最终证据
+
+第一次 fresh run `29805084515` 在 `0547953` 上失败：NuttX 已声明 `file_read/file_write`，
+与 file backend 静态回调冲突。失败 artifact 保留；修复提交 `a9d5a43` 改用
+`storage_file_*` 回调名。
+
+最终 run：<https://github.com/918154429/smart-band-demo/actions/runs/29806148523>
+
+- source commit：`a9d5a4326063c75dabea4d61c31152ba981b15a7`
+- 214 个 openvela project 全部解析为固定 SHA。
+- build、镜像链接校验、native smoke、清理、artifact 上传全部通过。
+- artifact：`openvela-fixed-release-29806148523`，`23,615,392` bytes。
+- artifact digest：
+  `sha256:cd24812b5eb4c681a5b03a27a06082a777edbd1d4460521dd9406faa02a3f9e4`
+- NuttX：`66,073,888` bytes，SHA-256
+  `b6605449990f01ab48c747c5e605ad4136eac7f8e1ef2dd6eb9831e282dff0dc`。
+- `.config` SHA-256：`e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10`。
+- `vela_system.bin`：
+  `c432a814d04355da298268dc6fc6caafecfbe7cd7ce0fe799deed8949c8614a6`。
+- `vela_data.bin`：
+  `9b4405cb8a1ab36f0cc852300d7810957f218566fd5072d4a80b39d667d685ee`。
+- native `UI ready`：`0.303s`；PID 13 在 5 秒检查后仍为 13；清理通过。
+- Host run `29806142043` 与 Browser run `29806142041` 全绿。
+
+紧凑证据：
+
+- `docs/q1s-versioned-storage-20260721.md`
+- `docs/evidence/q1s-gate-summary-20260721.json`
+
+## 4. 证据边界
+
+- host memory/file fault model 不是真实掉电介质，不证明目标板文件系统原子性、目录项持久化
+  或 power-loss durability。
+- 最终 openvela `.config` 的 `CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH=""`，因此 native
+  smoke 证明生产源码编译链接和默认 no-op 启动，不证明非空路径的写入/重启恢复。
+- storage load 在 UI tree 创建前同步执行；已证明 returned error 不会中止初始化，但没有
+  证明慢或永久阻塞 backend 的时延隔离。backend 必须有界、可响应。
+- degraded 状态在 store 中可观测，本切片未添加用户提示或运行日志遥测。
+- native sensor stale/TTL、全页面/全应用像素、第二分辨率、长时 soak 和所有真机能力仍未证明。
+
+## 5. 下一独立切片：Q2 第一段
+
+只做表盘 registry 与现有 Lotus 表盘迁移：
+
+1. 冻结现有 Lotus UI 的结构化状态、交互与 native golden。
+2. 定义 `watch_face_ops_t`、descriptor/registry 和受 runtime 管理的 lifecycle。
+3. 把现有表盘实现原样迁入 `face_lotus.c`，保持页面顺序、手势和渲染结果。
+4. 使用 host/fake LVGL 覆盖 mount/unmount、失败回滚、重试和资源零净增长。
+5. 用既有 native harness 证明 Lotus 零视觉与行为回归。
+
+明确不做：Activity、Minimal、picker、settings UI、Workout、History、通知、power、BLE 或其他
+A-G 功能。Q2 后续 settings 必须复用 Q1-S store，不建立第二套持久化。
 
 下一会话开场：
 
@@ -166,7 +141,7 @@ Set-Location 'E:\C_Moved_From_C\Users\Lenovo\Desktop\schoolwork\smart-band-demo'
 Get-Content -Raw FINALS_TOP_TIER_ROADMAP.md
 Get-Content -Raw NEXT_SESSION_HANDOFF.md
 git status --short
-git log -1 --oneline
+git log -3 --oneline
 gh pr list --state open
 ```
 

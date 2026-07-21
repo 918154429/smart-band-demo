@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "gate": "Q1-S",
-  "status": "pending_fresh_openvela_ci",
-  "recorded_at": "2026-07-21T13:45:55+08:00",
+  "status": "passed",
+  "completed_at": "2026-07-21T14:20:38+08:00",
   "scope": {
     "implemented": [
       "36-byte little-endian versioned storage frame with header and payload CRC32",
@@ -20,7 +20,8 @@
   },
   "source_snapshot": {
     "path": "/data/smart-band-q1s-20260721T132034CST/source-v6",
-    "archive_sha256": "1c8fbe9a27793133ce604c29b2472c75509f46313e85acb9c5f07e7e056792ad"
+    "archive_sha256": "1c8fbe9a27793133ce604c29b2472c75509f46313e85acb9c5f07e7e056792ad",
+    "final_git_commit": "a9d5a4326063c75dabea4d61c31152ba981b15a7"
   },
   "linux_coverage": {
     "toolchain": "GCC/gcov 13.3.0, gcovr 8.6",
@@ -69,11 +70,58 @@
     "passed": true
   },
   "fresh_openvela_ci": {
-    "status": "pending",
-    "run_id": null,
-    "url": null,
-    "artifact": null,
-    "artifact_sha256": null
+    "status": "passed",
+    "run_id": 29806148523,
+    "url": "https://github.com/918154429/smart-band-demo/actions/runs/29806148523",
+    "source_commit": "a9d5a4326063c75dabea4d61c31152ba981b15a7",
+    "resolved_projects": 214,
+    "manifest_commit": "67df2c52308f2579ac50d0cd7413e7f0e092b83a",
+    "claude_commit": "ab5f8be8225ce25c2f808fae0085dbf2db8fadf4",
+    "emulator_commit": "be9cdef6709c2a7aed547c3029d8872c58e5f3f9",
+    "emulator_tools_commit": "37f5024f1d9157b9778d0d9e739ee0fa68743d42",
+    "artifact": "openvela-fixed-release-29806148523",
+    "artifact_size_bytes": 23615392,
+    "artifact_digest": "sha256:cd24812b5eb4c681a5b03a27a06082a777edbd1d4460521dd9406faa02a3f9e4",
+    "artifacts": {
+      "nuttx": {
+        "bytes": 66073888,
+        "sha256": "b6605449990f01ab48c747c5e605ad4136eac7f8e1ef2dd6eb9831e282dff0dc"
+      },
+      ".config": {
+        "bytes": 103975,
+        "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10",
+        "storage_path": ""
+      },
+      "vela_system.bin": {
+        "bytes": 1024,
+        "sha256": "c432a814d04355da298268dc6fc6caafecfbe7cd7ce0fe799deed8949c8614a6"
+      },
+      "vela_data.bin": {
+        "bytes": 268435456,
+        "sha256": "9b4405cb8a1ab36f0cc852300d7810957f218566fd5072d4a80b39d667d685ee"
+      }
+    },
+    "native_smoke": {
+      "ui_ready_seconds": 0.303,
+      "initial_pid": 13,
+      "stable_pid": 13,
+      "stability_seconds": 5.0,
+      "cleanup_passed": true
+    },
+    "passed": true
+  },
+  "preserved_failed_openvela_ci": {
+    "run_id": 29805084515,
+    "source_commit": "05479539c5bb6c55cc59f6386e4cb6d4291c985e",
+    "failure": "NuttX file_read and file_write symbol collision",
+    "fixed_by_commit": "a9d5a4326063c75dabea4d61c31152ba981b15a7"
+  },
+  "pull_request_ci": {
+    "pull_request": 10,
+    "host_run_id": 29806142043,
+    "browser_run_id": 29806142041,
+    "gcc_clang_msvc_storage_matrix_passed": true,
+    "all_checks_passed": true
   },
   "remaining_unproven": [
     "target-board storage atomicity and power-loss durability",
