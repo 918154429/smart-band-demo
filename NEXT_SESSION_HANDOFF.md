@@ -10,10 +10,9 @@
 - 本地仓库：`E:\C_Moved_From_C\Users\Lenovo\Desktop\schoolwork\smart-band-demo`
 - GitHub：<https://github.com/918154429/smart-band-demo>
 - 默认分支：`master`
-- Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)
-- Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`。
-- 本文件写入时 PR10 尚待最终证据文档提交和正常合并；合并后必须把此处更新为实际
-  merge commit，不能把 feature commit 当成 master 基线。
+- Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)，已正常合并。
+- Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`；最终证据提交：`9172aef`。
+- 当前 master 合并基线：`7a99c8a19049d4a7f06538424e10df66e0a3d2ee`。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
   提交、推送、创建/更新/合并 PR。强制推送、历史改写、删除远端分支/标签和正式 release
   仍需当次明确指示。
@@ -26,9 +25,10 @@
 
 ## 2. 已完成基线
 
-PR1-PR9 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
-build/native smoke 和独立 simulator 证据。Q1-C 既有 master 基线为
-`5805fbd`，其中 Q1-C merge commit 为 `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
+PR1-PR10 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
+build/native smoke、独立 simulator 证据与 Q1-S 存储底座。当前 master 基线为
+`7a99c8a19049d4a7f06538424e10df66e0a3d2ee`；此前 Q1-C merge commit 为
+`9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
 
 Q0 正式 20 次冷启动与 Q1-V native fresh sensor 证据仍见：
 

@@ -4,7 +4,8 @@
 
 Q1-S 的生产代码、host 故障矩阵、独立 Linux 覆盖率、GitHub Host/Browser CI，以及
 新鲜 fixed openvela build/native smoke 已全部通过。Q1-S 总 Gate 完成；本切片没有实现
-Q2 或其他 A-G 用户功能。
+Q2 或其他 A-G 用户功能。PR10 已以 merge commit
+`7a99c8a19049d4a7f06538424e10df66e0a3d2ee` 合入 master。
 
 ## 格式与恢复契约
 

@@ -21,7 +21,9 @@
   "source_snapshot": {
     "path": "/data/smart-band-q1s-20260721T132034CST/source-v6",
     "archive_sha256": "1c8fbe9a27793133ce604c29b2472c75509f46313e85acb9c5f07e7e056792ad",
-    "final_git_commit": "a9d5a4326063c75dabea4d61c31152ba981b15a7"
+    "final_git_commit": "a9d5a4326063c75dabea4d61c31152ba981b15a7",
+    "evidence_commit": "9172aef539243767f5b391b594a4f2c41dbc8c30",
+    "merge_commit": "7a99c8a19049d4a7f06538424e10df66e0a3d2ee"
   },
   "linux_coverage": {
     "toolchain": "GCC/gcov 13.3.0, gcovr 8.6",
