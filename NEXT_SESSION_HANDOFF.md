@@ -11,9 +11,10 @@
 - GitHub：<https://github.com/918154429/smart-band-demo>
 - 默认分支：`master`
 - Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)，已正常合并。
-- W1 integration PR：[PR11](https://github.com/918154429/smart-band-demo/pull/11)。
+- W1 integration PR：[PR11](https://github.com/918154429/smart-band-demo/pull/11)，已正常合并。
 - Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`；最终证据提交：`9172aef`。
-- 当前 master 合并基线：`7a99c8a19049d4a7f06538424e10df66e0a3d2ee`。
+- W1 功能/门禁提交：`298a5c0`；最终证据提交：`5433b9b`。
+- 当前 master 合并基线：`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
   提交、推送、创建/更新/合并 PR。强制推送、历史改写、删除远端分支/标签和正式 release
   仍需当次明确指示。
@@ -26,9 +27,9 @@
 
 ## 2. 已完成基线
 
-PR1-PR10 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
-build/native smoke、独立 simulator 证据与 Q1-S 存储底座。当前 master 基线为
-`7a99c8a19049d4a7f06538424e10df66e0a3d2ee`；此前 Q1-C merge commit 为
+PR1-PR11 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
+build/native smoke、独立 simulator 证据、Q1-S 存储底座与 W1 第一波汇总。当前 master 基线为
+`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`；此前 Q1-C merge commit 为
 `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
 
 Q0 正式 20 次冷启动与 Q1-V native fresh sensor 证据仍见：
@@ -123,7 +124,9 @@ Q1-C central runtime、事件、时钟、能力、platform adapters 与 fake LVG
 
 独立 Linux coverage 在 `/data/smart-band-w1-integration-20260721`：overall
 `94.0% (2945/3134)`，六个新生产源分别 `97.6%` 到 `100%`，全部 `>=90%`。最终 Host
-run `29816173199`、Browser run `29816173171` 全绿。
+run `29816173199`、Browser run `29816173171` 全绿。最终 PR head `5433b9b` 的 Host run
+`29817713528`、Browser run `29817713549` 也全绿，PR11 已普通 merge 为
+`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`。
 
 最终 fixed openvela run：
 <https://github.com/918154429/smart-band-demo/actions/runs/29816300149>

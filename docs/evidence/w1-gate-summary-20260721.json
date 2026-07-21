@@ -4,6 +4,9 @@
   "status": "passed",
   "completed_at": "2026-07-21T17:11:21+08:00",
   "integration_source_commit": "298a5c0aa45968b341739c3d1c5a3c103f84e2eb",
+  "documentation_commit": "5433b9be4089b9c6c5a07a498c1cfe3ece7716f2",
+  "merge_commit": "bda730fd55e34ea7bdf7e75bfc600da9d75709a2",
+  "merged_at": "2026-07-21T17:20:25+08:00",
   "leaf_commits": {
     "W1-T1": "dca540a2905ddb83ed9261c61722d5fe1261d8d9",
     "W1-T2": "4533e741e1312dccb8b21a0bc465edfbbe0104ce",
@@ -34,8 +37,9 @@
   },
   "pr_ci": {
     "pull_request": 11,
-    "host_run_id": 29816173199,
-    "browser_run_id": 29816173171,
+    "head_commit": "5433b9be4089b9c6c5a07a498c1cfe3ece7716f2",
+    "host_run_id": 29817713528,
+    "browser_run_id": 29817713549,
     "passed": true
   },
   "fresh_openvela_ci": {
