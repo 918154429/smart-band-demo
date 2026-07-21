@@ -174,6 +174,7 @@ TARGETS = [
             APP_DIR / "services" / "store.c",
             APP_DIR / "platform" / "storage" / "storage_fault.c",
             APP_DIR / "platform" / "storage" / "storage_memory.c",
+            APP_DIR / "platform" / "storage" / "storage_file.c",
         ),
     ),
     CoverageTarget(
