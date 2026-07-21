@@ -359,14 +359,27 @@ jobs:
             > "$EVIDENCE_DIR/smart-band-build-paths.txt"
           test -s "$EVIDENCE_DIR/smart-band-build-paths.txt"
 
-      - name: Boot emulator and run native smart-band smoke
+      - name: Boot compact emulator and capture Lotus
         shell: bash
         run: |
           set -Eeuo pipefail
           timeout --signal=TERM --kill-after=30s 8m \
             python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/smoke_openvela_emulator.py" \
               --openvela-root "$OPENVELA_ROOT" \
-              --evidence-dir "$EVIDENCE_DIR"
+              --evidence-dir "$EVIDENCE_DIR" \
+              --skin xiaomi_smart_band_8_pro \
+              --screenshot-width 336 \
+              --screenshot-height 480
+
+      - name: Compare compact Lotus to the pre-migration native reference
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 \
+            "$GITHUB_WORKSPACE/smart-band-demo/scripts/compare_native_watch_face.py" \
+              --profile compact \
+              --candidate "$EVIDENCE_DIR/watch-face.png" \
+              --output "$EVIDENCE_DIR/compact-watch-face-comparison.json"
 
       - name: Run audited native screenshot and sensor journey
         shell: bash

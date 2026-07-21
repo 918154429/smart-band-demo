@@ -41,6 +41,18 @@ WATCH_FACE_DYNAMIC_MASKS = {
     "stress_value": (595, 567, 725, 597),
     "weather_value": (595, 662, 725, 692),
 }
+COMPACT_WATCH_FACE_REFERENCE = (
+    ROOT / "docs" / "evidence" / "w1-reference-native-compact-q1c-20260721.png"
+)
+COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
+    "battery": (235, 13, 319, 29),
+    "date": (111, 62, 226, 79),
+    "time": (104, 85, 239, 115),
+    "sleep_value": (135, 219, 225, 237),
+    "heart_value": (135, 283, 225, 301),
+    "stress_value": (135, 348, 225, 366),
+    "weather_value": (135, 413, 225, 431),
+}
 PAGE_TRANSITION_REGION = (470, 210, 810, 660)
 PAGE_TITLE_REGION = (570, 165, 710, 200)
 HEART_VALUE_REGION = (550, 330, 790, 390)

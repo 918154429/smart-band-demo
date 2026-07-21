@@ -204,6 +204,14 @@ class NativeE2ETest(unittest.TestCase):
         self.assertTrue(comparison["exact_match_outside_masks"])
         self.assertGreater(comparison["compared_ratio"], 0.95)
 
+    def test_reviewed_compact_watch_face_masks_leave_most_pixels_exact(self) -> None:
+        reference = E2E.decode_png_rgba(E2E.COMPACT_WATCH_FACE_REFERENCE)
+        comparison = E2E.masked_image_difference(
+            reference, reference, E2E.COMPACT_WATCH_FACE_DYNAMIC_MASKS
+        )
+        self.assertTrue(comparison["exact_match_outside_masks"])
+        self.assertGreater(comparison["compared_ratio"], 0.90)
+
     def test_reviewed_native_images_match_only_the_expected_golden_text(self) -> None:
         evidence = ROOT / "docs" / "evidence"
         model = E2E.decode_png_rgba(
