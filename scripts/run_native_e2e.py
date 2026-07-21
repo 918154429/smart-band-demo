@@ -47,7 +47,7 @@ COMPACT_WATCH_FACE_REFERENCE = (
 COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
     "battery": (235, 13, 319, 29),
     "date": (111, 62, 226, 79),
-    "time": (103, 85, 243, 115),
+    "time": (98, 84, 247, 116),
     "sleep_value": (135, 219, 225, 237),
     "heart_value": (135, 283, 225, 305),
     "stress_value": (135, 348, 225, 366),
