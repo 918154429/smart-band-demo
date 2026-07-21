@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "gate": "Q2-A-multi-watch-faces",
+  "status": "passed",
+  "completed_at": "2026-07-21T19:20:48+08:00",
+  "source_commit": "d7ce79b57c9900dafe083103ab3c37ce72cd321a",
+  "documentation_commit": null,
+  "merge_commit": null,
+  "faces": ["lotus", "activity", "minimal"],
+  "default_face": "lotus",
+  "picker": {
+    "long_press_ms": 600,
+    "preview_mounts_face_tree": false,
+    "single_face_tree_mounted": true,
+    "context_capacity_bytes": 256,
+    "face_object_counts": {
+      "lotus": 41,
+      "activity": 15,
+      "minimal": 9
+    },
+    "picker_object_count": 18
+  },
+  "settings": {
+    "slot_a": "0x00020000",
+    "slot_b": "0x00020001",
+    "schema_major": 1,
+    "schema_minor": 1,
+    "legacy_1_0_migration": true,
+    "corruption_and_future_version_fallback": true,
+    "native_storage_path": "",
+    "target_media_durability_claimed": false
+  },
+  "stress": {
+    "visible_face_switches": 100,
+    "object_growth": 0,
+    "event_callback_growth": 0,
+    "file_backend_commits": 100,
+    "linux_fd_before": 3,
+    "linux_fd_after": 3
+  },
+  "coverage": {
+    "source_commit": "37d584a28cd6e3873067b967f328501c5ec280df",
+    "remote_root": "/data/smart-band-q2-watch-faces-20260721",
+    "log": "evidence/coverage-37d584a.log",
+    "log_sha256": "4c7c4108b1cf5a01e75bf64040120899ef4fd40b1c00275a6aa1e0d2be5afe30",
+    "overall": {
+      "covered_lines": 2981,
+      "total_lines": 3172,
+      "percent": 94.0
+    },
+    "watch_face_settings": {
+      "covered_lines": 35,
+      "total_lines": 38,
+      "percent": 92.1
+    }
+  },
+  "pr_ci": {
+    "pull_request": 12,
+    "head_commit": "d7ce79b57c9900dafe083103ab3c37ce72cd321a",
+    "host_run_id": 29824971500,
+    "browser_run_id": 29824971555,
+    "passed": true
+  },
+  "fixed_openvela": {
+    "run_id": 29825089126,
+    "source_commit": "d7ce79b57c9900dafe083103ab3c37ce72cd321a",
+    "resolved_projects": 214,
+    "artifact": "openvela-fixed-release-29825089126",
+    "artifact_size_bytes": 24230516,
+    "artifact_digest": "sha256:7f41f8b424d5dace93bddc7e1a2a7cedb53de2443a785b54174e3bf454881d72",
+    "images": {
+      "nuttx": {
+        "bytes": 66247120,
+        "sha256": "2d57434f77c9a91b36fb9ccbbaf9d1fd14487aca29528836f9fadd409062cedf"
+      },
+      "config": {
+        "bytes": 103975,
+        "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+      },
+      "vela_system_bin": {
+        "bytes": 1024,
+        "sha256": "064b842c5c963379f74467413568b85fdefb1d88ff3bebb827d1fff65dc06570"
+      },
+      "vela_data_bin": {
+        "bytes": 268435456,
+        "sha256": "c9113c5761ee7a35fef47dfb8f744f30ba54e9c879cf3b1223a04189733ecbfa"
+      }
+    }
+  },
+  "native": {
+    "compact": {
+      "resolution": [336, 480],
+      "lotus_compared_pixels": 146941,
+      "lotus_compared_ratio": 0.911093,
+      "lotus_changed_pixels": 0,
+      "activity_selected": true,
+      "minimal_selected": true,
+      "pid_stable": true,
+      "smoke_sha256": "666e8d485960e3cebb35bbe1b1060d671560ef07e45fc16ae5b80a20795b3081",
+      "passed": true
+    },
+    "framed": {
+      "resolution": [1280, 800],
+      "lotus_compared_pixels": 989570,
+      "lotus_compared_ratio": 0.966377,
+      "lotus_changed_pixels": 0,
+      "activity_selected": true,
+      "minimal_selected": true,
+      "first_swipe_attempts": 1,
+      "structured_page_id": "heart_rate",
+      "value_bpm": 104,
+      "source": "sensor",
+      "ui_ready_seconds": 0.364171,
+      "cleanup_passed": true,
+      "journey_sha256": "251079878636512f04ae442cce14d9830c5dab5408099b0dfcb3a983d054d9ae",
+      "passed": true
+    }
+  },
+  "preserved_failures": [
+    {
+      "run_id": 29822578017,
+      "source_commit": "be0e80cb98d024686ee2df9e03e5b89c2b44fbaa",
+      "failure": "compact time mask missed three antialiasing pixels",
+      "artifact_digest": "sha256:ca692b0d7067a512a777d0126980b036aa5bae1986fc7212ba4098c7f9691062"
+    },
+    {
+      "run_id": 29824015101,
+      "source_commit": "37d584a28cd6e3873067b967f328501c5ec280df",
+      "failure": "framed capture observed stale picker framebuffer after apply",
+      "artifact_digest": "sha256:1b7e51f5ac21485ae30077069876bff206516db0babf82f6d92a620b25bde7e9"
+    }
+  ],
+  "boundaries": {
+    "target_board_claimed": false,
+    "power_loss_durability_claimed": false,
+    "real_ble_claimed": false,
+    "q3_to_q6_product_gates_complete": false
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "app_ui_ready_seconds": 0.289,
+  "boot_seconds": 0.5,
+  "console_port": 5554,
+  "initial_pids": [
+    13
+  ],
+  "nsh_prompt": "goldfish-armv8a-ap> ",
+  "screenshot": {
+    "bytes": 29569,
+    "console_ok": true,
+    "height": 480,
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face.png",
+    "sha256": "9a8caa4ef463c9388780e4381d5a359b93b19f636915720679604df7e5468cd3",
+    "width": 336
+  },
+  "settle_seconds": 10.0,
+  "skin": "xiaomi_smart_band_8_pro",
+  "stability_seconds": 5.0,
+  "stable_pids": [
+    13
+  ],
+  "status": "passed",
+  "watch_face_picker": {
+    "activity_face": {
+      "bytes": 13971,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-activity.png",
+      "sha256": "b703d1b480cf424e75ecf9eab3d4d1f7caff163fc28b9959bcfec1ed5cd4398f",
+      "width": 336
+    },
+    "activity_preview": {
+      "bytes": 16437,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-picker-activity.png",
+      "sha256": "bae0cc5d9d605ce436e1c4d34efb4b9cac77218a5b6cca426bcad6d3b61a6cd9",
+      "width": 336
+    },
+    "commands": [
+      {
+        "command": "event mouse 168 240 0 1",
+        "name": "hold-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 168 240 0 0",
+        "name": "hold-up",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 287 0 1",
+        "name": "next-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 287 0 0",
+        "name": "next-up",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 444 0 1",
+        "name": "apply-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 444 0 0",
+        "name": "apply-up",
+        "ok": true
+      },
+      {
+        "command": "event mouse 168 240 0 1",
+        "name": "minimal-hold-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 168 240 0 0",
+        "name": "minimal-hold-up",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 287 0 1",
+        "name": "minimal-next-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 287 0 0",
+        "name": "minimal-next-up",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 444 0 1",
+        "name": "minimal-apply-down",
+        "ok": true
+      },
+      {
+        "command": "event mouse 244 444 0 0",
+        "name": "minimal-apply-up",
+        "ok": true
+      }
+    ],
+    "images_changed": true,
+    "minimal_face": {
+      "bytes": 8275,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-minimal.png",
+      "sha256": "03edae0722f32c795dd21e39e3f8d5371bf49e9aac25a7aab5bace9cf8bb3bfc",
+      "width": 336
+    },
+    "minimal_preview": {
+      "bytes": 15954,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-picker-minimal.png",
+      "sha256": "f3273b884eba906b2cddff365f8a76507f3c8017fdd0430090eb4e970b0614c1",
+      "width": 336
+    },
+    "picker": {
+      "bytes": 14124,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-picker.png",
+      "sha256": "c9043386a574455bc53d878d473f3f5215f056d005bd1da2fd36ced16767f9a2",
+      "width": 336
+    },
+    "picker_from_activity": {
+      "bytes": 16437,
+      "console_ok": true,
+      "height": 480,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face-picker-from-activity.png",
+      "sha256": "bae0cc5d9d605ce436e1c4d34efb4b9cac77218a5b6cca426bcad6d3b61a6cd9",
+      "width": 336
+    },
+    "points": {
+      "apply": [
+        244,
+        444
+      ],
+      "hold": [
+        168,
+        240
+      ],
+      "next": [
+        244,
+        287
+      ]
+    },
+    "selected_activity": true,
+    "selected_minimal": true
+  }
+}

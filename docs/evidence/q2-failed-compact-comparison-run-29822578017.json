@@ -1,0 +1,133 @@
+{
+  "candidate": {
+    "bytes": 29430,
+    "channel_max": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "channel_min": [
+      0,
+      12,
+      8,
+      255
+    ],
+    "format": "RGBA8 non-interlaced PNG",
+    "height": 480,
+    "nonblank": true,
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/watch-face.png",
+    "sha256": "1708bfa921e94a667b62a8ce46c6ee9f64adcdf73500e094dfbc4a7d25065067",
+    "unique_rgba_colors": 1732,
+    "width": 336
+  },
+  "difference": {
+    "changed_pixels": 3,
+    "changed_ratio": 2.0412e-05,
+    "compared_pixels": 146971,
+    "compared_ratio": 0.911279,
+    "exact_match_outside_masks": false,
+    "height": 480,
+    "masked_pixels": 14309,
+    "masks": [
+      {
+        "name": "battery",
+        "region": [
+          235,
+          13,
+          319,
+          29
+        ]
+      },
+      {
+        "name": "date",
+        "region": [
+          111,
+          62,
+          226,
+          79
+        ]
+      },
+      {
+        "name": "time",
+        "region": [
+          104,
+          85,
+          243,
+          115
+        ]
+      },
+      {
+        "name": "sleep_value",
+        "region": [
+          135,
+          219,
+          225,
+          237
+        ]
+      },
+      {
+        "name": "heart_value",
+        "region": [
+          135,
+          283,
+          225,
+          305
+        ]
+      },
+      {
+        "name": "stress_value",
+        "region": [
+          135,
+          348,
+          225,
+          366
+        ]
+      },
+      {
+        "name": "weather_value",
+        "region": [
+          135,
+          413,
+          225,
+          431
+        ]
+      }
+    ],
+    "max_channel_delta": 214,
+    "mean_absolute_rgba_delta": 0.002073538,
+    "mismatch_bounds": [
+      103,
+      85,
+      104,
+      88
+    ],
+    "width": 336
+  },
+  "minimum_compared_ratio": 0.9,
+  "passed": false,
+  "profile": "compact",
+  "reference": {
+    "bytes": 29761,
+    "channel_max": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "channel_min": [
+      0,
+      12,
+      8,
+      255
+    ],
+    "format": "RGBA8 non-interlaced PNG",
+    "height": 480,
+    "nonblank": true,
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/docs/evidence/w1-reference-native-compact-q1c-20260721.png",
+    "sha256": "f573eb822f7d33fb43ccddc46e8046c92925cd91ee194ab022a103df83fb9ba7",
+    "unique_rgba_colors": 1734,
+    "width": 336
+  },
+  "schema_version": 1
+}

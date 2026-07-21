@@ -1,0 +1,1231 @@
+{
+  "app_ui_ready_seconds": 0.364171,
+  "checks": {
+    "activity_face_pixels": true,
+    "activity_face_png": true,
+    "activity_face_selected": true,
+    "app_no_fatal": true,
+    "attributed_process_cleanup": true,
+    "console_ping": true,
+    "first_swipe_reached_heart_rate": true,
+    "fixed_output_unchanged": true,
+    "heart_metric_structured_state": true,
+    "heart_model_png": true,
+    "heart_page_title_golden": true,
+    "heart_sensor_png": true,
+    "heart_value_104_bpm_golden": true,
+    "heart_value_transition_pixels": true,
+    "minimal_face_pixels": true,
+    "minimal_face_png": true,
+    "minimal_face_selected": true,
+    "nsh_ready": true,
+    "page_transition_pixels": true,
+    "picker_activity_preview_pixels": true,
+    "picker_console_ok": true,
+    "picker_from_activity_pixels": true,
+    "picker_minimal_preview_pixels": true,
+    "picker_open_pixels": true,
+    "picker_open_png": true,
+    "pidof": true,
+    "port_cleanup": true,
+    "port_preflight": true,
+    "process_cleanup": true,
+    "ps": true,
+    "runtime_input_cleanup": true,
+    "runtime_staged_isolated": true,
+    "sensor_enabled": true,
+    "sensor_get_104": true,
+    "sensor_set_console_ok": true,
+    "source_label_transition_pixels": true,
+    "source_sensor_golden": true,
+    "structured_page_id": true,
+    "swipe_console_ok": true,
+    "uorb_heart_node": true,
+    "watch_face_png": true,
+    "watch_face_static_masked_golden": true
+  },
+  "cleanup": {
+    "attributed_processes": {
+      "absent": true,
+      "actions": [],
+      "baseline": [],
+      "initial": [],
+      "remaining": [],
+      "run_id": "2906fb10f4bf24dbc212e747db68f38d",
+      "supported": true
+    },
+    "console_kill_response": "OK: killing emulator, bye bye\r\nOK",
+    "console_port_available": true,
+    "log": "cleanup.txt",
+    "process_group_absent": true,
+    "runtime_inputs": {
+      "already_missing": [],
+      "errors": [],
+      "inventory": [
+        {
+          "bytes": 103975,
+          "path": ".config"
+        },
+        {
+          "bytes": 65536,
+          "path": "build.avd/data/misc/pstore/pstore.bin"
+        },
+        {
+          "bytes": 26,
+          "path": "config.ini"
+        },
+        {
+          "bytes": 514,
+          "path": "emu-launch-params.txt"
+        },
+        {
+          "bytes": 3513,
+          "path": "hardware-qemu.ini"
+        },
+        {
+          "bytes": 6,
+          "path": "hardware-qemu.ini.lock"
+        },
+        {
+          "bytes": 0,
+          "path": "multiinstance.lock"
+        },
+        {
+          "bytes": 66247120,
+          "path": "nuttx"
+        },
+        {
+          "bytes": 0,
+          "path": "read-snapshot.txt"
+        },
+        {
+          "bytes": 6,
+          "path": "snapshot.lock.lock"
+        },
+        {
+          "bytes": 25,
+          "path": "system/build.prop"
+        },
+        {
+          "bytes": 268435456,
+          "path": "vela_data.bin"
+        },
+        {
+          "bytes": 1024,
+          "path": "vela_system.bin"
+        },
+        {
+          "bytes": 3,
+          "path": "version_num.cache"
+        }
+      ],
+      "passed": true,
+      "removed": [
+        ".config",
+        "nuttx",
+        "vela_system.bin",
+        "vela_data.bin"
+      ],
+      "tree_removed": true
+    }
+  },
+  "completed_at_utc": "2026-07-21T11:20:41.616367+00:00",
+  "console": {
+    "picker": [
+      {
+        "command": "event mouse 639 400 0 1",
+        "name": "hold-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 0",
+        "name": "hold-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 1",
+        "name": "next-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 0",
+        "name": "next-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 1",
+        "name": "apply-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 0",
+        "name": "apply-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 1",
+        "name": "minimal-hold-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 0",
+        "name": "minimal-hold-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 1",
+        "name": "minimal-next-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 0",
+        "name": "minimal-next-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 1",
+        "name": "minimal-apply-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 0",
+        "name": "minimal-apply-up",
+        "ok": true,
+        "response": "OK"
+      }
+    ],
+    "ping": "I am alive!\r\nOK",
+    "sensor_get": "heart-rate = 104\r\nOK",
+    "sensor_sets": [
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 1
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 2
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 3
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 4
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 5
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 6
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 7
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 8
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 9
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 10
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 11
+      },
+      {
+        "ok": true,
+        "response": "OK",
+        "sample": 12
+      }
+    ],
+    "sensor_status": "acceleration: enabled.\r\ngyroscope: enabled.\r\nmagnetic-field: enabled.\r\norientation: enabled.\r\ntemperature: enabled.\r\nproximity: enabled.\r\nlight: enabled.\r\npressure: enabled.\r\nhumidity: enabled.\r\nmagnetic-field-uncalibrated: enabled.\r\ngyroscope-uncalibrated: enabled.\r\nhinge-angle0: disabled.\r\nhinge-angle1: disabled.\r\nhinge-angle2: disabled.\r\nheart-rate: enabled.\r\nrgbc-light: disabled.\r\nwrist-tilt: disabled.\r\nacceleration-uncalibrated: enabled.\r\nOK",
+    "swipe": [
+      {
+        "command": "event mouse 800 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 760 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 720 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 680 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 640 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 600 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 560 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 520 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 1",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 480 400 0 0",
+        "ok": true,
+        "response": "OK"
+      }
+    ],
+    "swipe_attempts": [
+      {
+        "attempt": 1,
+        "commands": [
+          {
+            "command": "event mouse 800 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 760 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 720 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 680 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 640 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 600 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 560 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 520 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 1",
+            "ok": true,
+            "response": "OK"
+          },
+          {
+            "command": "event mouse 480 400 0 0",
+            "ok": true,
+            "response": "OK"
+          }
+        ],
+        "page_difference": {
+          "changed_pixels": 152995,
+          "changed_ratio": 0.999967,
+          "max_channel_delta": 247,
+          "mean_absolute_rgb_delta": 18.81112,
+          "region": [
+            470,
+            210,
+            810,
+            660
+          ],
+          "total_pixels": 153000
+        },
+        "screenshot": {
+          "bytes": 35108,
+          "channel_max": [
+            255,
+            255,
+            255,
+            255
+          ],
+          "channel_min": [
+            41,
+            12,
+            8,
+            255
+          ],
+          "console_ok": true,
+          "console_response": "OK",
+          "format": "RGBA8 non-interlaced PNG",
+          "height": 800,
+          "nonblank": true,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/heart-model-attempt-01.png",
+          "sha256": "91485110c574690130624bfc74417fb4c696c0b26dc29f473959b7cce34e9e51",
+          "unique_rgba_colors": 697,
+          "width": 1280
+        },
+        "title_golden": {
+          "bytes": 19600,
+          "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+          "expected_text": "Heart Rate",
+          "matches": true,
+          "region": [
+            570,
+            165,
+            710,
+            200
+          ],
+          "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+        }
+      }
+    ]
+  },
+  "console_port": 5564,
+  "emulator_command": [
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela/emulator.sh",
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output",
+    "-no-window",
+    "-no-audio",
+    "-accel",
+    "off",
+    "-port",
+    "5564",
+    "-skin",
+    "xiaomi_smart_screen_10",
+    "-skindir",
+    "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/skins"
+  ],
+  "emulator_process": {
+    "pgid": 27696,
+    "pid": 27696
+  },
+  "evidence_dir": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e",
+  "evidence_manifest": "evidence.sha256",
+  "failure": null,
+  "fixed_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap",
+  "golden_regions": {
+    "heart_page_title": {
+      "bytes": 19600,
+      "expected_sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688",
+      "expected_text": "Heart Rate",
+      "matches": true,
+      "region": [
+        570,
+        165,
+        710,
+        200
+      ],
+      "sha256": "ee5e90a2ec9ee48f2c47de74f91f49760042011cb7ba8f80b6ed7a9209077688"
+    },
+    "heart_value_104_bpm": {
+      "bytes": 57600,
+      "expected_sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761",
+      "expected_text": "104 bpm",
+      "matches": true,
+      "region": [
+        550,
+        330,
+        790,
+        390
+      ],
+      "sha256": "6eda2500a3515df5da0624356d877b95f5208503d8947da80393100595664761"
+    },
+    "source_sensor": {
+      "bytes": 30800,
+      "expected_sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a",
+      "expected_text": "Source / Sensor",
+      "matches": true,
+      "region": [
+        650,
+        490,
+        790,
+        545
+      ],
+      "sha256": "cfd1eec161120d19aa5a3b7a46c704bb8078b38a8adf78b0a0fa8edf44f1c60a"
+    }
+  },
+  "harness": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/run_native_e2e.py",
+    "sha256": "39c7798f01ec427e051423f290030c04bd32baa1055590f02cd78e24fdb4a7d2"
+  },
+  "nsh": {
+    "fatal_marker": null,
+    "heart_rate_node": true,
+    "ps_contains_smart_band": true,
+    "ready": true,
+    "smart_band_pids": [
+      13
+    ]
+  },
+  "openvela_root": "/home/runner/work/smart-band-demo/smart-band-demo/openvela",
+  "phase": "complete",
+  "pixel_transitions": {
+    "activity_face": {
+      "changed_pixels": 33768,
+      "changed_ratio": 0.220706,
+      "max_channel_delta": 239,
+      "mean_absolute_rgb_delta": 15.379795,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "heart_model_to_sensor": {
+      "heart_value": {
+        "changed_pixels": 1758,
+        "changed_ratio": 0.122083,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 15.996389,
+        "region": [
+          550,
+          330,
+          790,
+          390
+        ],
+        "total_pixels": 14400
+      },
+      "source_label": {
+        "changed_pixels": 612,
+        "changed_ratio": 0.079481,
+        "max_channel_delta": 214,
+        "mean_absolute_rgb_delta": 9.680952,
+        "region": [
+          650,
+          490,
+          790,
+          545
+        ],
+        "total_pixels": 7700
+      }
+    },
+    "minimal_face": {
+      "changed_pixels": 91336,
+      "changed_ratio": 0.596967,
+      "max_channel_delta": 231,
+      "mean_absolute_rgb_delta": 121.736706,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "picker_activity_preview": {
+      "changed_pixels": 153000,
+      "changed_ratio": 1.0,
+      "max_channel_delta": 239,
+      "mean_absolute_rgb_delta": 206.848821,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "picker_from_activity": {
+      "changed_pixels": 33768,
+      "changed_ratio": 0.220706,
+      "max_channel_delta": 239,
+      "mean_absolute_rgb_delta": 15.379795,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "picker_minimal_preview": {
+      "changed_pixels": 68356,
+      "changed_ratio": 0.446771,
+      "max_channel_delta": 231,
+      "mean_absolute_rgb_delta": 95.995791,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "picker_open": {
+      "changed_pixels": 113,
+      "changed_ratio": 0.000739,
+      "max_channel_delta": 214,
+      "mean_absolute_rgb_delta": 0.072179,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    },
+    "watch_face_to_heart_model": {
+      "changed_pixels": 152995,
+      "changed_ratio": 0.999967,
+      "max_channel_delta": 247,
+      "mean_absolute_rgb_delta": 18.81112,
+      "region": [
+        470,
+        210,
+        810,
+        660
+      ],
+      "total_pixels": 153000
+    }
+  },
+  "process_attribution": {
+    "baseline": [],
+    "environment": "SMART_BAND_NATIVE_E2E_RUN_ID",
+    "executables": [
+      "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/linux-x86_64/emulator",
+      "/home/runner/work/smart-band-demo/smart-band-demo/openvela/prebuilts/emulator/linux-x86_64/qemu/linux-x86_64/qemu-system-aarch64-headless"
+    ],
+    "run_id": "2906fb10f4bf24dbc212e747db68f38d",
+    "runtime_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output"
+  },
+  "rendered_metric_state": {
+    "derivation": {
+      "page": "exact Heart Rate golden ROI",
+      "source_freshness": "exact Sensor golden ROI; production mapping renders Sensor stale when freshness is stale",
+      "transport": "enabled emulator sensor plus NSH uORB node",
+      "value": "exact 104 bpm golden ROI plus console get"
+    },
+    "freshness": "fresh",
+    "page": "heart_rate",
+    "passed": true,
+    "source": "sensor",
+    "value_bpm": 104
+  },
+  "run_id": "2906fb10f4bf24dbc212e747db68f38d",
+  "runtime": {
+    "config_ini": {
+      "content": "hw.sensors.heart_rate=yes\n",
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/config.ini"
+    },
+    "files": {
+      ".config": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10599684,
+          "mtime_ns": 1784632447918045071,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "source_after": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10599684,
+          "mtime_ns": 1784632447918045071,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10143757,
+          "mtime_ns": 1784632447918045071,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        },
+        "staged_after": {
+          "bytes": 103975,
+          "device": 2049,
+          "inode": 10143757,
+          "mtime_ns": 1784632447918045071,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/.config",
+          "sha256": "e15bd57b33f7ea33132fd2bfde144b6bdd07291a1795de147dabb8b448d06e10"
+        }
+      },
+      "nuttx": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 66247120,
+          "device": 2049,
+          "inode": 10607784,
+          "mtime_ns": 1784632775487151796,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "2d57434f77c9a91b36fb9ccbbaf9d1fd14487aca29528836f9fadd409062cedf"
+        },
+        "source_after": {
+          "bytes": 66247120,
+          "device": 2049,
+          "inode": 10607784,
+          "mtime_ns": 1784632775487151796,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+          "sha256": "2d57434f77c9a91b36fb9ccbbaf9d1fd14487aca29528836f9fadd409062cedf"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 66247120,
+          "device": 2049,
+          "inode": 10143758,
+          "mtime_ns": 1784632775487151796,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/nuttx",
+          "sha256": "2d57434f77c9a91b36fb9ccbbaf9d1fd14487aca29528836f9fadd409062cedf"
+        },
+        "staged_after": {
+          "bytes": 66247120,
+          "device": 2049,
+          "inode": 10143758,
+          "mtime_ns": 1784632775487151796,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/nuttx",
+          "sha256": "2d57434f77c9a91b36fb9ccbbaf9d1fd14487aca29528836f9fadd409062cedf"
+        }
+      },
+      "vela_data.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10607786,
+          "mtime_ns": 1784632764727080539,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "c9113c5761ee7a35fef47dfb8f744f30ba54e9c879cf3b1223a04189733ecbfa"
+        },
+        "source_after": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10607786,
+          "mtime_ns": 1784632764727080539,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_data.bin",
+          "sha256": "c9113c5761ee7a35fef47dfb8f744f30ba54e9c879cf3b1223a04189733ecbfa"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10143760,
+          "mtime_ns": 1784632764727080539,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_data.bin",
+          "sha256": "c9113c5761ee7a35fef47dfb8f744f30ba54e9c879cf3b1223a04189733ecbfa"
+        },
+        "staged_after": {
+          "bytes": 268435456,
+          "device": 2049,
+          "inode": 10143760,
+          "mtime_ns": 1784632764727080539,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_data.bin",
+          "sha256": "c9113c5761ee7a35fef47dfb8f744f30ba54e9c879cf3b1223a04189733ecbfa"
+        }
+      },
+      "vela_system.bin": {
+        "hardlinked": false,
+        "initial_hash_matches": true,
+        "isolated": true,
+        "method": "copy2",
+        "source": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10607785,
+          "mtime_ns": 1784632764188076958,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "064b842c5c963379f74467413568b85fdefb1d88ff3bebb827d1fff65dc06570"
+        },
+        "source_after": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10607785,
+          "mtime_ns": 1784632764188076958,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap/vela_system.bin",
+          "sha256": "064b842c5c963379f74467413568b85fdefb1d88ff3bebb827d1fff65dc06570"
+        },
+        "source_unchanged": true,
+        "staged": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10143759,
+          "mtime_ns": 1784632764188076958,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_system.bin",
+          "sha256": "064b842c5c963379f74467413568b85fdefb1d88ff3bebb827d1fff65dc06570"
+        },
+        "staged_after": {
+          "bytes": 1024,
+          "device": 2049,
+          "inode": 10143759,
+          "mtime_ns": 1784632764188076958,
+          "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output/vela_system.bin",
+          "sha256": "064b842c5c963379f74467413568b85fdefb1d88ff3bebb827d1fff65dc06570"
+        }
+      }
+    },
+    "runtime_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/runtime-output",
+    "source_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap"
+  },
+  "screenshots": {
+    "heart_model": {
+      "bytes": 35108,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/heart-model.png",
+      "sha256": "91485110c574690130624bfc74417fb4c696c0b26dc29f473959b7cce34e9e51",
+      "unique_rgba_colors": 697,
+      "width": 1280
+    },
+    "heart_sensor": {
+      "bytes": 35923,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        41,
+        12,
+        8,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/heart-sensor.png",
+      "sha256": "30a5cbd4ab68c8808d7d403f4ceda31c89f8161f5b10e64f494f45ebb71fa8d6",
+      "unique_rgba_colors": 696,
+      "width": 1280
+    },
+    "watch_face": {
+      "bytes": 49912,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        0,
+        12,
+        16,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face.png",
+      "sha256": "cc4a74fedad8dfbce75d7eed0de44014a6e571fa62d13768d1ff62c75e8aa950",
+      "unique_rgba_colors": 1885,
+      "width": 1280
+    },
+    "watch_face_activity": {
+      "bytes": 27040,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        16,
+        20,
+        25,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-activity.png",
+      "sha256": "435ed4aca0ab508a96d206eb0345f2ad3c151b2f38962e82ef902bdc493b0937",
+      "unique_rgba_colors": 350,
+      "width": 1280
+    },
+    "watch_face_minimal": {
+      "bytes": 19936,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        25,
+        32,
+        33,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-minimal.png",
+      "sha256": "d2b03f4aa6ca5bba1408084f05bfbf539391e95aba5d5cedb7b6dbdbf7e8f03b",
+      "unique_rgba_colors": 189,
+      "width": 1280
+    },
+    "watch_face_picker": {
+      "bytes": 50309,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        0,
+        12,
+        16,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-picker.png",
+      "sha256": "087af3482afb5a1f21b27ebdc0f0182dd42697dc044d22dde40a9553b19ae97d",
+      "unique_rgba_colors": 1886,
+      "width": 1280
+    },
+    "watch_face_picker_activity": {
+      "bytes": 28752,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        16,
+        20,
+        25,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-picker-activity.png",
+      "sha256": "f8fe4c0df56a0e5a17a87565d517cc07cfcc0b67f242cd0389f6390ba2cc53a7",
+      "unique_rgba_colors": 349,
+      "width": 1280
+    },
+    "watch_face_picker_from_activity": {
+      "bytes": 28752,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        16,
+        20,
+        25,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-picker-from-activity.png",
+      "sha256": "f8fe4c0df56a0e5a17a87565d517cc07cfcc0b67f242cd0389f6390ba2cc53a7",
+      "unique_rgba_colors": 349,
+      "width": 1280
+    },
+    "watch_face_picker_minimal": {
+      "bytes": 28324,
+      "channel_max": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "channel_min": [
+        16,
+        20,
+        25,
+        255
+      ],
+      "console_ok": true,
+      "console_response": "OK",
+      "format": "RGBA8 non-interlaced PNG",
+      "height": 800,
+      "nonblank": true,
+      "path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face-picker-minimal.png",
+      "sha256": "1e447ceffa6f74b1d8c1188ff58a2eeda88e118313bd96370a11fba2833f82eb",
+      "unique_rgba_colors": 355,
+      "width": 1280
+    }
+  },
+  "smoke_helper": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/smoke_openvela_emulator.py",
+    "sha256": "fe510c0a9fabef4a0465325beda6e42c86c7a20559edfe806a45dd6a09d323b4"
+  },
+  "started_at_utc": "2026-07-21T11:19:58.053682+00:00",
+  "status": "passed",
+  "structured_page": {
+    "id": "heart_rate",
+    "passed": true,
+    "source": "reviewed Heart Rate title ROI after first swipe"
+  },
+  "watch_face_masked_comparison": {
+    "candidate_path": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e/watch-face.png",
+    "candidate_sha256": "cc4a74fedad8dfbce75d7eed0de44014a6e571fa62d13768d1ff62c75e8aa950",
+    "changed_pixels": 0,
+    "changed_ratio": 0.0,
+    "compared_pixels": 989570,
+    "compared_ratio": 0.966377,
+    "exact_match_outside_masks": true,
+    "height": 800,
+    "masked_pixels": 34430,
+    "masks": [
+      {
+        "name": "battery",
+        "region": [
+          700,
+          60,
+          805,
+          92
+        ]
+      },
+      {
+        "name": "date",
+        "region": [
+          570,
+          125,
+          710,
+          158
+        ]
+      },
+      {
+        "name": "time",
+        "region": [
+          570,
+          175,
+          725,
+          245
+        ]
+      },
+      {
+        "name": "sleep_value",
+        "region": [
+          595,
+          377,
+          725,
+          407
+        ]
+      },
+      {
+        "name": "heart_value",
+        "region": [
+          595,
+          472,
+          725,
+          502
+        ]
+      },
+      {
+        "name": "stress_value",
+        "region": [
+          595,
+          567,
+          725,
+          597
+        ]
+      },
+      {
+        "name": "weather_value",
+        "region": [
+          595,
+          662,
+          725,
+          692
+        ]
+      }
+    ],
+    "max_channel_delta": 0,
+    "mean_absolute_rgba_delta": 0.0,
+    "mismatch_bounds": null,
+    "reference_path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/docs/evidence/q1v-native-e2e-watch-face-20260720.png",
+    "reference_sha256": "3196411357d75f424813a442065206943cf76dbb91baa5759128f520d8c01dfe",
+    "width": 1280
+  },
+  "watch_face_picker": {
+    "commands": [
+      {
+        "command": "event mouse 639 400 0 1",
+        "name": "hold-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 0",
+        "name": "hold-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 1",
+        "name": "next-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 0",
+        "name": "next-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 1",
+        "name": "apply-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 0",
+        "name": "apply-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 1",
+        "name": "minimal-hold-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 639 400 0 0",
+        "name": "minimal-hold-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 1",
+        "name": "minimal-next-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 471 0 0",
+        "name": "minimal-next-up",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 1",
+        "name": "minimal-apply-down",
+        "ok": true,
+        "response": "OK"
+      },
+      {
+        "command": "event mouse 724 704 0 0",
+        "name": "minimal-apply-up",
+        "ok": true,
+        "response": "OK"
+      }
+    ],
+    "minimal_structured_marker": true,
+    "points": {
+      "apply": [
+        724,
+        704
+      ],
+      "hold": [
+        639,
+        400
+      ],
+      "next": [
+        724,
+        471
+      ]
+    },
+    "selected_face": "activity",
+    "selected_faces": [
+      "activity",
+      "minimal"
+    ],
+    "structured_marker": true
+  }
+}
