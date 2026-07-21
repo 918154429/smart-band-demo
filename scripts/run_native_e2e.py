@@ -58,6 +58,7 @@ PAGE_TITLE_REGION = (570, 165, 710, 200)
 HEART_VALUE_REGION = (550, 330, 790, 390)
 SOURCE_LABEL_REGION = (650, 490, 790, 545)
 MIN_CHANGED_PIXELS = 32
+FACE_APPLY_RENDER_SECONDS = 1.0
 MAX_SWIPE_ATTEMPTS = 3
 RUN_ID_ENV = "SMART_BAND_NATIVE_E2E_RUN_ID"
 GOLDEN_REGIONS = {
@@ -1120,7 +1121,7 @@ def run_journey(args: argparse.Namespace) -> int:
         selection_start = len(child.transcript)
         send_picker_pointer("apply-down", picker_points["apply"], True)
         send_picker_pointer("apply-up", picker_points["apply"], False)
-        child.pump(0.4)
+        child.pump(FACE_APPLY_RENDER_SECONDS)
         activity_image, activity_record = capture_screenshot(
             console, evidence_dir, "watch-face-activity"
         )
@@ -1217,7 +1218,7 @@ def run_journey(args: argparse.Namespace) -> int:
         minimal_selection_start = len(child.transcript)
         send_picker_pointer("minimal-apply-down", picker_points["apply"], True)
         send_picker_pointer("minimal-apply-up", picker_points["apply"], False)
-        child.pump(0.4)
+        child.pump(FACE_APPLY_RENDER_SECONDS)
         minimal_image, minimal_record = capture_screenshot(
             console, evidence_dir, "watch-face-minimal"
         )
