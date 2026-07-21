@@ -1,0 +1,54 @@
+{
+  "checks": {
+    "attributed_process_cleanup": true,
+    "fixed_output_unchanged": false,
+    "port_cleanup": false,
+    "port_preflight": false,
+    "process_cleanup": true,
+    "runtime_input_cleanup": false
+  },
+  "cleanup": {
+    "attributed_processes": {
+      "absent": true,
+      "actions": [],
+      "baseline": [],
+      "initial": [],
+      "remaining": [],
+      "run_id": "22a3d06c25722b389e60e2e149d3ae4a",
+      "supported": true
+    },
+    "console_port_available": false,
+    "log": "cleanup.txt",
+    "process_group_absent": true
+  },
+  "completed_at_utc": "2026-07-21T08:35:02.775551+00:00",
+  "console": {},
+  "console_port": 5554,
+  "evidence_dir": "/home/runner/work/smart-band-demo/smart-band-demo/openvela-nightly-evidence/native-e2e",
+  "evidence_manifest": "evidence.sha256",
+  "failure": {
+    "message": "console port is already in use: 5554",
+    "traceback": "failure.txt",
+    "type": "NativeE2EFailure"
+  },
+  "fixed_output": "/home/runner/work/smart-band-demo/smart-band-demo/openvela/cmake_out/vela_goldfish-arm64-v8a-ap",
+  "golden_regions": {},
+  "harness": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/run_native_e2e.py",
+    "sha256": "087e50be36b95ebd49fe66488f28cac6aeebe2f5876e1b266dd72d70478c7c0b"
+  },
+  "nsh": {},
+  "openvela_root": "/home/runner/work/smart-band-demo/smart-band-demo/openvela",
+  "phase": "complete",
+  "pixel_transitions": {},
+  "process_attribution": {},
+  "rendered_metric_state": {},
+  "run_id": "22a3d06c25722b389e60e2e149d3ae4a",
+  "screenshots": {},
+  "smoke_helper": {
+    "path": "/home/runner/work/smart-band-demo/smart-band-demo/smart-band-demo/scripts/smoke_openvela_emulator.py",
+    "sha256": "f0bb64107f5c399b7fde0d947e996d876cab103bf5a72e73ee4033b6d4c95e4b"
+  },
+  "started_at_utc": "2026-07-21T08:34:57.731436+00:00",
+  "status": "failed"
+}

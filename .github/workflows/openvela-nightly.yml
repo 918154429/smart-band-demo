@@ -388,7 +388,8 @@ jobs:
           timeout --signal=TERM --kill-after=30s 12m \
             python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_native_e2e.py" \
               --openvela-root "$OPENVELA_ROOT" \
-              --evidence-dir "$EVIDENCE_DIR/native-e2e"
+              --evidence-dir "$EVIDENCE_DIR/native-e2e" \
+              --console-port 5564
 
       - name: Ensure emulator process group is stopped
         if: always()
