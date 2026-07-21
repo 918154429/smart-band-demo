@@ -31,6 +31,8 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     platform/storage/storage_fault.c
     app_lvgl.c
     ui/lvgl/components.c
+    ui/lvgl/faces/lotus_face.c
+    ui/lvgl/faces/watch_face_registry.c
     ui/lvgl/watch_pages.c
     icon_assets.c
     smart_band_apps.c

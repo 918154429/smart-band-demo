@@ -36,6 +36,8 @@ PRODUCTION_SOURCES = [
     APP_DIR / "logic" / "mines_model.c",
     APP_DIR / "app_lvgl.c",
     APP_DIR / "ui" / "lvgl" / "components.c",
+    APP_DIR / "ui" / "lvgl" / "faces" / "lotus_face.c",
+    APP_DIR / "ui" / "lvgl" / "faces" / "watch_face_registry.c",
     APP_DIR / "ui" / "lvgl" / "watch_pages.c",
     APP_DIR / "icon_assets.c",
     APP_DIR / "smart_band_apps.c",
