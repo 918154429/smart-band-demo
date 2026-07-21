@@ -67,6 +67,12 @@ class Q3NativeHarnessTest(unittest.TestCase):
     def test_local_points_map_into_framed_emulator(self) -> None:
         self.assertEqual(Q3.local_point(0, 0), Q3.SCREEN_ORIGIN)
         self.assertEqual(Q3.local_point(335, 479), (807, 639))
+        self.assertEqual(
+            Q3.local_point(*Q3.WORKOUT_LAUNCHER_POINT), (562, 337)
+        )
+        self.assertEqual(
+            Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (718, 337)
+        )
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.local_point(336, 100)
 

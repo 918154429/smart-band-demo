@@ -23,6 +23,8 @@ DEFAULT_OUTPUT_DIR = "cmake_out/vela_goldfish-arm64-v8a-ap"
 DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
 SCREEN_ORIGIN = (472, 160)
 SCREEN_SIZE = (336, 480)
+WORKOUT_LAUNCHER_POINT = (90, 177)
+HISTORY_LAUNCHER_POINT = (246, 177)
 Q3_MARKER = "smart_band:q3:v1"
 STATE_IDLE = 0
 STATE_ACTIVE = 2
@@ -181,7 +183,7 @@ def swipe_to_apps(console: Any, child: Any, evidence_dir: Path) -> None:
 
 def open_workout(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
-    click(console, evidence_dir, "open-workout", local_point(90, 157))
+    click(console, evidence_dir, "open-workout", local_point(*WORKOUT_LAUNCHER_POINT))
     child.pump(1.0)
     wait_for_state(
         child,
@@ -194,7 +196,7 @@ def open_workout(console: Any, child: Any, evidence_dir: Path) -> None:
 
 def open_history(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
-    click(console, evidence_dir, "open-history", local_point(246, 157))
+    click(console, evidence_dir, "open-history", local_point(*HISTORY_LAUNCHER_POINT))
     child.pump(1.0)
     wait_for_state(
         child,
@@ -562,7 +564,7 @@ def run(args: argparse.Namespace) -> int:
         click(active_boot.console, evidence_dir, "summary-done", local_point(168, 448))
         active_boot.child.pump(1.0)
         click(active_boot.console, evidence_dir, "open-history-after-finish",
-              local_point(246, 157))
+              local_point(*HISTORY_LAUNCHER_POINT))
         history = wait_for_state(
             active_boot.child,
             lambda state: state["view"] == VIEW_HISTORY and state["sessions"] == 1,
