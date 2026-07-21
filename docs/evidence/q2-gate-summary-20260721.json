@@ -4,8 +4,9 @@
   "status": "passed",
   "completed_at": "2026-07-21T19:20:48+08:00",
   "source_commit": "d7ce79b57c9900dafe083103ab3c37ce72cd321a",
-  "documentation_commit": null,
-  "merge_commit": null,
+  "documentation_commit": "2da3d91bf1d98be5f7bb5b219871fa62e6b4db12",
+  "merge_commit": "e7e798c0aa5c0186d12f80479b208adc4862dd12",
+  "merged_at": "2026-07-21T19:30:04+08:00",
   "faces": ["lotus", "activity", "minimal"],
   "default_face": "lotus",
   "picker": {

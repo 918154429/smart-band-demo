@@ -12,11 +12,11 @@
 - 默认分支：`master`
 - Q1-S PR：[PR10](https://github.com/918154429/smart-band-demo/pull/10)，已正常合并。
 - W1 integration PR：[PR11](https://github.com/918154429/smart-band-demo/pull/11)，已正常合并。
-- Q2 PR：[PR12](https://github.com/918154429/smart-band-demo/pull/12)，Gate 已通过，等待普通 merge。
+- Q2 PR：[PR12](https://github.com/918154429/smart-band-demo/pull/12)，已正常合并。
 - Q1-S 功能提交：`0547953`；NuttX 符号冲突修复：`a9d5a43`；最终证据提交：`9172aef`。
 - W1 功能/门禁提交：`298a5c0`；最终证据提交：`5433b9b`。
-- Q2 功能提交：`07dece8`；门禁修复最终提交：`d7ce79b`。
-- 当前 master 合并基线：`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`。
+- Q2 功能提交：`07dece8`；门禁最终提交：`d7ce79b`；证据提交：`2da3d91`；merge：`e7e798c`。
+- 当前 master 合并基线：`e7e798c0aa5c0186d12f80479b208adc4862dd12`。
 - 用户确认其对主仓库拥有完整管理权并承担责任，长期授权 Codex 按持续开发需要修改、
   提交、推送、创建/更新/合并 PR。强制推送、历史改写、删除远端分支/标签和正式 release
   仍需当次明确指示。
@@ -29,9 +29,9 @@
 
 ## 2. 已完成基线
 
-PR1-PR11 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
-build/native smoke、独立 simulator 证据、Q1-S 存储底座与 W1 第一波汇总。当前 master 基线为
-`bda730fd55e34ea7bdf7e75bfc600da9d75709a2`；此前 Q1-C merge commit 为
+PR1-PR12 已完成生命周期、传感器来源、应用 runtime、响应式 UI、固定复现、真实 openvela
+build/native smoke、Q1-S 存储底座、W1 第一波汇总与 Q2 三表盘闭环。当前 master 基线为
+`e7e798c0aa5c0186d12f80479b208adc4862dd12`；此前 Q1-C merge commit 为
 `9f1f00fea130f7ccf4d79d89652a91e8fdfe0d13`。
 
 Q0 正式 20 次冷启动与 Q1-V native fresh sensor 证据仍见：
