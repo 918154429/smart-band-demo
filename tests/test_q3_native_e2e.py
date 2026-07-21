@@ -83,15 +83,15 @@ class Q3NativeHarnessTest(unittest.TestCase):
             Q3.framed_screen_geometry(336, 480), ((0, 0), (336, 480))
         )
         self.assertEqual(Q3.local_point(0, 0), Q3.SCREEN_ORIGIN)
-        self.assertEqual(Q3.local_point(335, 479), (824, 755))
+        self.assertEqual(Q3.local_point(329, 625), (824, 755))
         self.assertEqual(
-            Q3.local_point(*Q3.WORKOUT_LAUNCHER_POINT), (552, 306)
+            Q3.local_point(*Q3.WORKOUT_LAUNCHER_POINT), (554, 244)
         )
         self.assertEqual(
-            Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (726, 306)
+            Q3.local_point(*Q3.HISTORY_LAUNCHER_POINT), (731, 244)
         )
         with self.assertRaises(Q3.Q3NativeFailure):
-            Q3.local_point(336, 100)
+            Q3.local_point(330, 100)
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.framed_screen_geometry(0, 800)
 

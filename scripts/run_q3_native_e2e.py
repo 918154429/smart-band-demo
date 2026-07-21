@@ -21,7 +21,7 @@ from typing import Any, Callable
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = "cmake_out/vela_goldfish-arm64-v8a-ap"
 DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
-REFERENCE_SCREEN_SIZE = (336, 480)
+LAYOUT_SIZE = (330, 626)
 WORKOUT_LAUNCHER_POINT = (90, 177)
 HISTORY_LAUNCHER_POINT = (246, 177)
 MAX_APPS_SWIPE_ATTEMPTS = 5
@@ -118,13 +118,13 @@ def validate_settings(args: argparse.Namespace) -> None:
 
 def local_point(x: int, y: int) -> tuple[int, int]:
     if (
-        not 0 <= x < REFERENCE_SCREEN_SIZE[0]
-        or not 0 <= y < REFERENCE_SCREEN_SIZE[1]
+        not 0 <= x < LAYOUT_SIZE[0]
+        or not 0 <= y < LAYOUT_SIZE[1]
     ):
         raise Q3NativeFailure(f"local touch point is outside screen: {(x, y)}")
     return (
-        SCREEN_ORIGIN[0] + (x * SCREEN_SIZE[0]) // REFERENCE_SCREEN_SIZE[0],
-        SCREEN_ORIGIN[1] + (y * SCREEN_SIZE[1]) // REFERENCE_SCREEN_SIZE[1],
+        SCREEN_ORIGIN[0] + (x * SCREEN_SIZE[0]) // LAYOUT_SIZE[0],
+        SCREEN_ORIGIN[1] + (y * SCREEN_SIZE[1]) // LAYOUT_SIZE[1],
     )
 
 
