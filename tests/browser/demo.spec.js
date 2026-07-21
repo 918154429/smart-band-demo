@@ -172,6 +172,39 @@ test("all application controls meet target-size and contrast requirements", asyn
   }
 });
 
+test("workout continues through pause and publishes history", async ({ page }) => {
+  await openDemo(page, viewports[0]);
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole("button", { name: "下一页" }).click();
+    await page.waitForTimeout(260);
+  }
+
+  await page.getByRole("button", { name: "Workout" }).click();
+  await expect(page.getByText("Choose a workout")).toBeVisible();
+  await page.getByRole("button", { name: "Walk" }).click();
+  await expect(page.getByText(/Starting · Walk/)).toBeVisible();
+  await page.waitForTimeout(3_150);
+  await expect(page.getByText(/Active · Walk/)).toBeVisible();
+  await page.getByRole("button", { name: "Pause" }).click();
+  await expect(page.getByText(/Paused · Walk/)).toBeVisible();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await expect(page.getByText(/Active · Walk/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Finish" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Finish workout?");
+  await page.getByRole("button", { name: "下一页" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByText("Walk complete")).toBeVisible();
+  await page.getByRole("button", { name: "Done" }).click();
+
+  await page.getByRole("button", { name: "History" }).click();
+  await expect(page.getByRole("heading", { name: "7-day steps" })).toBeVisible();
+  await expect(page.getByText("Latest Walk")).toBeVisible();
+  await expect(page.getByText("--").first()).toBeVisible();
+  await expectVisibleButtonsAccessible(page);
+});
+
 test("reduced-motion preference removes visible transitions", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openDemo(page, viewports[0]);

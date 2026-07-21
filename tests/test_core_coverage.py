@@ -32,6 +32,9 @@ CORE_SOURCES = [
     APP_DIR / "services" / "runtime.c",
     APP_DIR / "services" / "storage_codec.c",
     APP_DIR / "services" / "store.c",
+    APP_DIR / "services" / "storage_transaction.c",
+    APP_DIR / "services" / "history_service.c",
+    APP_DIR / "services" / "workout_service.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "platform" / "storage" / "storage_fault.c",
@@ -82,6 +85,12 @@ NEW_WATCH_FACE_SOURCES = [
     APP_DIR / "logic" / "watch_face_settings.c",
 ]
 
+NEW_Q3_SOURCES = [
+    APP_DIR / "services" / "storage_transaction.c",
+    APP_DIR / "services" / "history_service.c",
+    APP_DIR / "services" / "workout_service.c",
+]
+
 
 @dataclass(frozen=True)
 class CoverageTarget:
@@ -109,6 +118,11 @@ TARGETS = [
             *NEW_RUNTIME_SOURCES,
             APP_DIR / "services" / "storage_codec.c",
             APP_DIR / "services" / "store.c",
+            APP_DIR / "services" / "storage_transaction.c",
+            APP_DIR / "services" / "history_service.c",
+            APP_DIR / "services" / "workout_service.c",
+            APP_DIR / "logic" / "step_normalizer.c",
+            APP_DIR / "logic" / "workout_model.c",
             APP_DIR / "platform" / "storage" / "storage_fault.c",
             APP_DIR / "platform" / "storage" / "storage_memory.c",
         ),
@@ -150,6 +164,45 @@ TARGETS = [
         (
             APP_DIR / "logic" / "step_normalizer.c",
             APP_DIR / "logic" / "workout_model.c",
+        ),
+    ),
+    CoverageTarget(
+        "history_service",
+        Path(__file__).with_name("history_service_test.c"),
+        (
+            APP_DIR / "services" / "history_service.c",
+            APP_DIR / "services" / "storage_codec.c",
+            APP_DIR / "services" / "store.c",
+            APP_DIR / "services" / "storage_transaction.c",
+            APP_DIR / "platform" / "storage" / "storage_fault.c",
+            APP_DIR / "platform" / "storage" / "storage_memory.c",
+        ),
+    ),
+    CoverageTarget(
+        "workout_service",
+        Path(__file__).with_name("workout_service_test.c"),
+        (
+            APP_DIR / "logic" / "step_normalizer.c",
+            APP_DIR / "logic" / "workout_model.c",
+            APP_DIR / "services" / "storage_codec.c",
+            APP_DIR / "services" / "store.c",
+            APP_DIR / "services" / "storage_transaction.c",
+            APP_DIR / "services" / "history_service.c",
+            APP_DIR / "services" / "workout_service.c",
+            APP_DIR / "platform" / "storage" / "storage_fault.c",
+            APP_DIR / "platform" / "storage" / "storage_memory.c",
+            APP_DIR / "platform" / "platform_noop.c",
+        ),
+    ),
+    CoverageTarget(
+        "storage_transaction",
+        Path(__file__).with_name("storage_transaction_test.c"),
+        (
+            APP_DIR / "services" / "storage_codec.c",
+            APP_DIR / "services" / "store.c",
+            APP_DIR / "services" / "storage_transaction.c",
+            APP_DIR / "platform" / "storage" / "storage_fault.c",
+            APP_DIR / "platform" / "storage" / "storage_memory.c",
         ),
     ),
     CoverageTarget(
@@ -281,6 +334,7 @@ def run_gcovr(build_root: Path) -> None:
         *NEW_STORAGE_SOURCES,
         *NEW_W1_SOURCES,
         *NEW_WATCH_FACE_SOURCES,
+        *NEW_Q3_SOURCES,
     ]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [

@@ -67,7 +67,8 @@ static const smart_band_storage_ops_t g_unavailable_ops =
 {
   unavailable_read,
   unavailable_write,
-  unavailable_flush
+  unavailable_flush,
+  NULL
 };
 
 typedef struct
@@ -121,7 +122,8 @@ static const smart_band_storage_ops_t g_counting_ops =
 {
   counting_read,
   counting_write,
-  counting_flush
+  counting_flush,
+  NULL
 };
 
 static smart_band_store_record_spec_t make_spec(uint16_t schema_minor)

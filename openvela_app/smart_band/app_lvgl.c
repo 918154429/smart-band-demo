@@ -11,6 +11,8 @@
 #include "smart_band_watch_face_settings.h"
 #include "ui/lvgl/components.h"
 #include "ui/lvgl/watch_face_picker.h"
+#include "ui/lvgl/history_view.h"
+#include "ui/lvgl/workout_view.h"
 #include "ui/lvgl/watch_pages.h"
 
 #include <stdint.h>
@@ -22,6 +24,13 @@
 #define SMART_BAND_DEFAULT_TZ "CST-8"
 #define SMART_BAND_SWIPE_CLICK_GUARD_MS 300
 #define SMART_BAND_FACE_LONG_PRESS_MS 600
+
+typedef enum
+{
+  SMART_BAND_SYSTEM_VIEW_NONE = 0,
+  SMART_BAND_SYSTEM_VIEW_WORKOUT,
+  SMART_BAND_SYSTEM_VIEW_HISTORY
+} smart_band_system_view_t;
 
 typedef struct
 {
@@ -43,6 +52,9 @@ typedef struct
   lv_obj_t *app_title;
   lv_obj_t *app_content;
   lv_obj_t *app_back;
+  smart_band_workout_view_t workout_view;
+  smart_band_history_view_t history_view;
+  smart_band_system_view_t system_view;
 
   lv_timer_t *timer;
   smart_band_runtime_t runtime;
@@ -57,6 +69,10 @@ typedef struct
   smart_band_watch_face_id_t selected_face;
   smart_band_store_result_t face_settings_result;
   bool compact_band;
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  uint64_t diagnostic_last_elapsed_ms;
+  uint64_t diagnostic_tick_gap_max_ms;
+#endif
 } smart_band_ui_t;
 
 static smart_band_ui_t g_ui;
@@ -67,15 +83,88 @@ static void enable_touch_navigation(lv_obj_t *obj);
 static void enable_touch_navigation_tree(lv_obj_t *obj);
 static void set_page_visible(lv_obj_t *page, bool visible);
 static void app_icon_cb(lv_event_t *event);
+static void system_icon_cb(lv_event_t *event);
 static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
 static void render_page(void);
 static void render_pending(void);
+static void workout_action_cb(void *context,
+                              smart_band_workout_view_action_t action);
 static lv_obj_t *create_action_button(lv_obj_t *parent, const char *text,
                                       lv_coord_t x, lv_coord_t y,
                                       lv_coord_t w, lv_coord_t h,
                                       lv_color_t color, lv_event_cb_t cb,
                                       uintptr_t data);
+
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+static size_t diagnostic_object_count(lv_obj_t *object)
+{
+  size_t count = object == NULL ? 0u : 1u;
+  int32_t index = 0;
+  lv_obj_t *child;
+
+  if (object == NULL)
+    {
+      return 0u;
+    }
+  while ((child = lv_obj_get_child(object, index)) != NULL)
+    {
+      count += diagnostic_object_count(child);
+      index++;
+    }
+  return count;
+}
+
+static void emit_q3_diagnostics(void)
+{
+  smart_band_workout_snapshot_t workout;
+  uint64_t elapsed_ms = g_ui.runtime.last_clock.elapsed_ms;
+  uint64_t gap_ms = elapsed_ms - g_ui.diagnostic_last_elapsed_ms;
+
+  if (!smart_band_workout_service_snapshot(&g_ui.runtime.workout, &workout))
+    {
+      return;
+    }
+  if (g_ui.diagnostic_last_elapsed_ms != 0u &&
+      gap_ms > g_ui.diagnostic_tick_gap_max_ms)
+    {
+      g_ui.diagnostic_tick_gap_max_ms = gap_ms;
+    }
+  g_ui.diagnostic_last_elapsed_ms = elapsed_ms;
+  if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_NONE &&
+      !smart_band_workout_service_is_live(&g_ui.runtime.workout) &&
+      g_ui.runtime.history.session_count == 0u)
+    {
+      return;
+    }
+
+  printf("smart_band:q3:v1 elapsed_ms=%llu page=%u view=%u state=%u "
+         "mode=%u active_ms=%llu steps=%llu recovery=%u phase=%u "
+         "checkpoint=%d daily=%u sessions=%u daily_store=%d "
+         "session_store=%d queue=%u dropped=%u evicted=%u "
+         "coalesced=%u inbox_dropped=%u objects=%u tick_gap_max_ms=%llu\n",
+         (unsigned long long)elapsed_ms,
+         (unsigned int)g_ui.runtime.model.page,
+         (unsigned int)g_ui.system_view, (unsigned int)workout.state,
+         (unsigned int)workout.mode,
+         (unsigned long long)workout.active_duration_ms,
+         (unsigned long long)workout.steps,
+         g_ui.runtime.workout.recovery_pending ? 1u : 0u,
+         (unsigned int)g_ui.runtime.workout.phase,
+         (int)g_ui.runtime.workout.checkpoint_result,
+         (unsigned int)g_ui.runtime.history.daily_count,
+         (unsigned int)g_ui.runtime.history.session_count,
+         (int)g_ui.runtime.history.last_daily_result,
+         (int)g_ui.runtime.history.last_session_result,
+         (unsigned int)smart_band_event_queue_count(&g_ui.runtime.events),
+         g_ui.runtime.events.dropped, g_ui.runtime.events.evicted,
+         g_ui.runtime.events.coalesced,
+         g_ui.runtime.external_events.dropped,
+         (unsigned int)diagnostic_object_count(g_ui.root),
+         (unsigned long long)g_ui.diagnostic_tick_gap_max_ms);
+  fflush(stdout);
+}
+#endif
 
 static time_t runtime_wall_now(void *context)
 {
@@ -456,6 +545,136 @@ static void update_active_app(void)
   smart_band_app_render(&g_ui.runtime.apps, &host);
 }
 
+static void build_history_view_state(smart_band_history_view_state_t *state)
+{
+  static const char *const weekdays[] =
+    {"Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"};
+  int32_t latest_day = 0;
+  size_t index;
+
+  memset(state, 0, sizeof(*state));
+  if (!(g_ui.runtime.last_clock.wall_valid &&
+        smart_band_history_day_key(g_ui.runtime.last_clock.wall_time,
+                                   &latest_day)) &&
+      g_ui.runtime.history.daily_count != 0u)
+    {
+      latest_day = g_ui.runtime.history.daily[
+        g_ui.runtime.history.daily_count - 1u].day_key;
+    }
+  if (g_ui.runtime.history.daily_count != 0u &&
+      g_ui.runtime.history.daily[
+        g_ui.runtime.history.daily_count - 1u].day_key > latest_day)
+    {
+      latest_day = g_ui.runtime.history.daily[
+        g_ui.runtime.history.daily_count - 1u].day_key;
+    }
+
+  for (index = 0; index < SMART_BAND_HISTORY_VIEW_DAY_COUNT; index++)
+    {
+      smart_band_history_view_day_t *day = &state->days[index];
+      int32_t key = latest_day -
+                    (int32_t)(SMART_BAND_HISTORY_VIEW_DAY_COUNT - 1u - index);
+      int32_t weekday = key % 7;
+      size_t history_index;
+
+      if (weekday < 0)
+        {
+          weekday += 7;
+        }
+      day->summary.day_key = key;
+      (void)snprintf(day->label, sizeof(day->label), "%s",
+                     weekdays[weekday]);
+      for (history_index = 0;
+           history_index < g_ui.runtime.history.daily_count;
+           history_index++)
+        {
+          if (g_ui.runtime.history.daily[history_index].day_key == key)
+            {
+              day->summary = g_ui.runtime.history.daily[history_index];
+              day->present = true;
+              break;
+            }
+        }
+    }
+
+  if (g_ui.runtime.history.session_count != 0u)
+    {
+      state->latest_session = g_ui.runtime.history.sessions[
+        g_ui.runtime.history.session_count - 1u];
+      state->latest_session_present = true;
+    }
+}
+
+static void render_system_view(void)
+{
+  if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_WORKOUT &&
+      g_ui.workout_view.mounted)
+    {
+      smart_band_workout_view_state_t state;
+
+      memset(&state, 0, sizeof(state));
+      (void)smart_band_workout_service_snapshot(&g_ui.runtime.workout,
+                                                &state.snapshot);
+      state.countdown_duration_ms = 3000u;
+      state.pause_count = g_ui.runtime.workout.pause_count;
+      smart_band_workout_view_render(&g_ui.workout_view, &state);
+    }
+  else if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_HISTORY &&
+           g_ui.history_view.mounted)
+    {
+      smart_band_history_view_state_t state;
+
+      build_history_view_state(&state);
+      smart_band_history_view_render(&g_ui.history_view, &state);
+    }
+}
+
+static void close_system_view(void)
+{
+  smart_band_workout_view_unmount(&g_ui.workout_view);
+  smart_band_history_view_unmount(&g_ui.history_view);
+  g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
+  set_label_text(g_ui.app_title, "Apps");
+  set_page_visible(g_ui.app_detail, false);
+  set_page_visible(g_ui.apps_launcher, true);
+}
+
+static void open_system_view(smart_band_system_view_t system_view)
+{
+  int result = -1;
+
+  smart_band_app_unmount(&g_ui.runtime.apps);
+  smart_band_workout_view_unmount(&g_ui.workout_view);
+  smart_band_history_view_unmount(&g_ui.history_view);
+  lv_obj_clean(g_ui.app_content);
+  g_ui.system_view = system_view;
+  if (system_view == SMART_BAND_SYSTEM_VIEW_WORKOUT)
+    {
+      set_label_text(g_ui.app_title, "Workout");
+      result = smart_band_workout_view_mount(
+        &g_ui.workout_view, g_ui.app_content, &g_ui.components,
+        workout_action_cb, NULL);
+    }
+  else if (system_view == SMART_BAND_SYSTEM_VIEW_HISTORY)
+    {
+      set_label_text(g_ui.app_title, "History");
+      result = smart_band_history_view_mount(
+        &g_ui.history_view, g_ui.app_content, &g_ui.components);
+    }
+
+  if (result != 0)
+    {
+      smart_band_workout_view_unmount(&g_ui.workout_view);
+      smart_band_history_view_unmount(&g_ui.history_view);
+      g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
+      set_label_text(g_ui.app_title, "View failed");
+    }
+
+  set_page_visible(g_ui.apps_launcher, false);
+  set_page_visible(g_ui.app_detail, true);
+  render_system_view();
+}
+
 static void open_app(smart_band_app_id_t id)
 {
   const smart_band_app_def_t *def = smart_band_app_find(id);
@@ -467,6 +686,9 @@ static void open_app(smart_band_app_id_t id)
     }
 
   host = make_app_host();
+  smart_band_workout_view_unmount(&g_ui.workout_view);
+  smart_band_history_view_unmount(&g_ui.history_view);
+  g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
   smart_band_app_unmount(&g_ui.runtime.apps);
   lv_obj_clean(g_ui.app_content);
   set_label_text(g_ui.app_title, def->title);
@@ -480,6 +702,51 @@ static void open_app(smart_band_app_id_t id)
 
   set_page_visible(g_ui.apps_launcher, false);
   set_page_visible(g_ui.app_detail, true);
+}
+
+static int create_system_launcher_card(lv_obj_t *parent, const char *title_text,
+                                       const lv_image_dsc_t *icon_source,
+                                       smart_band_system_view_t system_view,
+                                       lv_coord_t x, lv_coord_t y,
+                                       lv_coord_t w, lv_coord_t h)
+{
+  lv_obj_t *card = lv_btn_create(parent);
+  lv_obj_t *icon;
+  lv_obj_t *title;
+
+  if (card == NULL)
+    {
+      return -1;
+    }
+
+  strip_obj(card);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_pos(card, x, y);
+  lv_obj_set_size(card, w, h);
+  lv_obj_set_style_bg_color(card, lv_color_hex(0xe9f7f4), 0);
+  lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(card, sx(16), 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_border_color(card, lv_color_hex(0xbfe2dc), 0);
+  lv_obj_add_event_cb(card, system_icon_cb, LV_EVENT_CLICKED,
+                      (void *)(uintptr_t)system_view);
+
+  icon = create_icon_image(card, icon_source, sx(8), sy(7), sx(48));
+  title = create_label(card, title_text, font_12(), lv_color_hex(0x234a50),
+                       LV_TEXT_ALIGN_CENTER);
+  if (icon == NULL || title == NULL)
+    {
+      return -1;
+    }
+
+  lv_obj_add_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(icon, system_icon_cb, LV_EVENT_CLICKED,
+                      (void *)(uintptr_t)system_view);
+  lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(title, system_icon_cb, LV_EVENT_CLICKED,
+                      (void *)(uintptr_t)system_view);
+  place_label(title, sx(60), sy(16), w - sx(66), sy(24));
+  return 0;
 }
 
 static int create_launcher_card(lv_obj_t *parent,
@@ -548,6 +815,7 @@ static int create_apps_page(void)
   lv_coord_t card_w = (g_ui.screen_w - margin * 2 - gap_x) / 2;
   lv_coord_t card_h = sy(62);
   lv_coord_t grid_y = sy(126);
+  lv_coord_t content_y = sy(94);
 
   g_ui.apps_page = create_page(g_ui.screen);
   if (g_ui.apps_page == NULL ||
@@ -580,10 +848,38 @@ static int create_apps_page(void)
   lv_obj_set_style_bg_grad_dir(g_ui.app_detail, LV_GRAD_DIR_VER, 0);
   lv_obj_set_style_bg_opa(g_ui.app_detail, LV_OPA_COVER, 0);
 
+  g_ui.app_back = create_action_button(g_ui.app_detail, "<", sx(20), sy(28),
+                                       sx(44), sy(38),
+                                       lv_color_hex(0x6f8790), app_back_cb,
+                                       0);
+  g_ui.app_title = create_label(g_ui.app_detail, "Apps", font_20(),
+                                lv_color_hex(0x293b53),
+                                LV_TEXT_ALIGN_CENTER);
+  g_ui.app_content = create_plain_layer(
+    g_ui.app_detail, 0, content_y, g_ui.screen_w,
+    max_coord(g_ui.screen_h - content_y, 1));
+  if (g_ui.app_back == NULL || g_ui.app_title == NULL ||
+      g_ui.app_content == NULL)
+    {
+      return -1;
+    }
+
+  if (create_system_launcher_card(
+        g_ui.apps_launcher, "Workout", &smart_band_icon_steps,
+        SMART_BAND_SYSTEM_VIEW_WORKOUT, margin, grid_y, card_w, card_h) != 0 ||
+      create_system_launcher_card(
+        g_ui.apps_launcher, "History", &smart_band_icon_stopwatch,
+        SMART_BAND_SYSTEM_VIEW_HISTORY, margin + card_w + gap_x,
+        grid_y, card_w, card_h) != 0)
+    {
+      return -1;
+    }
+
   for (size_t i = 0; i < app_count; i++)
     {
-      lv_coord_t row = (lv_coord_t)(i / 2u);
-      lv_coord_t col = (lv_coord_t)(i % 2u);
+      size_t position = i + 2u;
+      lv_coord_t row = (lv_coord_t)(position / 2u);
+      lv_coord_t col = (lv_coord_t)(position % 2u);
 
       if (create_launcher_card(g_ui.apps_launcher, &apps[i],
                                margin + col * (card_w + gap_x),
@@ -592,21 +888,6 @@ static int create_apps_page(void)
         {
           return -1;
         }
-    }
-
-  g_ui.app_back = create_action_button(g_ui.app_detail, "<", sx(20), sy(28),
-                                       sx(44), sy(38),
-                                       lv_color_hex(0x6f8790), app_back_cb,
-                                       0);
-  g_ui.app_title = create_label(g_ui.app_detail, "Apps", font_20(),
-                                lv_color_hex(0x293b53),
-                                LV_TEXT_ALIGN_CENTER);
-  g_ui.app_content = create_plain_layer(g_ui.app_detail, 0, sy(94),
-                                        g_ui.screen_w, sy(452));
-  if (g_ui.app_back == NULL || g_ui.app_title == NULL ||
-      g_ui.app_content == NULL)
-    {
-      return -1;
     }
 
   place_label(g_ui.app_title, sx(72), sy(34), g_ui.screen_w - sx(144),
@@ -879,7 +1160,14 @@ static void update_apps_page(void)
 
   format_watch_date(date_text, sizeof(date_text));
   set_label_text(g_ui.apps_date, date_text);
-  update_active_app();
+  if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_NONE)
+    {
+      update_active_app();
+    }
+  else
+    {
+      render_system_view();
+    }
 }
 
 static void render_page(void)
@@ -920,6 +1208,7 @@ static smart_band_dirty_flags_t current_page_dirty_mask(void)
         return SMART_BAND_DIRTY_STEPS | SMART_BAND_DIRTY_PAGE;
       case SMART_BAND_PAGE_APPS:
         return SMART_BAND_DIRTY_TIME | SMART_BAND_DIRTY_APP |
+               SMART_BAND_DIRTY_WORKOUT | SMART_BAND_DIRTY_HISTORY |
                SMART_BAND_DIRTY_PAGE;
       default:
         return SMART_BAND_DIRTY_PAGE;
@@ -952,9 +1241,36 @@ static void app_icon_cb(lv_event_t *event)
   open_app(id);
 }
 
+static void system_icon_cb(lv_event_t *event)
+{
+  smart_band_system_view_t system_view =
+    (smart_band_system_view_t)(uintptr_t)lv_event_get_user_data(event);
+
+  if (g_ui.page_swipe_consumed &&
+      lv_tick_elaps(g_ui.page_swipe_at) < SMART_BAND_SWIPE_CLICK_GUARD_MS)
+    {
+      return;
+    }
+
+  g_ui.page_swipe_consumed = false;
+  open_system_view(system_view);
+}
+
 static void app_back_cb(lv_event_t *event)
 {
   (void)event;
+
+  if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_WORKOUT &&
+      smart_band_workout_view_captures_input(&g_ui.workout_view))
+    {
+      return;
+    }
+
+  if (g_ui.system_view != SMART_BAND_SYSTEM_VIEW_NONE)
+    {
+      close_system_view();
+      return;
+    }
 
   smart_band_app_unmount(&g_ui.runtime.apps);
   if (g_ui.app_content != NULL)
@@ -965,6 +1281,79 @@ static void app_back_cb(lv_event_t *event)
   set_label_text(g_ui.app_title, "Apps");
   set_page_visible(g_ui.app_detail, false);
   set_page_visible(g_ui.apps_launcher, true);
+}
+
+static void post_workout_command(smart_band_workout_command_t command,
+                                 smart_band_workout_mode_t mode)
+{
+  smart_band_event_t event;
+
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_WORKOUT_COMMAND;
+  event.payload.workout.command = (uint8_t)command;
+  event.payload.workout.mode = (uint8_t)mode;
+  if (smart_band_runtime_post(&g_ui.runtime, &event))
+    {
+      smart_band_runtime_dispatch_pending(&g_ui.runtime);
+    }
+}
+
+static void workout_action_cb(void *context,
+                              smart_band_workout_view_action_t action)
+{
+  (void)context;
+
+  switch (action)
+    {
+      case SMART_BAND_WORKOUT_VIEW_ACTION_START_WALK:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_START,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_START_RUN:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_START,
+                             SMART_BAND_WORKOUT_MODE_RUN);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_PAUSE:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_PAUSE,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_RESUME:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_RESUME,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_FINISH:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_FINISH,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_ABORT:
+      case SMART_BAND_WORKOUT_VIEW_ACTION_RECOVER_DISCARD:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_ABORT,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_RECOVER_RESUME:
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_CONFIRM_RECOVERY,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        post_workout_command(SMART_BAND_WORKOUT_COMMAND_RESUME,
+                             SMART_BAND_WORKOUT_MODE_WALK);
+        break;
+      case SMART_BAND_WORKOUT_VIEW_ACTION_DONE:
+        g_ui.runtime.last_workout_result =
+          smart_band_workout_service_dismiss_summary(
+            &g_ui.runtime.workout, g_ui.runtime.last_clock.elapsed_ms);
+        if (g_ui.runtime.last_workout_result ==
+            SMART_BAND_WORKOUT_SERVICE_OK)
+          {
+            close_system_view();
+          }
+        break;
+      default:
+        break;
+    }
+
+  smart_band_runtime_mark_dirty(&g_ui.runtime,
+                                SMART_BAND_DIRTY_WORKOUT |
+                                SMART_BAND_DIRTY_HISTORY);
+  render_system_view();
 }
 
 static void step_goal_cb(lv_event_t *event)
@@ -985,6 +1374,9 @@ static void timer_cb(lv_timer_t *timer)
     &g_ui.runtime, g_ui.runtime.model.page == SMART_BAND_PAGE_APPS);
 
   render_pending();
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  emit_q3_diagnostics();
+#endif
 }
 
 static void next_page(void)
@@ -1010,6 +1402,11 @@ static void page_drag_cb(lv_event_t *event)
   lv_coord_t dy;
   lv_coord_t threshold = max_coord(sx(36), 28);
   uint32_t press_duration;
+
+  if (g_ui.system_view != SMART_BAND_SYSTEM_VIEW_NONE)
+    {
+      return;
+    }
 
   if (indev == NULL)
     {
@@ -1218,6 +1615,8 @@ void smart_band_lvgl_destroy(void)
       g_ui.timer = NULL;
     }
 
+  smart_band_workout_view_unmount(&g_ui.workout_view);
+  smart_band_history_view_unmount(&g_ui.history_view);
   smart_band_watch_face_picker_unmount(&g_ui.face_picker);
   smart_band_runtime_deinit(&g_ui.runtime);
   smart_band_watch_face_unmount(&g_ui.watch_face);

@@ -35,6 +35,12 @@ static smart_band_platform_result_t noop_unavailable(void *context)
   return SMART_BAND_PLATFORM_UNAVAILABLE;
 }
 
+static bool noop_storage_is_permanently_unavailable(void *context)
+{
+  (void)context;
+  return true;
+}
+
 static smart_band_platform_result_t
 noop_display(void *context, bool enabled)
 {
@@ -111,7 +117,8 @@ static const smart_band_storage_ops_t g_noop_storage_ops =
 {
   noop_storage_read,
   noop_storage_write,
-  noop_unavailable
+  noop_unavailable,
+  noop_storage_is_permanently_unavailable
 };
 
 static const smart_band_power_ops_t g_noop_power_ops =

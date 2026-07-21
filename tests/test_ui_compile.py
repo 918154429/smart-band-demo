@@ -26,6 +26,9 @@ PRODUCTION_SOURCES = [
     APP_DIR / "services" / "runtime.c",
     APP_DIR / "services" / "storage_codec.c",
     APP_DIR / "services" / "store.c",
+    APP_DIR / "services" / "storage_transaction.c",
+    APP_DIR / "services" / "history_service.c",
+    APP_DIR / "services" / "workout_service.c",
     APP_DIR / "services" / "sync_protocol.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
@@ -49,6 +52,8 @@ PRODUCTION_SOURCES = [
     APP_DIR / "ui" / "lvgl" / "faces" / "minimal_face.c",
     APP_DIR / "ui" / "lvgl" / "faces" / "watch_face_registry.c",
     APP_DIR / "ui" / "lvgl" / "watch_pages.c",
+    APP_DIR / "ui" / "lvgl" / "workout_view.c",
+    APP_DIR / "ui" / "lvgl" / "history_view.c",
     APP_DIR / "icon_assets.c",
     APP_DIR / "smart_band_apps.c",
     APP_DIR / "apps" / "weather_app.c",
@@ -113,12 +118,14 @@ def compile_and_run() -> None:
             command = [
                 compiler, "/nologo", "/std:c11", "/W4", "/WX",
                 "/D_CRT_SECURE_NO_WARNINGS", "/D_CRT_NONSTDC_NO_WARNINGS",
+                "/DCONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=1",
                 f"/I{FAKE_LVGL_DIR}", f"/I{INCLUDE_DIR}", *sources,
                 f"/Fo{temp}{os.sep}", f"/Fe:{output}",
             ]
         else:
             command = [
                 compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+                "-DCONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=1",
                 "-pedantic", f"-I{FAKE_LVGL_DIR}", f"-I{INCLUDE_DIR}",
                 *sources, "-o", str(output),
             ]

@@ -625,7 +625,8 @@ static const smart_band_storage_ops_t g_file_ops =
 {
   storage_file_read,
   storage_file_write,
-  storage_file_flush
+  storage_file_flush,
+  NULL
 };
 
 smart_band_platform_result_t smart_band_storage_file_init(
