@@ -95,7 +95,7 @@ class Q3NativeHarnessTest(unittest.TestCase):
             Q3.local_point(*Q3.SESSION_PRIMARY_POINT), (523, 722)
         )
         self.assertEqual(
-            Q3.local_point(*Q3.SESSION_FINISH_POINT), (642, 722)
+            Q3.local_point(*Q3.SESSION_FINISH_POINT), (642, 704)
         )
         self.assertEqual(
             Q3.local_point(*Q3.RECOVERY_RESUME_POINT), (554, 703)
@@ -104,7 +104,7 @@ class Q3NativeHarnessTest(unittest.TestCase):
             Q3.local_point(*Q3.CONFIRM_ACCEPT_POINT), (731, 696)
         )
         self.assertEqual(
-            Q3.local_point(*Q3.SUMMARY_DONE_POINT), (642, 720)
+            Q3.local_point(*Q3.SUMMARY_DONE_POINT), (642, 704)
         )
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.local_point(330, 100)
