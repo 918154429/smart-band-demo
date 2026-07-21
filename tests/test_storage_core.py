@@ -1,4 +1,4 @@
-"""Compile and execute the production central-runtime host test."""
+"""Compile and execute the production Q1-S storage core tests."""
 
 from __future__ import annotations
 
@@ -13,23 +13,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "openvela_app" / "smart_band"
 INCLUDE_DIR = APP_DIR / "include"
-FAKE_LVGL_DIR = Path(__file__).with_name("fake_lvgl")
-TEST_SOURCE = Path(__file__).with_name("runtime_core_test.c")
+TEST_SOURCE = Path(__file__).with_name("storage_core_test.c")
 PRODUCTION_SOURCES = [
-    APP_DIR / "watch_model.c",
-    APP_DIR / "sensor_bridge.c",
-    APP_DIR / "smart_band_apps.c",
-    APP_DIR / "services" / "event_queue.c",
-    APP_DIR / "services" / "event_inbox.c",
-    APP_DIR / "services" / "clock.c",
-    APP_DIR / "services" / "capabilities.c",
-    APP_DIR / "services" / "runtime.c",
     APP_DIR / "services" / "storage_codec.c",
     APP_DIR / "services" / "store.c",
-    APP_DIR / "platform" / "platform_noop.c",
-    APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "platform" / "storage" / "storage_fault.c",
     APP_DIR / "platform" / "storage" / "storage_memory.c",
+    APP_DIR / "platform" / "storage" / "storage_file.c",
 ]
 
 
@@ -76,27 +66,29 @@ def find_compiler() -> tuple[str, str, Path | None]:
 
 def compile_and_run() -> None:
     compiler, family, compiler_environment = find_compiler()
-    with tempfile.TemporaryDirectory(prefix="smart-band-runtime-core-") as temp:
-        output = Path(temp) / ("runtime_core_test.exe" if os.name == "nt" else "runtime_core_test")
+    with tempfile.TemporaryDirectory(prefix="smart-band-storage-core-") as temp:
+        temp_root = Path(temp)
+        output = temp_root / ("storage_core_test.exe" if os.name == "nt" else "storage_core_test")
+        file_backend_root = temp_root / "file-backend"
+        file_backend_root.mkdir()
         sources = [str(TEST_SOURCE), *(str(source) for source in PRODUCTION_SOURCES)]
         if family == "msvc":
             command = [
                 compiler, "/nologo", "/std:c11", "/W4", "/WX",
-                "/D_CRT_SECURE_NO_WARNINGS", f"/I{FAKE_LVGL_DIR}",
-                f"/I{INCLUDE_DIR}", *sources, f"/Fo{temp}{os.sep}",
-                f"/Fe:{output}",
+                "/D_CRT_SECURE_NO_WARNINGS", f"/I{INCLUDE_DIR}", *sources,
+                f"/Fo{temp}{os.sep}", f"/Fe:{output}",
             ]
         else:
             command = [
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                "-pedantic", f"-I{FAKE_LVGL_DIR}", f"-I{INCLUDE_DIR}",
-                *sources, "-o", str(output),
+                "-pedantic", f"-I{INCLUDE_DIR}", *sources, "-o", str(output),
             ]
-        print("compiling production central runtime:", " ".join(command), flush=True)
+
+        print("compiling production Q1-S storage core:", " ".join(command), flush=True)
         if compiler_environment is None:
             subprocess.run(command, cwd=ROOT, check=True)
         else:
-            batch = Path(temp) / "compile_runtime_core_test.bat"
+            batch = temp_root / "compile_storage_core_test.bat"
             batch.write_text(
                 "@echo off\r\n"
                 f'call "{compiler_environment}" >nul || exit /b 1\r\n'
@@ -104,12 +96,12 @@ def compile_and_run() -> None:
                 encoding="utf-8",
             )
             subprocess.run(["cmd.exe", "/d", "/c", str(batch)], cwd=ROOT, check=True)
-        subprocess.run([str(output)], cwd=ROOT, check=True)
+        subprocess.run([str(output), str(file_backend_root)], cwd=ROOT, check=True)
 
 
 if __name__ == "__main__":
     try:
         compile_and_run()
     except (RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"central runtime host test failed: {error}", file=sys.stderr)
+        print(f"Q1-S storage core host test failed: {error}", file=sys.stderr)
         raise SystemExit(1) from error

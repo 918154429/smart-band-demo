@@ -6,6 +6,7 @@
 
 #include "icon_assets.h"
 #include "smart_band_runtime.h"
+#include "smart_band_storage_backend.h"
 #include "ui/lvgl/components.h"
 #include "ui/lvgl/watch_pages.h"
 
@@ -38,6 +39,7 @@ typedef struct
 
   lv_timer_t *timer;
   smart_band_runtime_t runtime;
+  smart_band_storage_file_t storage_file;
   lv_coord_t screen_w;
   lv_coord_t screen_h;
   lv_point_t press_point;
@@ -75,6 +77,30 @@ static uint32_t runtime_monotonic_now(void *context)
 {
   (void)context;
   return lv_tick_get();
+}
+
+static int runtime_init(const smart_band_clock_source_t *clock_source)
+{
+  smart_band_platform_t platform;
+
+  smart_band_platform_init_noop(&platform);
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH)
+  if (CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH[0] != '\0')
+    {
+      smart_band_platform_result_t result = smart_band_storage_file_init(
+        &g_ui.storage_file, CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH,
+        &platform.storage);
+
+      if (result != SMART_BAND_PLATFORM_OK)
+        {
+          fprintf(stderr, "smart_band: storage unavailable (%d)\n", result);
+          smart_band_platform_init_noop(&platform);
+        }
+    }
+#endif
+
+  return smart_band_runtime_init_with_platform(
+    &g_ui.runtime, clock_source, NULL, &platform);
 }
 
 static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
@@ -973,7 +999,7 @@ int smart_band_lvgl_create(lv_obj_t *parent)
   memset(&clock_source, 0, sizeof(clock_source));
   clock_source.wall_now = runtime_wall_now;
   clock_source.monotonic_now = runtime_monotonic_now;
-  if (smart_band_runtime_init(&g_ui.runtime, &clock_source, NULL) != 0)
+  if (runtime_init(&clock_source) != 0)
     {
       lv_obj_del(owned_root);
       g_ui.root = NULL;

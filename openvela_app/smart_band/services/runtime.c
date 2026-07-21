@@ -2,6 +2,19 @@
 
 #include <string.h>
 
+static const smart_band_store_record_spec_t g_runtime_checkpoint_spec =
+{
+  {SMART_BAND_RUNTIME_CHECKPOINT_SLOT_A,
+   SMART_BAND_RUNTIME_CHECKPOINT_SLOT_B},
+  SMART_BAND_STORAGE_RECORD_RUNTIME_CHECKPOINT,
+  1,
+  0,
+  NULL,
+  0,
+  NULL,
+  NULL
+};
+
 typedef struct
 {
   smart_band_page_t page;
@@ -218,6 +231,18 @@ int smart_band_runtime_init_with_platform(
       return -1;
     }
 
+  if (smart_band_store_init(&runtime->storage,
+                            &runtime->platform.storage) == 0)
+    {
+      uint8_t empty_payload = 0;
+      size_t payload_size = 0;
+
+      runtime->storage_initialized = true;
+      (void)smart_band_store_load(
+        &runtime->storage, &g_runtime_checkpoint_spec, &empty_payload, 0,
+        &payload_size, NULL);
+    }
+
   if (capabilities == NULL)
     {
       smart_band_capabilities_init_base(&runtime->capabilities);
@@ -226,6 +251,12 @@ int smart_band_runtime_init_with_platform(
   else
     {
       runtime->capabilities = *capabilities;
+    }
+
+  if (detect_capabilities && runtime->storage_initialized &&
+      runtime->storage.last_result != SMART_BAND_STORE_UNAVAILABLE)
+    {
+      runtime->capabilities.storage = true;
     }
 
   smart_band_event_queue_init(&runtime->events);
@@ -248,6 +279,11 @@ int smart_band_runtime_init_with_platform(
     {
       smart_band_sensor_bridge_deinit(&runtime->sensors);
       runtime->sensors_initialized = false;
+      if (runtime->storage_initialized)
+        {
+          smart_band_store_deinit(&runtime->storage);
+          runtime->storage_initialized = false;
+        }
       (void)smart_band_event_inbox_close(&runtime->external_events);
       return -1;
     }
@@ -279,6 +315,11 @@ void smart_band_runtime_deinit(smart_band_runtime_t *runtime)
   if (runtime->sensors_initialized)
     {
       smart_band_sensor_bridge_deinit(&runtime->sensors);
+    }
+
+  if (runtime->storage_initialized)
+    {
+      smart_band_store_deinit(&runtime->storage);
     }
 
   memset(runtime, 0, sizeof(*runtime));

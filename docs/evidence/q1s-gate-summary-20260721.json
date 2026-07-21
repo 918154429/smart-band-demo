@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "gate": "Q1-S",
+  "status": "pending_fresh_openvela_ci",
+  "recorded_at": "2026-07-21T13:45:55+08:00",
+  "scope": {
+    "implemented": [
+      "36-byte little-endian versioned storage frame with header and payload CRC32",
+      "typed record and schema validation with migration results",
+      "generation-based A/B slot selection and verified commits",
+      "memory and file storage backends",
+      "nth-operation storage fault injection",
+      "runtime checkpoint load and optional configured file backend"
+    ],
+    "excluded": [
+      "target-board filesystem atomicity and power-loss durability proof",
+      "slow-backend startup latency isolation",
+      "finals features A-G"
+    ]
+  },
+  "source_snapshot": {
+    "path": "/data/smart-band-q1s-20260721T132034CST/source-v6",
+    "archive_sha256": "1c8fbe9a27793133ce604c29b2472c75509f46313e85acb9c5f07e7e056792ad"
+  },
+  "linux_coverage": {
+    "toolchain": "GCC/gcov 13.3.0, gcovr 8.6",
+    "log": "/data/smart-band-q1s-20260721T132034CST/evidence/coverage-v6.log",
+    "overall": {
+      "covered_lines": 2125,
+      "total_lines": 2305,
+      "percent": 92.2,
+      "required_percent": 85.0
+    },
+    "new_production_sources": {
+      "services/storage_codec.c": 100.0,
+      "services/store.c": 95.9,
+      "platform/storage/storage_fault.c": 93.3,
+      "platform/storage/storage_memory.c": 93.5,
+      "platform/storage/storage_file.c": 91.4
+    },
+    "required_each_percent": 90.0,
+    "passed": true
+  },
+  "fault_matrix": {
+    "byte_cut_points_per_sweep": 160,
+    "covered": [
+      "short write",
+      "interrupted mixed-image write",
+      "EIO",
+      "ENOSPC",
+      "EROFS",
+      "truncate",
+      "header and payload CRC corruption",
+      "schema migration and unsupported fallback",
+      "generation zero and generation exhaustion",
+      "equal-generation conflict",
+      "uncertain read before write",
+      "file reopen and flush"
+    ],
+    "passed": true
+  },
+  "local_regression": {
+    "msvc_w4_wx_production_gates": 7,
+    "emulator_harness": "4 passed, 1 expected Windows POSIX skip",
+    "q0_harness": "14 passed, 1 expected Windows POSIX skip",
+    "native_harness": "13 passed, 1 expected Windows POSIX skip",
+    "browser": "6/6 passed",
+    "shell_syntax_and_rollback": "passed",
+    "passed": true
+  },
+  "fresh_openvela_ci": {
+    "status": "pending",
+    "run_id": null,
+    "url": null,
+    "artifact": null,
+    "artifact_sha256": null
+  },
+  "remaining_unproven": [
+    "target-board storage atomicity and power-loss durability",
+    "slow or permanently blocking backend isolation",
+    "physical board storage behavior",
+    "finals features A-G"
+  ]
+}

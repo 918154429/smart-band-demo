@@ -23,6 +23,8 @@
   8 个可运行小应用。
 - 异常处理：LVGL 初始化失败会返回错误；传感器打开失败不会崩溃，会使用兜底数据；
   温度设备名不一致时自动尝试备用路径；电池和传感器读数做基本范围保护。
+- 持久化底座：使用显式 little-endian 版本化格式、header/payload CRC32、generation 和
+  A/B slot；单槽损坏可回退，双槽损坏以可观测 degraded 状态使用默认值。
 
 ## 目录结构
 
@@ -30,8 +32,8 @@
 openvela_app/smart_band/        openvela 原生应用源码，可复制到 packages/demos
 openvela_app/smart_band/apps/   每个小应用的 context、view 与 lifecycle 实现
 openvela_app/smart_band/logic/  Calculator、2048、Mines 等无 LVGL 生产状态机
-openvela_app/smart_band/services 中央 runtime、事件、时钟与能力服务
-openvela_app/smart_band/platform 可注入 platform no-op 与 sync loopback
+openvela_app/smart_band/services 中央 runtime、事件、时钟、能力与版本化存储服务
+openvela_app/smart_band/platform 可注入 no-op、sync loopback 与 memory/file storage backend
 openvela_app/smart_band/ui/lvgl 通用 LVGL 组件与主页面 view
 openvela_app/smart_band/include 公共头文件、模型和图标声明
 openvela_app/smart_band/assets  项目图标与演示图片资源
@@ -65,6 +67,10 @@ THIRD_PARTY_NOTICES.md          第三方依赖声明
 真实传感器模式还需要启用 `SENSORS`、`UORB` 和
 `LVX_DEMO_SMART_BAND_USE_SENSORS`。若目标只需要演示数据，可关闭 provider；此时
 `sensor_bridge.c` 使用无设备依赖的空 provider，模型明确运行在 simulation 模式。
+
+持久化默认保持关闭。只有将 `LVX_DEMO_SMART_BAND_STORAGE_PATH` 配置为一个已经存在且
+可写的目录时，应用才会启用 file backend；空字符串继续使用显式 no-op backend。应用
+不会创建目录、猜测分区或声明目标板文件系统具备原子写语义。
 
 ## 接入 openvela 工程
 
@@ -299,7 +305,7 @@ SMART_BAND_ROLL_LOOPS=4 SMART_BAND_ROLL_DELAY=2 \
 
 ## 本机基础测试
 
-本仓库包含六组不依赖 openvela 的 host C 门禁。Python 入口会寻找
+本仓库包含七组不依赖 openvela 的 host C 门禁。Python 入口会寻找
 GCC、Clang 或 MSVC，直接编译生产模型、无传感器 provider、中央 runtime、应用
 registry、Timer、Stopwatch 以及完整 LVGL/UI 源集，再执行测试或编译链接 smoke：
 
@@ -308,6 +314,7 @@ python3 tests/test_watch_model.py
 python3 tests/test_time_apps.py
 python3 tests/test_app_runtime.py
 python3 tests/test_runtime_core.py
+python3 tests/test_storage_core.py
 python3 tests/test_app_logic.py
 python3 tests/test_ui_compile.py
 python3 tests/test_emulator_smoke.py
@@ -321,7 +328,8 @@ npm run test:browser
 
 测试覆盖定长事件队列的合并/满载/优先级、带锁外部事件 inbox、32 位单调 tick 回绕、
 启动无效后可恢复的 RTC、墙钟回拨、page-specific dirty render、可注入
-storage/power/haptic/sync 平台接口与固定内存 loopback、时间格式、页面切换、数据来源/TTL、
+storage/power/haptic/sync 平台接口与固定内存 loopback、版本化 storage codec、A/B slot、
+迁移、短写/写中断/截断/CRC/EIO/ENOSPC/EROFS 故障、时间格式、页面切换、数据来源/TTL、
 无传感器构建、模拟数据范围、步数目标，以及应用 runtime 的 owned container、失败回滚、
 双实例隔离、全部 UI/app 创建失败扫点和 1000 次 create/navigation/mount/tick/back/destroy
 零对象、event、timer 净增长，Timer/Stopwatch 的后台计时、卸载重挂载和 tick 回绕。测试不再维护
@@ -329,8 +337,8 @@ storage/power/haptic/sync 平台接口与固定内存 loopback、时间格式、
 reducer、显式 seed 与边界条件。浏览器门禁覆盖 320x568、667x375、焦点保留、
 ARIA live、对比度、触控尺寸和 reduced-motion。Linux CI 还使用
 `tests/test_core_coverage.py` 对完整 host-testable production C core 强制至少 85% 行
-覆盖率，并对新增 event queue/inbox、clock、capabilities、runtime、platform no-op 和
-sync loopback 每个生产源文件分别强制至少 90%。也可以
+覆盖率，并对新增 event queue/inbox、clock、capabilities、runtime、platform no-op、sync
+loopback、storage codec/store 及三个 storage backend 源文件分别强制至少 90%。也可以
 通过 `CC` 环境变量指定编译器。
 
 Q0 的 20 次冷启动/资源采集入口为 `scripts/collect_q0_baseline.py`；正式运行硬性要求
@@ -339,7 +347,9 @@ Q0 的 20 次冷启动/资源采集入口为 `scripts/collect_q0_baseline.py`；
 `scripts/run_native_e2e.py`，并精确断言 `Heart Rate`、`104 bpm`、`Source / Sensor`
 golden ROI。两者都拒绝覆盖非空 evidence 目录并保留结构化失败结果。当前结果见
 [`docs/q0-q1v-baseline-20260720.md`](docs/q0-q1v-baseline-20260720.md) 和
-[`docs/q1c-runtime-platform-20260720.md`](docs/q1c-runtime-platform-20260720.md)。
+[`docs/q1c-runtime-platform-20260720.md`](docs/q1c-runtime-platform-20260720.md)。Q1-S 的
+格式、恢复语义、故障矩阵和证据边界见
+[`docs/q1s-versioned-storage-20260721.md`](docs/q1s-versioned-storage-20260721.md)。
 
 ## 基本异常处理说明
 
@@ -374,4 +384,5 @@ golden ROI。两者都拒绝覆盖非空 evidence 目录并保留结构化失败
 
 - [openvela 复现说明](docs/openvela-runbook.md)
 - [实现过程说明](docs/implementation-notes.md)
+- [Q1-S 版本化存储与故障恢复](docs/q1s-versioned-storage-20260721.md)
 - [第三方依赖声明](THIRD_PARTY_NOTICES.md)

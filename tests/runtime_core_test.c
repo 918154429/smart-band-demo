@@ -1,4 +1,5 @@
 #include "smart_band_runtime.h"
+#include "smart_band_storage_backend.h"
 #include "smart_band_sync_loopback.h"
 
 #include "icon_assets.h"
@@ -477,12 +478,57 @@ static int test_runtime_defaults_and_init_rollback(void)
 
   CHECK(smart_band_runtime_init(&runtime, &source, NULL) == 0);
   CHECK(runtime.capabilities.display);
+  CHECK(runtime.storage_initialized);
+  CHECK(runtime.storage.last_result == SMART_BAND_STORE_UNAVAILABLE);
   smart_band_runtime_deinit(&runtime);
 
   g_fail_app_init = true;
   CHECK(smart_band_runtime_init(&runtime, &source, NULL) != 0);
   CHECK(!runtime.initialized);
   CHECK(!runtime.sensors_initialized);
+  return 0;
+}
+
+static int test_runtime_storage_failure_does_not_block_startup(void)
+{
+  static smart_band_storage_memory_t memory;
+  fake_clock_t fake = {FAKE_WALL_BASE, 1};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_storage_t storage;
+  smart_band_platform_t platform;
+  smart_band_runtime_t runtime;
+  const uint8_t corrupt[] = {0x53, 0x42, 0x00};
+
+  CHECK(smart_band_storage_memory_init(&memory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  CHECK(storage.ops->write(storage.context,
+                           SMART_BAND_RUNTIME_CHECKPOINT_SLOT_A,
+                           corrupt, sizeof(corrupt)) ==
+        SMART_BAND_PLATFORM_OK);
+  CHECK(storage.ops->write(storage.context,
+                           SMART_BAND_RUNTIME_CHECKPOINT_SLOT_B,
+                           corrupt, sizeof(corrupt)) ==
+        SMART_BAND_PLATFORM_OK);
+  smart_band_platform_init_noop(&platform);
+  platform.storage = storage;
+  CHECK(smart_band_runtime_init_with_platform(
+          &runtime, &source, NULL, &platform) == 0);
+  CHECK(runtime.initialized);
+  CHECK(runtime.storage_initialized);
+  CHECK(runtime.storage.last_result == SMART_BAND_STORE_DEGRADED);
+  CHECK(runtime.capabilities.storage);
+  CHECK(smart_band_runtime_tick(&runtime, false));
+  smart_band_runtime_deinit(&runtime);
+
+  CHECK(smart_band_storage_memory_init(&memory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  platform.storage = storage;
+  CHECK(smart_band_runtime_init_with_platform(
+          &runtime, &source, NULL, &platform) == 0);
+  CHECK(runtime.storage.last_result == SMART_BAND_STORE_DEFAULTED);
+  CHECK(runtime.capabilities.storage);
+  smart_band_runtime_deinit(&runtime);
   return 0;
 }
 
@@ -861,6 +907,7 @@ int main(void)
   CHECK(test_capability_base() == 0);
   CHECK(test_runtime_tick_order_and_clock_correction() == 0);
   CHECK(test_runtime_defaults_and_init_rollback() == 0);
+  CHECK(test_runtime_storage_failure_does_not_block_startup() == 0);
   CHECK(test_runtime_without_rtc() == 0);
   CHECK(test_event_inbox_contract() == 0);
   CHECK(test_platform_noop_contract() == 0);
