@@ -24,6 +24,12 @@ DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
 LAYOUT_SIZE = (330, 626)
 WORKOUT_LAUNCHER_POINT = (90, 177)
 HISTORY_LAUNCHER_POINT = (246, 177)
+START_WALK_POINT = (90, 388)
+SESSION_PRIMARY_POINT = (62, 596)
+SESSION_FINISH_POINT = (168, 596)
+RECOVERY_RESUME_POINT = (90, 579)
+CONFIRM_ACCEPT_POINT = (246, 573)
+SUMMARY_DONE_POINT = (168, 594)
 MAX_APPS_SWIPE_ATTEMPTS = 5
 SWIPE_STEP_DELAY_SECONDS = 0.03
 POST_SWIPE_SECONDS = 1.2
@@ -301,10 +307,12 @@ def run_soak(
         if elapsed >= warmup_seconds:
             formal_samples.append(state)
         if elapsed >= next_pause and elapsed + 5 < total:
-            click(console, evidence_dir, f"soak-pause-{next_pause}", local_point(62, 450))
+            click(console, evidence_dir, f"soak-pause-{next_pause}",
+                  local_point(*SESSION_PRIMARY_POINT))
             wait_for_state(child, lambda value: value["state"] == STATE_PAUSED,
                            5.0, "soak pause")
-            click(console, evidence_dir, f"soak-resume-{next_pause}", local_point(62, 450))
+            click(console, evidence_dir, f"soak-resume-{next_pause}",
+                  local_point(*SESSION_PRIMARY_POINT))
             wait_for_state(child, lambda value: value["state"] == STATE_ACTIVE,
                            5.0, "soak resume")
             next_pause += 300
@@ -538,13 +546,15 @@ def run(args: argparse.Namespace) -> int:
         active_boot.start(create_storage=True)
         check("boot1_pid", bool(active_boot.app_pid()), "boot1 app is not alive")
         open_workout(active_boot.console, active_boot.child, evidence_dir)
-        click(active_boot.console, evidence_dir, "start-walk", local_point(90, 315))
+        click(active_boot.console, evidence_dir, "start-walk",
+              local_point(*START_WALK_POINT))
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,
                        8.0, "boot1 active workout")
         for index in range(8):
             inject_motion(active_boot.console, evidence_dir, index)
             active_boot.child.pump(1.0)
-        click(active_boot.console, evidence_dir, "pause-workout", local_point(62, 450))
+        click(active_boot.console, evidence_dir, "pause-workout",
+              local_point(*SESSION_PRIMARY_POINT))
         paused = wait_for_state(
             active_boot.child,
             lambda state: state["state"] == STATE_PAUSED and state["checkpoint"] == 0,
@@ -574,7 +584,8 @@ def run(args: argparse.Namespace) -> int:
         check("recovery_steps_match", recovered["steps"] == paused["steps"],
               "recovered step count differs from paused checkpoint")
         result["screenshots"]["recovery"] = screenshot(active_boot, "q3-recovery")
-        click(active_boot.console, evidence_dir, "resume-recovery", local_point(90, 433))
+        click(active_boot.console, evidence_dir, "resume-recovery",
+              local_point(*RECOVERY_RESUME_POINT))
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,
                        8.0, "boot2 resumed workout")
         result["soak"] = run_soak(
@@ -584,12 +595,14 @@ def run(args: argparse.Namespace) -> int:
         for index in range(8, 12):
             inject_motion(active_boot.console, evidence_dir, index)
             active_boot.child.pump(1.0)
-        click(active_boot.console, evidence_dir, "finish-request", local_point(168, 450))
+        click(active_boot.console, evidence_dir, "finish-request",
+              local_point(*SESSION_FINISH_POINT))
         active_boot.child.pump(1.0)
         result["screenshots"]["confirmation"] = screenshot(
             active_boot, "q3-finish-confirmation"
         )
-        click(active_boot.console, evidence_dir, "finish-confirm", local_point(246, 427))
+        click(active_boot.console, evidence_dir, "finish-confirm",
+              local_point(*CONFIRM_ACCEPT_POINT))
         finished = wait_for_state(
             active_boot.child,
             lambda state: state["state"] == STATE_FINISHED
@@ -601,7 +614,8 @@ def run(args: argparse.Namespace) -> int:
         check("finished_steps_not_less", finished["steps"] >= recovered["steps"],
               "finished session lost recovered steps")
         result["screenshots"]["summary"] = screenshot(active_boot, "q3-summary")
-        click(active_boot.console, evidence_dir, "summary-done", local_point(168, 448))
+        click(active_boot.console, evidence_dir, "summary-done",
+              local_point(*SUMMARY_DONE_POINT))
         active_boot.child.pump(1.0)
         click(active_boot.console, evidence_dir, "open-history-after-finish",
               local_point(*HISTORY_LAUNCHER_POINT))
