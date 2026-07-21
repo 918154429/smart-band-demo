@@ -149,6 +149,35 @@ class Q3NativeHarnessTest(unittest.TestCase):
         self.assertEqual(sleep.call_count, expected_commands)
         self.assertEqual(child.pumps, [Q3.POST_SWIPE_SECONDS] * 3)
 
+    def test_click_pumps_frame_between_mouse_down_and_up(self) -> None:
+        events: list[tuple[str, object]] = []
+
+        class Console:
+            def command(self, command: str, name: str) -> str:
+                events.append(("command", (command, name)))
+                return "OK\n"
+
+        class Child:
+            def pump(self, seconds: float) -> None:
+                events.append(("pump", seconds))
+
+        Q3.click(Console(), Child(), ROOT, "start-walk", (554, 485))
+
+        self.assertEqual(
+            events,
+            [
+                (
+                    "command",
+                    ("event mouse 554 485 0 1", "console-start-walk-down.txt"),
+                ),
+                ("pump", Q3.CLICK_HOLD_SECONDS),
+                (
+                    "command",
+                    ("event mouse 554 485 0 0", "console-start-walk-up.txt"),
+                ),
+            ],
+        )
+
     def test_stability_contract_rejects_queue_or_timer_regression(self) -> None:
         stable = {
             "queue": 0,

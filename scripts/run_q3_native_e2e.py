@@ -33,6 +33,7 @@ SUMMARY_DONE_POINT = (168, 594)
 MAX_APPS_SWIPE_ATTEMPTS = 5
 SWIPE_STEP_DELAY_SECONDS = 0.03
 POST_SWIPE_SECONDS = 1.2
+CLICK_HOLD_SECONDS = 0.1
 Q3_MARKER = "smart_band:q3:v1"
 STATE_IDLE = 0
 STATE_ACTIVE = 2
@@ -192,7 +193,13 @@ def console_ok(response: str) -> bool:
     return NATIVE.console_response_ok(response)
 
 
-def click(console: Any, evidence_dir: Path, name: str, point: tuple[int, int]) -> None:
+def click(
+    console: Any,
+    child: Any,
+    evidence_dir: Path,
+    name: str,
+    point: tuple[int, int],
+) -> None:
     x, y = point
     for suffix, pressed in (("down", 1), ("up", 0)):
         response = console.command(
@@ -200,6 +207,8 @@ def click(console: Any, evidence_dir: Path, name: str, point: tuple[int, int]) -
         )
         if not console_ok(response):
             raise Q3NativeFailure(f"console rejected {name} {suffix}: {response!r}")
+        if pressed:
+            child.pump(CLICK_HOLD_SECONDS)
 
 
 def swipe_to_apps(console: Any, child: Any, evidence_dir: Path) -> None:
@@ -229,7 +238,10 @@ def swipe_to_apps(console: Any, child: Any, evidence_dir: Path) -> None:
 
 def open_workout(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
-    click(console, evidence_dir, "open-workout", local_point(*WORKOUT_LAUNCHER_POINT))
+    click(
+        console, child, evidence_dir, "open-workout",
+        local_point(*WORKOUT_LAUNCHER_POINT),
+    )
     child.pump(1.0)
     wait_for_state(
         child,
@@ -242,7 +254,10 @@ def open_workout(console: Any, child: Any, evidence_dir: Path) -> None:
 
 def open_history(console: Any, child: Any, evidence_dir: Path) -> None:
     swipe_to_apps(console, child, evidence_dir)
-    click(console, evidence_dir, "open-history", local_point(*HISTORY_LAUNCHER_POINT))
+    click(
+        console, child, evidence_dir, "open-history",
+        local_point(*HISTORY_LAUNCHER_POINT),
+    )
     child.pump(1.0)
     wait_for_state(
         child,
@@ -307,11 +322,11 @@ def run_soak(
         if elapsed >= warmup_seconds:
             formal_samples.append(state)
         if elapsed >= next_pause and elapsed + 5 < total:
-            click(console, evidence_dir, f"soak-pause-{next_pause}",
+            click(console, child, evidence_dir, f"soak-pause-{next_pause}",
                   local_point(*SESSION_PRIMARY_POINT))
             wait_for_state(child, lambda value: value["state"] == STATE_PAUSED,
                            5.0, "soak pause")
-            click(console, evidence_dir, f"soak-resume-{next_pause}",
+            click(console, child, evidence_dir, f"soak-resume-{next_pause}",
                   local_point(*SESSION_PRIMARY_POINT))
             wait_for_state(child, lambda value: value["state"] == STATE_ACTIVE,
                            5.0, "soak resume")
@@ -546,14 +561,14 @@ def run(args: argparse.Namespace) -> int:
         active_boot.start(create_storage=True)
         check("boot1_pid", bool(active_boot.app_pid()), "boot1 app is not alive")
         open_workout(active_boot.console, active_boot.child, evidence_dir)
-        click(active_boot.console, evidence_dir, "start-walk",
+        click(active_boot.console, active_boot.child, evidence_dir, "start-walk",
               local_point(*START_WALK_POINT))
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,
                        8.0, "boot1 active workout")
         for index in range(8):
             inject_motion(active_boot.console, evidence_dir, index)
             active_boot.child.pump(1.0)
-        click(active_boot.console, evidence_dir, "pause-workout",
+        click(active_boot.console, active_boot.child, evidence_dir, "pause-workout",
               local_point(*SESSION_PRIMARY_POINT))
         paused = wait_for_state(
             active_boot.child,
@@ -584,7 +599,7 @@ def run(args: argparse.Namespace) -> int:
         check("recovery_steps_match", recovered["steps"] == paused["steps"],
               "recovered step count differs from paused checkpoint")
         result["screenshots"]["recovery"] = screenshot(active_boot, "q3-recovery")
-        click(active_boot.console, evidence_dir, "resume-recovery",
+        click(active_boot.console, active_boot.child, evidence_dir, "resume-recovery",
               local_point(*RECOVERY_RESUME_POINT))
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,
                        8.0, "boot2 resumed workout")
@@ -595,13 +610,13 @@ def run(args: argparse.Namespace) -> int:
         for index in range(8, 12):
             inject_motion(active_boot.console, evidence_dir, index)
             active_boot.child.pump(1.0)
-        click(active_boot.console, evidence_dir, "finish-request",
+        click(active_boot.console, active_boot.child, evidence_dir, "finish-request",
               local_point(*SESSION_FINISH_POINT))
         active_boot.child.pump(1.0)
         result["screenshots"]["confirmation"] = screenshot(
             active_boot, "q3-finish-confirmation"
         )
-        click(active_boot.console, evidence_dir, "finish-confirm",
+        click(active_boot.console, active_boot.child, evidence_dir, "finish-confirm",
               local_point(*CONFIRM_ACCEPT_POINT))
         finished = wait_for_state(
             active_boot.child,
@@ -614,10 +629,11 @@ def run(args: argparse.Namespace) -> int:
         check("finished_steps_not_less", finished["steps"] >= recovered["steps"],
               "finished session lost recovered steps")
         result["screenshots"]["summary"] = screenshot(active_boot, "q3-summary")
-        click(active_boot.console, evidence_dir, "summary-done",
+        click(active_boot.console, active_boot.child, evidence_dir, "summary-done",
               local_point(*SUMMARY_DONE_POINT))
         active_boot.child.pump(1.0)
-        click(active_boot.console, evidence_dir, "open-history-after-finish",
+        click(active_boot.console, active_boot.child, evidence_dir,
+              "open-history-after-finish",
               local_point(*HISTORY_LAUNCHER_POINT))
         history = wait_for_state(
             active_boot.child,
