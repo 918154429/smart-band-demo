@@ -94,13 +94,14 @@ class EmulatorSmokeHarnessTest(unittest.TestCase):
             renderer_root = emulator_root / "lib64"
             qemu_root = emulator_root / "qemu/linux-x86_64"
             skin_root = openvela / "prebuilts/emulator/skins"
+            default_skin = skin_root / "xiaomi_smart_screen_10"
             evidence = base / "evidence"
             home = base / "home"
             for path in (
                 output,
                 renderer_root,
                 qemu_root,
-                skin_root,
+                default_skin,
                 evidence,
                 home,
             ):
