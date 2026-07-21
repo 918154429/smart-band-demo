@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -66,6 +67,17 @@ class EmulatorSmokeHelpersTest(unittest.TestCase):
                 EMULATOR_SMOKE.SmokeFailure, "vela_data.bin"
             ):
                 EMULATOR_SMOKE.validate_runtime_inputs(emulator_script, output)
+
+    def test_png_dimensions_reads_the_ihdr_size(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "screen.png"
+            image.write_bytes(
+                b"\x89PNG\r\n\x1a\n"
+                + struct.pack(">I", 13)
+                + b"IHDR"
+                + struct.pack(">II", 336, 480)
+            )
+            self.assertEqual(EMULATOR_SMOKE.png_dimensions(image), (336, 480))
 
 
 @unittest.skipUnless(
