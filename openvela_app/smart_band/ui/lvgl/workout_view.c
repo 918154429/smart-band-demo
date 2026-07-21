@@ -704,6 +704,7 @@ int smart_band_workout_view_mount(
   lv_obj_set_pos(view->root, 0, 0);
   lv_obj_set_size(view->root, lv_obj_get_width(parent),
                   lv_obj_get_height(parent));
+  lv_obj_update_layout(view->root);
   lv_obj_set_style_bg_opa(view->root, LV_OPA_TRANSP, 0);
   if (create_selection_layer(view) != 0 || create_session_layer(view) != 0 ||
       create_recovery_layer(view) != 0 || create_summary_layer(view) != 0 ||
