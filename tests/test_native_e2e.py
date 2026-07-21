@@ -210,7 +210,10 @@ class NativeE2ETest(unittest.TestCase):
             reference, reference, E2E.COMPACT_WATCH_FACE_DYNAMIC_MASKS
         )
         self.assertEqual(
-            E2E.COMPACT_WATCH_FACE_DYNAMIC_MASKS["time"], (98, 84, 247, 116)
+            E2E.COMPACT_WATCH_FACE_DYNAMIC_MASKS["date"], (100, 62, 236, 79)
+        )
+        self.assertEqual(
+            E2E.COMPACT_WATCH_FACE_DYNAMIC_MASKS["time"], (90, 84, 247, 116)
         )
         self.assertTrue(comparison["exact_match_outside_masks"])
         self.assertGreater(comparison["compared_ratio"], 0.90)
