@@ -24,6 +24,9 @@ DEFAULT_STORAGE_PATH = "/data/smart-band-q3"
 REFERENCE_SCREEN_SIZE = (336, 480)
 WORKOUT_LAUNCHER_POINT = (90, 177)
 HISTORY_LAUNCHER_POINT = (246, 177)
+MAX_APPS_SWIPE_ATTEMPTS = 5
+SWIPE_STEP_DELAY_SECONDS = 0.03
+POST_SWIPE_SECONDS = 1.2
 Q3_MARKER = "smart_band:q3:v1"
 STATE_IDLE = 0
 STATE_ACTIVE = 2
@@ -194,18 +197,26 @@ def click(console: Any, evidence_dir: Path, name: str, point: tuple[int, int]) -
 
 
 def swipe_to_apps(console: Any, child: Any, evidence_dir: Path) -> None:
-    for swipe in range(3):
+    for swipe in range(MAX_APPS_SWIPE_ATTEMPTS):
         for index, command in enumerate(NATIVE.build_swipe_commands(), 1):
             response = console.command(
                 command, f"console-apps-swipe-{swipe + 1:02d}-{index:02d}.txt"
             )
             if not console_ok(response):
                 raise Q3NativeFailure(f"apps swipe command failed: {response!r}")
-        child.pump(0.4)
+            time.sleep(SWIPE_STEP_DELAY_SECONDS)
+        child.pump(POST_SWIPE_SECONDS)
+        states = marker_states(child.transcript)
+        if (
+            states
+            and states[-1]["page"] == PAGE_APPS
+            and states[-1]["view"] == VIEW_NONE
+        ):
+            return
     wait_for_state(
         child,
         lambda state: state["page"] == PAGE_APPS and state["view"] == VIEW_NONE,
-        4.0,
+        POST_SWIPE_SECONDS,
         "Apps page",
     )
 

@@ -6,6 +6,7 @@ import argparse
 import importlib.util
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,16 @@ def settings(**overrides: object) -> argparse.Namespace:
 
 
 class Q3NativeHarnessTest(unittest.TestCase):
+    @staticmethod
+    def marker_for_page(page: int) -> bytes:
+        return (
+            f"smart_band:q3:v1 elapsed_ms={page + 1} page={page} view=0 "
+            "state=0 mode=0 active_ms=0 steps=0 recovery=0 phase=0 "
+            "checkpoint=0 daily=0 sessions=0 daily_store=0 session_store=0 "
+            "queue=0 dropped=0 evicted=0 coalesced=0 inbox_dropped=0 "
+            "objects=1 tick_gap_max_ms=0\r\n"
+        ).encode()
+
     def test_parse_marker_requires_complete_numeric_contract(self) -> None:
         line = (
             "smart_band:q3:v1 elapsed_ms=4200 page=3 view=1 state=3 mode=0 "
@@ -93,6 +104,34 @@ class Q3NativeHarnessTest(unittest.TestCase):
             Q3.validate_settings(settings(sample_interval_seconds=0))
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.validate_settings(settings(soak_seconds=5))
+
+    def test_swipe_to_apps_retries_until_structured_page_marker(self) -> None:
+        class Console:
+            def __init__(self) -> None:
+                self.commands: list[str] = []
+
+            def command(self, command: str, _name: str) -> str:
+                self.commands.append(command)
+                return "OK\n"
+
+        class Child:
+            def __init__(self, owner: Q3NativeHarnessTest) -> None:
+                self.owner = owner
+                self.transcript = owner.marker_for_page(0)
+                self.pumps: list[float] = []
+
+            def pump(self, seconds: float) -> None:
+                self.pumps.append(seconds)
+                self.transcript += self.owner.marker_for_page(len(self.pumps))
+
+        console = Console()
+        child = Child(self)
+        with mock.patch.object(Q3.time, "sleep") as sleep:
+            Q3.swipe_to_apps(console, child, ROOT)
+        expected_commands = 3 * len(Q3.NATIVE.build_swipe_commands())
+        self.assertEqual(len(console.commands), expected_commands)
+        self.assertEqual(sleep.call_count, expected_commands)
+        self.assertEqual(child.pumps, [Q3.POST_SWIPE_SECONDS] * 3)
 
     def test_stability_contract_rejects_queue_or_timer_regression(self) -> None:
         stable = {
