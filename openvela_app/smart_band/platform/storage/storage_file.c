@@ -389,7 +389,7 @@ static smart_band_platform_result_t corrupt_file(const char *path,
   return result;
 }
 
-static smart_band_platform_result_t file_read(
+static smart_band_platform_result_t storage_file_read(
   void *opaque, uint32_t object_id, void *buffer, size_t capacity,
   size_t *actual_size)
 {
@@ -477,7 +477,7 @@ static smart_band_platform_result_t file_read(
   return result;
 }
 
-static smart_band_platform_result_t file_write(
+static smart_band_platform_result_t storage_file_write(
   void *opaque, uint32_t object_id, const void *buffer, size_t size)
 {
   smart_band_storage_file_t *context = opaque;
@@ -568,7 +568,7 @@ static smart_band_platform_result_t file_write(
   return SMART_BAND_PLATFORM_OK;
 }
 
-static smart_band_platform_result_t file_flush(void *opaque)
+static smart_band_platform_result_t storage_file_flush(void *opaque)
 {
   smart_band_storage_file_t *context = opaque;
   smart_band_storage_fault_kind_t kind;
@@ -623,9 +623,9 @@ static smart_band_platform_result_t file_flush(void *opaque)
 
 static const smart_band_storage_ops_t g_file_ops =
 {
-  file_read,
-  file_write,
-  file_flush
+  storage_file_read,
+  storage_file_write,
+  storage_file_flush
 };
 
 smart_band_platform_result_t smart_band_storage_file_init(
