@@ -332,15 +332,55 @@ static int test_event_queue(void)
                                      SMART_BAND_EVENT_TOUCH_ACTIVITY, NULL));
   CHECK(!smart_band_event_queue_take(&queue, SMART_BAND_EVENT_NONE,
                                      &popped));
+  CHECK(!smart_band_event_queue_take_next_notification(NULL, &popped));
+  CHECK(!smart_band_event_queue_take_next_notification(&queue, NULL));
+  CHECK(!smart_band_event_queue_take_next_notification(&queue, &popped));
+  CHECK(!smart_band_event_queue_take_next_domain(NULL, &popped));
+  CHECK(!smart_band_event_queue_take_next_domain(&queue, NULL));
+  event = make_event(SMART_BAND_EVENT_TOUCH_ACTIVITY, 700u);
+  CHECK(smart_band_event_queue_push(&queue, &event));
+  event = make_event(SMART_BAND_EVENT_NOTIFICATION_ACTION, 701u);
+  CHECK(smart_band_event_queue_push(&queue, &event));
+  CHECK(smart_band_event_queue_take_next_notification(&queue, &popped));
+  CHECK(popped.type == SMART_BAND_EVENT_NOTIFICATION_ACTION);
+  CHECK(smart_band_event_queue_take(&queue,
+                                    SMART_BAND_EVENT_TOUCH_ACTIVITY,
+                                    &popped));
+  CHECK(popped.payload.generic.code == 700u);
   event = make_event(SMART_BAND_EVENT_NOTIFICATION_RECEIVED, 0);
   event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_APP;
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_LOW;
+  CHECK(smart_band_event_priority(&event) == SMART_BAND_EVENT_PRIORITY_LOW);
   event.payload.notification_received.priority =
     SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
   CHECK(smart_band_event_priority(&event) ==
         SMART_BAND_EVENT_PRIORITY_NORMAL);
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL;
+  CHECK(smart_band_event_priority(&event) ==
+        SMART_BAND_EVENT_PRIORITY_CRITICAL);
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
   event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_CALL;
   CHECK(smart_band_event_priority(&event) ==
         SMART_BAND_EVENT_PRIORITY_HIGH);
+
+  smart_band_event_queue_init(&queue);
+  event = make_event(SMART_BAND_EVENT_STORAGE_FLUSH_REQUEST, 800u);
+  CHECK(smart_band_event_queue_push(&queue, &event));
+  for (index = 1u; index < SMART_BAND_EVENT_QUEUE_CAPACITY; index++)
+    {
+      event = make_event(SMART_BAND_EVENT_TOUCH_ACTIVITY, (uint32_t)index);
+      CHECK(smart_band_event_queue_push(&queue, &event));
+    }
+  event = make_event(SMART_BAND_EVENT_NOTIFICATION_RECEIVED, 801u);
+  event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_CALL;
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH;
+  CHECK(smart_band_event_queue_push(&queue, &event));
+  CHECK(queue.evicted == 1u);
+  CHECK(queue.items[0].type == SMART_BAND_EVENT_STORAGE_FLUSH_REQUEST);
   return 0;
 }
 
