@@ -116,6 +116,9 @@ static bool update_steps_from_counter(smart_band_sensor_bridge_t *bridge,
     }
 
   steps = clamp_int((int)(sample.steps % 100000u), 0, 99999);
+  bridge->raw_step_counter = sample.steps;
+  bridge->raw_step_source = SMART_BAND_STEP_SOURCE_SENSOR;
+  bridge->have_raw_step = true;
   bridge->derived_steps = steps;
   smart_band_state_publish_metric_at(
     state, SMART_BAND_METRIC_STEPS, steps, SMART_BAND_DATA_SOURCE_SENSOR,
@@ -151,6 +154,9 @@ static void update_steps_from_accel(smart_band_sensor_bridge_t *bridge,
 
   bridge->last_accel_energy = energy;
   bridge->have_last_accel = true;
+  bridge->raw_step_counter = (uint64_t)bridge->derived_steps;
+  bridge->raw_step_source = SMART_BAND_STEP_SOURCE_DERIVED;
+  bridge->have_raw_step = true;
 
   step_info = smart_band_state_metric_info(state, SMART_BAND_METRIC_STEPS);
   if (step_info != NULL &&
@@ -375,4 +381,28 @@ void smart_band_sensor_bridge_deinit(smart_band_sensor_bridge_t *bridge)
   bridge->have_last_accel = false;
   bridge->have_temperature = false;
   bridge->have_humidity = false;
+  bridge->have_raw_step = false;
+}
+
+bool smart_band_sensor_bridge_step_sample(
+  const smart_band_sensor_bridge_t *bridge, uint64_t monotonic_ms,
+  bool fresh, smart_band_step_sample_t *sample)
+{
+  if (bridge == NULL || sample == NULL)
+    {
+      return false;
+    }
+
+  memset(sample, 0, sizeof(*sample));
+  sample->monotonic_ms = monotonic_ms;
+  if (!bridge->have_raw_step)
+    {
+      return true;
+    }
+
+  sample->source = bridge->raw_step_source;
+  sample->raw_counter = bridge->raw_step_counter;
+  sample->available = true;
+  sample->fresh = fresh;
+  return true;
 }

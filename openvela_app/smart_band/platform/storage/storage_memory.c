@@ -223,7 +223,8 @@ static const smart_band_storage_ops_t g_memory_ops =
 {
   memory_read,
   memory_write,
-  memory_flush
+  memory_flush,
+  NULL
 };
 
 smart_band_platform_result_t smart_band_storage_memory_init(

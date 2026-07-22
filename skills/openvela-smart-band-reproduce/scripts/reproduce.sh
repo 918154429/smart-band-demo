@@ -9,6 +9,8 @@ SKIP_BUILD=0
 NO_BROWSER=0
 DRY_RUN=0
 ALLOW_DIRTY=0
+STORAGE_PATH="${SMART_BAND_STORAGE_PATH:-}"
+E2E_DIAGNOSTICS="${SMART_BAND_E2E_DIAGNOSTICS:-0}"
 OPENVELA_ROOT=""
 DEFCONFIG_PATH=""
 DEFCONFIG_BACKUP=""
@@ -54,6 +56,9 @@ Environment:
                             full openvela manifest commit, defaults to versions.env
   SMART_BAND_OPENVELA_MANIFEST_FILE
                             release manifest path, defaults to tags/trunk-5.4.xml
+  SMART_BAND_STORAGE_PATH   existing guest directory for persistent Q3 data
+  SMART_BAND_E2E_DIAGNOSTICS
+                            1 enables bounded machine-readable Q3 state lines
 
 Safety:
   --dry-run       Validate prerequisites and print planned mutations only.
@@ -138,6 +143,18 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+case "$E2E_DIAGNOSTICS" in
+  0|1) ;;
+  *) die "SMART_BAND_E2E_DIAGNOSTICS must be 0 or 1" ;;
+esac
+if [ -n "$STORAGE_PATH" ]; then
+  [[ "$STORAGE_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] ||
+    die "SMART_BAND_STORAGE_PATH must be a simple absolute guest path"
+  case "$STORAGE_PATH/" in
+    */../*|*/./*) die "SMART_BAND_STORAGE_PATH cannot contain dot segments" ;;
+  esac
+fi
 
 guess_openvela_root() {
   if [ -n "$OPENVELA_ROOT" ]; then
@@ -472,6 +489,14 @@ enable_config() {
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS" "y"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_PRIORITY" "100"
   append_unique_config "$defconfig" "CONFIG_LVX_DEMO_SMART_BAND_BASIC_STACKSIZE" "32768"
+  if [ -n "$STORAGE_PATH" ]; then
+    append_unique_config "$defconfig" \
+      "CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH" "\"$STORAGE_PATH\""
+  fi
+  if [ "$E2E_DIAGNOSTICS" -eq 1 ]; then
+    append_unique_config "$defconfig" \
+      "CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS" "y"
+  fi
   maybe_fail "after-enable-config"
 }
 

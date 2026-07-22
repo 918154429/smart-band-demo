@@ -198,6 +198,12 @@ jobs:
         target:
           - name: Workout core
             script: tests/test_workout_core.py
+          - name: Workout service
+            script: tests/test_workout_service.py
+          - name: History service
+            script: tests/test_history_service.py
+          - name: Storage transaction
+            script: tests/test_storage_transaction.py
           - name: Notification core
             script: tests/test_notification_core.py
           - name: Power policy
@@ -280,6 +286,7 @@ jobs:
           python tests/test_emulator_smoke.py
           python tests/test_q0_baseline.py
           python tests/test_native_e2e.py
+          python tests/test_q3_native_e2e.py
 
   shell-syntax:
     runs-on: ubuntu-latest
@@ -290,6 +297,7 @@ jobs:
           test "$(git ls-files -s scripts/reproduce_openvela_demo.sh | awk '{print $1}')" = 100755
           test "$(git ls-files -s scripts/roll_emulator_sensors.sh | awk '{print $1}')" = 100755
           test "$(git ls-files -s scripts/smoke_openvela_emulator.py | awk '{print $1}')" = 100755
+          test "$(git ls-files -s scripts/run_q3_native_e2e.py | awk '{print $1}')" = 100755
           test "$(git ls-files -s skills/openvela-smart-band-reproduce/scripts/reproduce.sh | awk '{print $1}')" = 100755
       - name: Validate shell syntax
         run: bash -n scripts/*.sh skills/openvela-smart-band-reproduce/scripts/*.sh
@@ -305,6 +313,7 @@ jobs:
             services/runtime.c \
             services/storage_codec.c \
             services/store.c \
+            services/storage_transaction.c \
             services/sync_protocol.c \
             platform/platform_noop.c \
             platform/loopback/sync_loopback.c \

@@ -63,6 +63,11 @@ typedef struct
       uint32_t code;
       int32_t value;
     } generic;
+    struct
+    {
+      uint8_t command;
+      uint8_t mode;
+    } workout;
   } payload;
 } smart_band_event_t;
 

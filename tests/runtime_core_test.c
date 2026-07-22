@@ -900,6 +900,147 @@ static int test_runtime_rejects_partial_event_lock(void)
   return 0;
 }
 
+static int test_runtime_dispatches_workout_commands(void)
+{
+  fake_clock_t fake = {FAKE_WALL_BASE, 100};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_runtime_t runtime;
+  smart_band_event_t event;
+  smart_band_event_t retained;
+
+  CHECK(smart_band_runtime_init(&runtime, &source, NULL) == 0);
+  (void)smart_band_runtime_take_dirty(&runtime);
+  event = make_event(SMART_BAND_EVENT_TOUCH_ACTIVITY, 77);
+  CHECK(smart_band_runtime_post(&runtime, &event));
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_WORKOUT_COMMAND;
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_START;
+  event.payload.workout.mode = SMART_BAND_WORKOUT_MODE_WALK;
+  CHECK(smart_band_runtime_post(&runtime, &event));
+
+  fake.wall_time++;
+  fake.monotonic_ms += 1000u;
+  CHECK(smart_band_runtime_tick(&runtime, false));
+  CHECK(runtime.workout.model.data.state ==
+        SMART_BAND_WORKOUT_STATE_COUNTDOWN);
+  CHECK(smart_band_event_queue_count(&runtime.events) == 1u);
+  CHECK(smart_band_event_queue_pop(&runtime.events, &retained));
+  CHECK(retained.type == SMART_BAND_EVENT_TOUCH_ACTIVITY);
+
+  for (int index = 0; index < 3; index++)
+    {
+      fake.wall_time++;
+      fake.monotonic_ms += 1000u;
+      CHECK(smart_band_runtime_tick(&runtime, false));
+    }
+  CHECK(runtime.workout.model.data.state == SMART_BAND_WORKOUT_STATE_ACTIVE);
+
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_WORKOUT_COMMAND;
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_PAUSE;
+  CHECK(smart_band_runtime_post(&runtime, &event));
+  fake.wall_time++;
+  fake.monotonic_ms += 1000u;
+  CHECK(smart_band_runtime_tick(&runtime, false));
+  CHECK(runtime.workout.model.data.state == SMART_BAND_WORKOUT_STATE_PAUSED);
+  CHECK(runtime.workout.pause_count == 1u);
+
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_RESUME;
+  CHECK(smart_band_runtime_post(&runtime, &event));
+  fake.wall_time++;
+  fake.monotonic_ms += 1000u;
+  CHECK(smart_band_runtime_tick(&runtime, false));
+  CHECK(runtime.workout.model.data.state == SMART_BAND_WORKOUT_STATE_ACTIVE);
+
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_FINISH;
+  CHECK(smart_band_runtime_post(&runtime, &event));
+  fake.wall_time++;
+  fake.monotonic_ms += 1000u;
+  CHECK(smart_band_runtime_tick(&runtime, false));
+  CHECK(runtime.workout.model.data.state == SMART_BAND_WORKOUT_STATE_FINISHED);
+  CHECK(runtime.workout.phase == SMART_BAND_WORKOUT_SERVICE_PHASE_READY);
+  CHECK(runtime.history.session_count == 1u);
+  CHECK(runtime.history.sessions[0].pause_count == 1u);
+  CHECK((smart_band_runtime_take_dirty(&runtime) &
+         (SMART_BAND_DIRTY_WORKOUT | SMART_BAND_DIRTY_HISTORY)) != 0u);
+  smart_band_runtime_deinit(&runtime);
+  return 0;
+}
+
+static int test_immediate_dispatch_samples_current_clock(void)
+{
+  fake_clock_t fake = {FAKE_WALL_BASE, 100};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_runtime_t runtime;
+  smart_band_event_t event;
+
+  CHECK(smart_band_runtime_init(&runtime, &source, NULL) == 0);
+  fake.wall_time += 2;
+  fake.monotonic_ms += 750u;
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_WORKOUT_COMMAND;
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_START;
+  event.payload.workout.mode = SMART_BAND_WORKOUT_MODE_RUN;
+  CHECK(smart_band_runtime_post(&runtime, &event));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(runtime.workout.model.last_monotonic_ms == 750u);
+  CHECK(runtime.last_clock.elapsed_ms == 750u);
+  smart_band_runtime_deinit(&runtime);
+  return 0;
+}
+
+static int test_runtime_deinit_checkpoints_live_workout(void)
+{
+  fake_clock_t fake = {FAKE_WALL_BASE, 100};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_storage_memory_t memory;
+  smart_band_storage_t storage;
+  smart_band_platform_t platform;
+  smart_band_runtime_t runtime1;
+  smart_band_runtime_t runtime2;
+  smart_band_event_t event;
+  smart_band_workout_snapshot_t before;
+  smart_band_workout_snapshot_t recovered;
+  int index;
+
+  smart_band_platform_init_noop(&platform);
+  CHECK(smart_band_storage_memory_init(&memory, &storage) ==
+        SMART_BAND_PLATFORM_OK);
+  platform.storage = storage;
+  CHECK(smart_band_runtime_init_with_platform(
+          &runtime1, &source, NULL, &platform) == 0);
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_WORKOUT_COMMAND;
+  event.payload.workout.command = SMART_BAND_WORKOUT_COMMAND_START;
+  event.payload.workout.mode = SMART_BAND_WORKOUT_MODE_WALK;
+  CHECK(smart_band_runtime_post(&runtime1, &event));
+  smart_band_runtime_dispatch_pending(&runtime1);
+  for (index = 0; index < 8; index++)
+    {
+      fake.wall_time++;
+      fake.monotonic_ms += 1000u;
+      CHECK(smart_band_runtime_tick(&runtime1, false));
+    }
+  CHECK(smart_band_workout_service_snapshot(&runtime1.workout, &before));
+  CHECK(before.state == SMART_BAND_WORKOUT_STATE_ACTIVE);
+  CHECK(before.active_duration_ms == 5000u);
+  smart_band_runtime_deinit(&runtime1);
+
+  fake.wall_time++;
+  fake.monotonic_ms += 1000u;
+  CHECK(smart_band_runtime_init_with_platform(
+          &runtime2, &source, NULL, &platform) == 0);
+  CHECK(runtime2.workout.recovery_pending);
+  CHECK(smart_band_workout_service_snapshot(&runtime2.workout, &recovered));
+  CHECK(recovered.state == SMART_BAND_WORKOUT_STATE_RECOVERY_CONFIRMATION);
+  CHECK(recovered.active_duration_ms == before.active_duration_ms);
+  smart_band_runtime_deinit(&runtime2);
+  return 0;
+}
+
 int main(void)
 {
   CHECK(test_event_queue() == 0);
@@ -915,6 +1056,9 @@ int main(void)
   CHECK(test_runtime_platform_ingress_and_dirty() == 0);
   CHECK(test_runtime_rejects_partial_event_lock() == 0);
   CHECK(test_runtime_recovers_when_rtc_becomes_valid() == 0);
+  CHECK(test_runtime_dispatches_workout_commands() == 0);
+  CHECK(test_immediate_dispatch_samples_current_clock() == 0);
+  CHECK(test_runtime_deinit_checkpoints_live_workout() == 0);
   puts("smart band central runtime production tests passed");
   return 0;
 }

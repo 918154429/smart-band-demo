@@ -21,7 +21,7 @@ import time
 import traceback
 import zlib
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,8 +46,8 @@ COMPACT_WATCH_FACE_REFERENCE = (
 )
 COMPACT_WATCH_FACE_DYNAMIC_MASKS = {
     "battery": (235, 13, 319, 29),
-    "date": (111, 62, 226, 79),
-    "time": (103, 85, 243, 115),
+    "date": (100, 62, 236, 79),
+    "time": (90, 84, 247, 116),
     "sleep_value": (135, 219, 225, 237),
     "heart_value": (135, 283, 225, 305),
     "stress_value": (135, 348, 225, 366),
@@ -59,6 +59,7 @@ HEART_VALUE_REGION = (550, 330, 790, 390)
 SOURCE_LABEL_REGION = (650, 490, 790, 545)
 MIN_CHANGED_PIXELS = 32
 FACE_APPLY_RENDER_SECONDS = 1.0
+POINTER_CLICK_HOLD_SECONDS = 0.1
 MAX_SWIPE_ATTEMPTS = 3
 RUN_ID_ENV = "SMART_BAND_NATIVE_E2E_RUN_ID"
 GOLDEN_REGIONS = {
@@ -631,6 +632,17 @@ def build_swipe_commands() -> list[str]:
     return [f"event mouse {x} {y} 0 {button}" for x, y, button in points]
 
 
+def send_pointer_click(
+    send_pointer: Callable[[str, tuple[int, int], bool], None],
+    child: Any,
+    name: str,
+    point: tuple[int, int],
+) -> None:
+    send_pointer(f"{name}-down", point, True)
+    child.pump(POINTER_CLICK_HOLD_SECONDS)
+    send_pointer(f"{name}-up", point, False)
+
+
 def console_response_ok(response: str) -> bool:
     return re.search(r"(?:^|\r?\n)OK\r?\n?$", response) is not None
 
@@ -1108,9 +1120,10 @@ def run_journey(args: argparse.Namespace) -> int:
             watch_image, picker_image, PAGE_TRANSITION_REGION
         )
 
-        send_picker_pointer("next-down", picker_points["next"], True)
-        send_picker_pointer("next-up", picker_points["next"], False)
-        child.pump(0.2)
+        send_pointer_click(
+            send_picker_pointer, child, "next", picker_points["next"]
+        )
+        child.pump(args.ui_settle_seconds)
         picker_activity_image, picker_activity_record = capture_screenshot(
             console, evidence_dir, "watch-face-picker-activity"
         )
@@ -1119,8 +1132,9 @@ def run_journey(args: argparse.Namespace) -> int:
         )
 
         selection_start = len(child.transcript)
-        send_picker_pointer("apply-down", picker_points["apply"], True)
-        send_picker_pointer("apply-up", picker_points["apply"], False)
+        send_pointer_click(
+            send_picker_pointer, child, "apply", picker_points["apply"]
+        )
         child.pump(FACE_APPLY_RENDER_SECONDS)
         activity_image, activity_record = capture_screenshot(
             console, evidence_dir, "watch-face-activity"
@@ -1205,9 +1219,10 @@ def run_journey(args: argparse.Namespace) -> int:
             activity_image, picker_from_activity_image, PAGE_TRANSITION_REGION
         )
 
-        send_picker_pointer("minimal-next-down", picker_points["next"], True)
-        send_picker_pointer("minimal-next-up", picker_points["next"], False)
-        child.pump(0.2)
+        send_pointer_click(
+            send_picker_pointer, child, "minimal-next", picker_points["next"]
+        )
+        child.pump(args.ui_settle_seconds)
         picker_minimal_image, picker_minimal_record = capture_screenshot(
             console, evidence_dir, "watch-face-picker-minimal"
         )
@@ -1216,8 +1231,9 @@ def run_journey(args: argparse.Namespace) -> int:
         )
 
         minimal_selection_start = len(child.transcript)
-        send_picker_pointer("minimal-apply-down", picker_points["apply"], True)
-        send_picker_pointer("minimal-apply-up", picker_points["apply"], False)
+        send_pointer_click(
+            send_picker_pointer, child, "minimal-apply", picker_points["apply"]
+        )
         child.pump(FACE_APPLY_RENDER_SECONDS)
         minimal_image, minimal_record = capture_screenshot(
             console, evidence_dir, "watch-face-minimal"

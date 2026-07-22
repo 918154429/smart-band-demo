@@ -3,6 +3,7 @@
 
 #include "smart_band_platform_result.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@ typedef struct
   smart_band_platform_result_t (*write)(void *context, uint32_t object_id,
                                         const void *buffer, size_t size);
   smart_band_platform_result_t (*flush)(void *context);
+  bool (*is_permanently_unavailable)(void *context);
 } smart_band_storage_ops_t;
 
 typedef struct
@@ -25,6 +27,14 @@ typedef struct
   const smart_band_storage_ops_t *ops;
   void *context;
 } smart_band_storage_t;
+
+static inline bool smart_band_storage_is_permanently_unavailable(
+  const smart_band_storage_t *storage)
+{
+  return storage != NULL && storage->ops != NULL &&
+         storage->ops->is_permanently_unavailable != NULL &&
+         storage->ops->is_permanently_unavailable(storage->context);
+}
 
 #ifdef __cplusplus
 }

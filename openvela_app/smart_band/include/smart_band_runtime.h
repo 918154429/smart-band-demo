@@ -8,6 +8,8 @@
 #include "smart_band_event.h"
 #include "smart_band_platform.h"
 #include "smart_band_store.h"
+#include "smart_band_history.h"
+#include "smart_band_workout_service.h"
 #include "watch_model.h"
 
 #include <stdbool.h>
@@ -17,8 +19,10 @@
 extern "C" {
 #endif
 
-#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_A UINT32_C(0x00010000)
-#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_B UINT32_C(0x00010001)
+#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_A \
+  SMART_BAND_WORKOUT_CHECKPOINT_SLOT_A
+#define SMART_BAND_RUNTIME_CHECKPOINT_SLOT_B \
+  SMART_BAND_WORKOUT_CHECKPOINT_SLOT_B
 
 typedef struct
 {
@@ -32,10 +36,15 @@ typedef struct
   smart_band_capabilities_t capabilities;
   smart_band_platform_t platform;
   smart_band_store_t storage;
+  smart_band_history_t history;
+  smart_band_workout_service_t workout;
+  smart_band_workout_service_result_t last_workout_result;
   uint32_t dirty;
   bool initialized;
   bool sensors_initialized;
   bool storage_initialized;
+  bool history_initialized;
+  bool workout_initialized;
 } smart_band_runtime_t;
 
 typedef uint32_t smart_band_dirty_flags_t;
@@ -49,7 +58,9 @@ typedef uint32_t smart_band_dirty_flags_t;
 #define SMART_BAND_DIRTY_STATUS      (1u << 5)
 #define SMART_BAND_DIRTY_APP         (1u << 6)
 #define SMART_BAND_DIRTY_PAGE        (1u << 7)
-#define SMART_BAND_DIRTY_ALL         ((1u << 8) - 1u)
+#define SMART_BAND_DIRTY_WORKOUT     (1u << 8)
+#define SMART_BAND_DIRTY_HISTORY     (1u << 9)
+#define SMART_BAND_DIRTY_ALL         ((1u << 10) - 1u)
 
 int smart_band_runtime_init(
   smart_band_runtime_t *runtime,
@@ -67,6 +78,7 @@ bool smart_band_runtime_post_external(void *context,
                                       const smart_band_event_t *event);
 size_t smart_band_runtime_drain_external(smart_band_runtime_t *runtime,
                                          size_t limit);
+void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime);
 bool smart_band_runtime_tick(smart_band_runtime_t *runtime,
                              bool active_app_visible);
 bool smart_band_runtime_refresh_sensors(smart_band_runtime_t *runtime);

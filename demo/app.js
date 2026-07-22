@@ -9,6 +9,8 @@ const STEP_GOAL_DELTA = 1000;
 const ICON_ROOT = "../openvela_app/smart_band/assets/generated_icons";
 
 const apps = [
+  { id: "workout", title: "Workout", icon: "steps.png", color: "#49a89f", system: true },
+  { id: "history", title: "History", icon: "stopwatch.png", color: "#d8a454", system: true },
   { id: "weather", title: "Weather", icon: "weather.png", color: "#f5c66e" },
   { id: "calculator", title: "Calculator", icon: "calculator.png", color: "#80cbc3" },
   { id: "timer", title: "Timer", icon: "timer.png", color: "#a98bd6" },
@@ -53,6 +55,15 @@ const state = {
   minesStatus: "Find safe cells",
   tetrisCells: new Set(),
   tetrisPiece: { x: 2, y: 0 },
+  workoutStatus: "idle",
+  workoutMode: "Walk",
+  workoutCountdown: 3,
+  workoutSeconds: 0,
+  workoutSteps: 0,
+  workoutPauses: 0,
+  workoutConfirm: null,
+  latestWorkout: null,
+  dailyHistory: [3810, null, 6240, 7025, null, 8430, 4260],
 };
 
 const contentElement = document.getElementById("content");
@@ -320,6 +331,85 @@ function renderWeatherApp() {
     </section>`;
 }
 
+function renderWorkoutApp() {
+  const status = state.workoutStatus;
+  let body;
+  if (status === "idle" || status === "aborted") {
+    body = `
+      <section class="workout-panel workout-choice">
+        <p class="source">Choose a workout</p>
+        <div class="button-row">
+          <button type="button" data-action="startWalk">Walk</button>
+          <button type="button" data-action="startRun">Run</button>
+        </div>
+      </section>`;
+  } else if (status === "finished") {
+    body = `
+      <section class="workout-panel workout-summary">
+        <p class="source">${state.workoutMode} complete</p>
+        <div class="big-time">${formatDuration(state.workoutSeconds)}</div>
+        <div class="mini-grid">
+          <div class="mini-card"><span>Steps</span><strong>${state.workoutSteps}</strong></div>
+          <div class="mini-card"><span>Pauses</span><strong>${state.workoutPauses}</strong></div>
+        </div>
+        <div class="button-row"><button type="button" data-action="workoutDone">Done</button></div>
+      </section>`;
+  } else {
+    const countdown = status === "countdown";
+    body = `
+      <section class="workout-panel">
+        <p class="source">${countdown ? "Starting" : status === "paused" ? "Paused" : "Active"} · ${state.workoutMode}</p>
+        <div class="big-time">${countdown ? state.workoutCountdown : formatDuration(state.workoutSeconds)}</div>
+        <div class="mini-grid">
+          <div class="mini-card"><span>Steps</span><strong>${state.workoutSteps}</strong></div>
+          <div class="mini-card"><span>Heart</span><strong>${state.heartRate} bpm</strong></div>
+          <div class="mini-card"><span>Distance est.</span><strong>${(state.workoutSteps * (state.workoutMode === "Run" ? 1.2 : 0.8) / 1000).toFixed(2)} km</strong></div>
+          <div class="mini-card"><span>Calories est.</span><strong>${Math.round(state.workoutSteps * (state.workoutMode === "Run" ? 0.08 : 0.04))}</strong></div>
+        </div>
+        <div class="button-row">
+          ${countdown ? "" : `<button type="button" data-action="workoutToggle">${status === "paused" ? "Resume" : "Pause"}</button><button type="button" data-action="workoutFinish">Finish</button>`}
+          <button type="button" data-action="workoutAbort">Discard</button>
+        </div>
+      </section>`;
+  }
+
+  const confirmation = state.workoutConfirm ? `
+    <div class="workout-confirm" role="dialog" aria-modal="true" aria-labelledby="workoutConfirmTitle">
+      <strong id="workoutConfirmTitle">${state.workoutConfirm === "finish" ? "Finish workout?" : "Discard workout?"}</strong>
+      <span>${state.workoutConfirm === "finish" ? "Save this session to history" : "This active session will be lost"}</span>
+      <div class="button-row">
+        <button type="button" data-action="workoutKeep">Keep</button>
+        <button type="button" data-action="workoutConfirm">Confirm</button>
+      </div>
+    </div>` : "";
+
+  el.content.innerHTML = `${appHeader("Workout")}${body}${confirmation}`;
+}
+
+function renderHistoryApp() {
+  const labels = ["6d", "5d", "4d", "3d", "2d", "1d", "Now"];
+  const maximum = Math.max(1, ...state.dailyHistory.filter((value) => value !== null));
+  const latest = state.latestWorkout;
+  el.content.innerHTML = `
+    ${appHeader("History")}
+    <section class="history-panel">
+      <h2>7-day steps</h2>
+      <div class="history-bars">
+        ${state.dailyHistory.map((value, index) => `
+          <div class="history-day ${value === null ? "missing" : ""}">
+            <span>${value === null ? "--" : value >= 10000 ? `${Math.floor(value / 1000)}k` : value}</span>
+            <i style="--bar:${value === null ? 0 : Math.max(8, Math.round(value * 100 / maximum))}%"></i>
+            <small>${labels[index]}</small>
+          </div>`).join("")}
+      </div>
+      <div class="history-latest">
+        <strong>${latest ? `Latest ${latest.mode}` : "Latest workout"}</strong>
+        <span>${latest ? `${formatDuration(latest.seconds)} / ${latest.steps} steps` : "No workouts yet"}</span>
+        <span>${latest ? `${latest.distance.toFixed(2)} km est. / ${latest.calories} kcal est.` : "Missing days are shown as --"}</span>
+      </div>
+    </section>`;
+}
+
 function renderCalculatorApp() {
   const buttons = ["C", "÷", "×", "⌫", "7", "8", "9", "-", "4", "5", "6", "+", "1", "2", "3", "=", "0", "."];
 
@@ -569,6 +659,8 @@ function renderActiveApp() {
   }
 
   if (app.id === "weather") renderWeatherApp();
+  if (app.id === "workout") renderWorkoutApp();
+  if (app.id === "history") renderHistoryApp();
   if (app.id === "calculator") renderCalculatorApp();
   if (app.id === "timer") renderTimerApp();
   if (app.id === "game2048") render2048App();
@@ -647,7 +739,7 @@ function calculate(input) {
 }
 
 function handleAction(action, target) {
-  if (action === "back") state.activeApp = null;
+  if (action === "back" && !state.workoutConfirm) state.activeApp = null;
   if (action === "goalDown") state.stepGoal = clamp(state.stepGoal - STEP_GOAL_DELTA, STEP_GOAL_MIN, STEP_GOAL_MAX);
   if (action === "goalUp") state.stepGoal = clamp(state.stepGoal + STEP_GOAL_DELTA, STEP_GOAL_MIN, STEP_GOAL_MAX);
   if (action === "timerDown" && !state.timerRunning) state.timerSeconds = Math.max(0, state.timerSeconds - 60);
@@ -686,6 +778,44 @@ function handleAction(action, target) {
     state.woodenFloat = "";
     state.woodenMessage = "Merit becomes your luck";
   }
+  if (action === "startWalk" || action === "startRun") {
+    state.workoutMode = action === "startRun" ? "Run" : "Walk";
+    state.workoutStatus = "countdown";
+    state.workoutCountdown = 3;
+    state.workoutSeconds = 0;
+    state.workoutSteps = 0;
+    state.workoutPauses = 0;
+  }
+  if (action === "workoutToggle") {
+    if (state.workoutStatus === "active") {
+      state.workoutStatus = "paused";
+      state.workoutPauses += 1;
+    } else if (state.workoutStatus === "paused") {
+      state.workoutStatus = "active";
+    }
+  }
+  if (action === "workoutFinish") state.workoutConfirm = "finish";
+  if (action === "workoutAbort") state.workoutConfirm = "abort";
+  if (action === "workoutKeep") state.workoutConfirm = null;
+  if (action === "workoutConfirm") {
+    if (state.workoutConfirm === "finish") {
+      state.workoutStatus = "finished";
+      state.latestWorkout = {
+        mode: state.workoutMode,
+        seconds: state.workoutSeconds,
+        steps: state.workoutSteps,
+        distance: state.workoutSteps * (state.workoutMode === "Run" ? 1.2 : 0.8) / 1000,
+        calories: Math.round(state.workoutSteps * (state.workoutMode === "Run" ? 0.08 : 0.04)),
+      };
+    } else {
+      state.workoutStatus = "aborted";
+    }
+    state.workoutConfirm = null;
+  }
+  if (action === "workoutDone") {
+    state.workoutStatus = "idle";
+    state.activeApp = null;
+  }
   render();
   const actionSummary = {
     back: "已返回应用列表",
@@ -711,6 +841,13 @@ function tick() {
     announce("计时器已完成");
   }
   if (state.stopwatchRunning) state.stopwatchSeconds += 1;
+  if (state.workoutStatus === "countdown") {
+    state.workoutCountdown -= 1;
+    if (state.workoutCountdown <= 0) state.workoutStatus = "active";
+  } else if (state.workoutStatus === "active") {
+    state.workoutSeconds += 1;
+    state.workoutSteps += 5 + (state.ticks % 4);
+  }
   if (state.activeApp === "tetris" && state.ticks % 2 === 0) {
     state.tetrisPiece.y += 1;
     if (state.tetrisPiece.y > 6) state.tetrisPiece = { x: 2, y: 0 };

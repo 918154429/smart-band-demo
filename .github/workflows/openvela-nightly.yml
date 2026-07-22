@@ -15,6 +15,19 @@ on:
         options:
           - "2"
           - "4"
+      q3_native_e2e:
+        description: Run storage-backed three-boot Workout/History E2E
+        required: true
+        default: false
+        type: boolean
+      q3_soak_seconds:
+        description: Q3 measured soak seconds (adds a 300 second warmup)
+        required: true
+        default: "0"
+        type: choice
+        options:
+          - "0"
+          - "1800"
 
 permissions:
   contents: read
@@ -31,6 +44,8 @@ env:
   OPENVELA_ROOT: ${{ github.workspace }}/openvela
   EVIDENCE_DIR: ${{ github.workspace }}/openvela-nightly-evidence
   SMART_BAND_BUILD_JOBS: ${{ inputs.build_jobs || '2' }}
+  SMART_BAND_STORAGE_PATH: ${{ inputs.q3_native_e2e && '/data/smart-band-q3' || '' }}
+  SMART_BAND_E2E_DIAGNOSTICS: ${{ inputs.q3_native_e2e && '1' || '0' }}
 
 jobs:
   goldfish-arm64:
@@ -336,6 +351,14 @@ jobs:
           done
           test -n "$config"
           grep -Fq 'CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC=y' "$config"
+          if [ "${{ inputs.q3_native_e2e }}" = "true" ]; then
+            grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH="/data/smart-band-q3"' \
+              "$config"
+            grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=y' "$config"
+            grep -Fq 'CONFIG_FS_PROCFS=y' "$config"
+            grep -Fq 'CONFIG_MM_RECORD_PID=y' "$config"
+            grep -Fq 'CONFIG_NSH_PROC_MOUNTPOINT="/proc"' "$config"
+          fi
           if ! readelf --symbols --wide "$image" 2>/dev/null | \
                grep -Eq 'smart_band(_main)?'; then
             strings "$image" | grep -Fq 'smart_band'
@@ -391,6 +414,28 @@ jobs:
               --openvela-root "$OPENVELA_ROOT" \
               --evidence-dir "$EVIDENCE_DIR/native-e2e" \
               --console-port 5564
+
+      - name: Run storage-backed Q3 recovery and History journey
+        if: inputs.q3_native_e2e
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          soak_seconds="${{ inputs.q3_soak_seconds }}"
+          warmup_seconds=0
+          timeout_minutes=18
+          if [ "$soak_seconds" -gt 0 ]; then
+            warmup_seconds=300
+            timeout_minutes=70
+          fi
+          timeout --signal=TERM --kill-after=30s "${timeout_minutes}m" \
+            python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_q3_native_e2e.py" \
+              --openvela-root "$OPENVELA_ROOT" \
+              --evidence-dir "$EVIDENCE_DIR/q3-native" \
+              --console-port 5565 \
+              --storage-path /data/smart-band-q3 \
+              --warmup-seconds "$warmup_seconds" \
+              --soak-seconds "$soak_seconds" \
+              --sample-interval-seconds 10
 
       - name: Ensure emulator process group is stopped
         if: always()

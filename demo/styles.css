@@ -372,7 +372,11 @@ button {
 }
 
 .app-title {
-  padding: 2px 44px 0;
+  padding: 2px 72px 0 44px;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-hero {
@@ -629,6 +633,112 @@ button {
   padding: 0 6px;
   background: var(--color-primary);
   font-size: 13px;
+}
+
+.workout-panel,
+.history-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+}
+
+.workout-choice {
+  align-content: center;
+  min-height: 260px;
+}
+
+.workout-panel .mini-card,
+.history-latest {
+  border: 1px solid #dce8e6;
+}
+
+.workout-summary .button-row button {
+  grid-column: 1 / -1;
+}
+
+.workout-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: 32px 20px;
+  background: rgba(21, 32, 39, 0.86);
+  color: #ffffff;
+  text-align: center;
+}
+
+.workout-confirm strong {
+  font-size: 20px;
+}
+
+.workout-confirm span {
+  color: #e5efed;
+  font-size: 13px;
+}
+
+.workout-confirm .button-row button:first-child {
+  background: #526d78;
+}
+
+.history-panel h2 {
+  margin: 0;
+  color: #293b53;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.history-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  min-height: 128px;
+}
+
+.history-day {
+  display: grid;
+  grid-template-rows: 22px 86px 20px;
+  align-items: end;
+  min-width: 0;
+  color: #405962;
+  font-size: 10px;
+  text-align: center;
+}
+
+.history-day i {
+  display: block;
+  width: 100%;
+  height: var(--bar);
+  min-height: 4px;
+  border-radius: 5px 5px 2px 2px;
+  background: #267e76;
+}
+
+.history-day.missing i {
+  min-height: 4px;
+  border: 1px dashed #82959c;
+  background: transparent;
+}
+
+.history-day small {
+  align-self: center;
+}
+
+.history-latest {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #405962;
+  font-size: 12px;
+}
+
+.history-latest strong {
+  color: #293b53;
+  font-size: 15px;
 }
 
 .board-2048 {
@@ -1109,6 +1219,22 @@ button:focus-visible {
     right: 12px;
     transform: scale(0.72);
     transform-origin: top right;
+  }
+
+  .app-title {
+    margin-top: 52px;
+    padding: 0 6px;
+    font-size: 14px;
+  }
+
+  .workout-choice {
+    min-height: 170px;
+    padding-top: 0;
+  }
+
+  .workout-panel,
+  .history-panel {
+    gap: 8px;
   }
 
   .date-row {

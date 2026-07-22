@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "gate": "Q3-B-D-workout-history",
+  "status": "passed",
+  "completed_at": "2026-07-22T12:26:00+08:00",
+  "source_commit": "8f8d788fa80f19dff23c1474b83a8f80570d03ed",
+  "pull_request": 13,
+  "features": {
+    "workout_modes": ["walk", "run"],
+    "checkpoint_seconds": 30,
+    "daily_retention_days": 30,
+    "history_trend_days": 7,
+    "restart_recovery_confirmation": true,
+    "cross_object_transaction_recovery": true
+  },
+  "pr_ci": {
+    "head_commit": "8f8d788fa80f19dff23c1474b83a8f80570d03ed",
+    "host_run_id": 29887461218,
+    "browser_run_id": 29887461190,
+    "passed": true
+  },
+  "coverage": {
+    "overall": {"covered_lines": 4304, "total_lines": 4640, "percent": 92.8},
+    "storage_transaction": {"covered_lines": 188, "total_lines": 200, "percent": 94.0},
+    "history_service": {"covered_lines": 594, "total_lines": 658, "percent": 90.3},
+    "workout_service": {"covered_lines": 455, "total_lines": 505, "percent": 90.1}
+  },
+  "fixed_openvela": {
+    "run_id": 29888365756,
+    "source_commit": "8f8d788fa80f19dff23c1474b83a8f80570d03ed",
+    "resolved_projects": 214,
+    "artifact": "openvela-fixed-release-29888365756",
+    "artifact_size_bytes": 24965512,
+    "artifact_digest": "sha256:5adc9b82cb3019f6c8317cffeb3159c6adeeaed667afe3205aa2653165ff1d9e",
+    "nuttx_sha256": "950f2f8a97bedf83753e1d0faf04abada0c715c1642c1adf5c17982aa93df9aa",
+    "vela_system_sha256": "9571c4dcf8b2dc1687667879ce0b2744c052fc05c631b971736fdec1846f92b4",
+    "vela_data_before_sha256": "c9cc1477dbc1bf9e37fbabc4fe0c185a83169312f202359b4724ab54b0f26e7a",
+    "vela_data_after_sha256": "de8654ceb81c57d8680a8edf021b8e3725830c2aecbbc42b50ca34188022bc92"
+  },
+  "native_soak": {
+    "warmup_seconds": 300,
+    "measurement_seconds": 1800,
+    "marker_samples": 180,
+    "resource_samples": 180,
+    "sample_delta_ms": {"min": 10000, "average": 10077.7, "max": 11036},
+    "max_tick_gap_ms": 1146,
+    "lvgl_object_count": 220,
+    "queue_maxima": {
+      "queue": 0,
+      "dropped": 0,
+      "evicted": 0,
+      "coalesced": 0,
+      "inbox_dropped": 0
+    },
+    "pid": 13,
+    "member_ids": [13],
+    "heap_bytes": {"baseline": 404800, "final": 404800, "high_water": 406976, "drift": 0},
+    "fd_count": {"baseline": 18, "final": 18, "high_water": 18, "drift": 0},
+    "guest_heap_bytes": {"baseline": 5275152, "final": 5275152, "high_water": 5293648, "drift": 0},
+    "heap_verified": true,
+    "fd_verified": true
+  },
+  "evidence": {
+    "manifest_entries": 1437,
+    "manifest_failures": 0,
+    "boots": 3,
+    "screenshots_reviewed": 7,
+    "history_sha256": "977c45bfe1a439246d8772c9811463edeb5d3b9fa9d14c66802ec87a3b83fa95",
+    "history_reloaded_sha256": "977c45bfe1a439246d8772c9811463edeb5d3b9fa9d14c66802ec87a3b83fa95",
+    "source_output_unchanged": true,
+    "runtime_tree_removed": true,
+    "port_cleanup": true
+  },
+  "boundaries": {
+    "target_board_claimed": false,
+    "target_media_power_loss_durability_claimed": false,
+    "real_sensor_claimed": false,
+    "real_ble_claimed": false,
+    "real_power_claimed": false
+  }
+}
