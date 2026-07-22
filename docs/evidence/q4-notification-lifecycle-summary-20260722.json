@@ -1,0 +1,87 @@
+{
+  "schema": "smart-band-q4-notification-lifecycle-summary/v1",
+  "date": "2026-07-22",
+  "scope": "notification-presentation-lifecycle-and-runtime-ordering",
+  "status": "passed",
+  "c_gate": "open",
+  "head_commit": "394662e970881b601595a1ec360ba1e72bc2256f",
+  "pull_request": "https://github.com/918154429/smart-band-demo/pull/14",
+  "runs": {
+    "host": {
+      "id": 29902320055,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29902320055",
+      "conclusion": "success",
+      "jobs_passed": 55,
+      "jobs_total": 55
+    },
+    "browser": {
+      "id": 29902320024,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29902320024",
+      "conclusion": "success"
+    },
+    "negative_coverage": {
+      "id": 29901995462,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29901995462",
+      "conclusion": "failure",
+      "reason": "event_queue_c_80_percent_before_test_closure"
+    }
+  },
+  "coverage": {
+    "overall": {
+      "percent": 92.9,
+      "covered": 4838,
+      "total": 5207
+    },
+    "event_queue_c": {
+      "percent": 98.3,
+      "covered": 113,
+      "total": 115
+    },
+    "runtime_c": {
+      "percent": 90.3,
+      "covered": 315,
+      "total": 349
+    },
+    "notification_service_c": {
+      "percent": 94.8,
+      "covered": 401,
+      "total": 423
+    }
+  },
+  "host_abi_sizes": {
+    "event_bytes": 232,
+    "event_queue_bytes": 3736,
+    "event_inbox_bytes": 3768,
+    "notification_service_bytes": 4344,
+    "queue_inbox_service_bytes": 11848,
+    "service_growth_from_first_slice_bytes": 552,
+    "target_abi_verified": false
+  },
+  "verified": [
+    "ordinary-overlay-5000ms-monotonic-timeout",
+    "uint32-monotonic-wrap",
+    "call-persists-until-action",
+    "generation-safe-visual-ack",
+    "independent-haptic-and-wake-ack",
+    "bounded-priority-aware-effect-pressure",
+    "multiple-call-backlog-and-promotion",
+    "call-priority-normalized-to-high",
+    "model-eviction-reconciles-effects-and-presentation",
+    "workout-policy-derived-from-live-service",
+    "workout-notification-main-queue-order",
+    "gcc-clang-msvc-strict-builds"
+  ],
+  "open": [
+    "application-event-lock-and-fast-pump",
+    "notification-center-ui",
+    "ordinary-overlay-ui",
+    "incoming-call-ui",
+    "overlay-input-capture",
+    "haptic-structured-log-consumer",
+    "synthetic-wake-consumer",
+    "native-notification-journeys",
+    "cross-inbox-main-total-order",
+    "explicit-length-utf8-ingress",
+    "target-elf-map-and-stack-budget"
+  ]
+}
