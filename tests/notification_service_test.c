@@ -145,18 +145,23 @@ static int test_validation_sizes_and_recovery(void)
   volatile size_t stats_size =
     sizeof(smart_band_notification_service_stats_t);
   volatile size_t event_size = sizeof(smart_band_event_t);
+  volatile size_t queue_size = sizeof(smart_band_event_queue_t);
   volatile size_t inbox_size = sizeof(smart_band_event_inbox_t);
   volatile size_t service_size = sizeof(smart_band_notification_service_t);
 
   CHECK(stats_size == 8u * sizeof(uint32_t));
   CHECK(event_size <= 256u);
+  CHECK(queue_size <=
+        event_size * SMART_BAND_EVENT_QUEUE_CAPACITY + 128u);
   CHECK(inbox_size <=
         event_size * SMART_BAND_EVENT_QUEUE_CAPACITY + 128u);
   CHECK(service_size <=
         sizeof(smart_band_notification_t) * SMART_BAND_NOTIFICATION_CAPACITY +
           512u);
-  printf("notification sizes: event=%zu inbox=%zu service=%zu stats=%zu\n",
-         sizeof(smart_band_event_t), sizeof(smart_band_event_inbox_t),
+  printf("notification sizes: event=%zu queue=%zu inbox=%zu service=%zu "
+         "stats=%zu\n",
+         sizeof(smart_band_event_t), sizeof(smart_band_event_queue_t),
+         sizeof(smart_band_event_inbox_t),
          sizeof(smart_band_notification_service_t),
          sizeof(smart_band_notification_service_stats_t));
 

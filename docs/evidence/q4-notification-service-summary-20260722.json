@@ -1,0 +1,73 @@
+{
+  "schema": "smart-band-q4-notification-service-summary/v1",
+  "date": "2026-07-22",
+  "scope": "notification-service-and-deterministic-ingress",
+  "status": "passed",
+  "c_gate": "open",
+  "head_commit": "54273fb687b353175536e46bd6550979c0c7e93e",
+  "pull_request": "https://github.com/918154429/smart-band-demo/pull/14",
+  "runs": {
+    "host": {
+      "id": 29899475732,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29899475732",
+      "conclusion": "success"
+    },
+    "browser": {
+      "id": 29899475681,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29899475681",
+      "conclusion": "success"
+    }
+  },
+  "coverage": {
+    "overall": {
+      "percent": 92.7,
+      "covered": 4575,
+      "total": 4936
+    },
+    "runtime_c": {
+      "percent": 90.0,
+      "covered": 298,
+      "total": 331
+    },
+    "notification_service_c": {
+      "percent": 95.1,
+      "covered": 173,
+      "total": 182
+    }
+  },
+  "host_abi_sizes": {
+    "event_bytes": 232,
+    "event_queue_bytes": 3736,
+    "event_inbox_bytes": 3768,
+    "notification_service_bytes": 3792,
+    "queue_inbox_service_bytes": 11296,
+    "target_abi_verified": false
+  },
+  "verified": [
+    "runtime-owned-notification-model",
+    "owned-bounded-received-event",
+    "deterministic-demo-through-event-ingress",
+    "locked-external-ingress-contract",
+    "receive-action-order",
+    "exact-duplicate-does-not-replay-presentation",
+    "call-presentation-protection",
+    "dnd-and-workout-policy",
+    "read-dismiss-accept-reject-delete",
+    "1000-mixed-receives",
+    "queue-and-inbox-pressure",
+    "malformed-event-cannot-evict-valid-work",
+    "gcc-clang-msvc-strict-builds"
+  ],
+  "open": [
+    "notification-center-ui",
+    "ordinary-overlay-timeout",
+    "incoming-call-ui",
+    "overlay-input-capture",
+    "haptic-structured-log",
+    "synthetic-wake-consumer",
+    "real-workout-ui-policy-integration",
+    "application-event-lock-and-fast-pump",
+    "explicit-length-utf8-ingress",
+    "target-elf-map-and-stack-budget"
+  ]
+}
