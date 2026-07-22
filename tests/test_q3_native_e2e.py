@@ -75,6 +75,64 @@ class Q3NativeHarnessTest(unittest.TestCase):
         self.assertEqual(len(states), 1)
         self.assertEqual(states[0]["elapsed_ms"], 1)
 
+    def test_procfs_resource_parsers(self) -> None:
+        self.assertEqual(
+            Q3.parse_group_members(
+                "Main task:  13\nMembers:    3\nMember IDs: 19 13 17\n"
+            ),
+            (13, 17, 19),
+        )
+        self.assertEqual(
+            Q3.parse_task_heap("AllocSize:  4096\nAllocBlks:  21\n"),
+            {"allocsize": 4096, "allocblks": 21},
+        )
+        fd_output = (
+            "\nFD  OFLAGS  TYPE POS       PATH\n"
+            "0   2       8    0         /dev/console\n"
+            "3   1026    8    0         /data/object\n"
+        )
+        self.assertEqual(Q3.parse_group_fd_count(fd_output), 2)
+        meminfo = (
+            "      total       used       free    maxused    maxfree  nused  nfree name\n"
+            "    1000000      12000     988000      13000     900000     20      2 user\n"
+            "      50000       2000      48000       2500      47000      4      1 kernel\n"
+        )
+        self.assertEqual(
+            Q3.parse_meminfo_used(meminfo), {"user": 12000, "kernel": 2000}
+        )
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.parse_group_members("Members: 1\n")
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.parse_task_heap("AllocSize: 1\n")
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.parse_group_fd_count("0 /dev/console\n")
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.parse_meminfo_used("no heap rows\n")
+
+    def test_resource_summary_is_fail_closed(self) -> None:
+        samples = [
+            {"members": [13, 17], "heap_alloc_bytes": 10000, "fd_count": 4,
+             "guest_heap_used_bytes": 50000},
+            {"members": [13, 17], "heap_alloc_bytes": 10800, "fd_count": 4,
+             "guest_heap_used_bytes": 50800},
+        ]
+        summary = Q3.summarize_resource_samples(samples)
+        self.assertTrue(summary["heap_verified"])
+        self.assertTrue(summary["fd_verified"])
+        self.assertEqual(summary["heap_drift_bytes"], 800)
+        for changed in (
+            [samples[0], {"members": [13], "heap_alloc_bytes": 10000,
+                          "fd_count": 4, "guest_heap_used_bytes": 50000}],
+            [samples[0], {"members": [13, 17], "heap_alloc_bytes": 11025,
+                          "fd_count": 4, "guest_heap_used_bytes": 50000}],
+            [samples[0], {"members": [13, 17], "heap_alloc_bytes": 10000,
+                          "fd_count": 5, "guest_heap_used_bytes": 50000}],
+        ):
+            with self.subTest(changed=changed), self.assertRaises(
+                Q3.Q3NativeFailure
+            ):
+                Q3.summarize_resource_samples(changed)
+
     def test_local_points_map_into_framed_emulator(self) -> None:
         self.assertEqual(
             Q3.framed_screen_geometry(1280, 800), ((453, 43), (373, 714))
@@ -120,6 +178,8 @@ class Q3NativeHarnessTest(unittest.TestCase):
             Q3.validate_settings(settings(sample_interval_seconds=0))
         with self.assertRaises(Q3.Q3NativeFailure):
             Q3.validate_settings(settings(soak_seconds=5))
+        with self.assertRaises(Q3.Q3NativeFailure):
+            Q3.validate_settings(settings(warmup_seconds=300))
 
     def test_swipe_to_apps_retries_until_structured_page_marker(self) -> None:
         class Console:

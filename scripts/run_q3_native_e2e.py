@@ -117,6 +117,8 @@ def validate_settings(args: argparse.Namespace) -> None:
             raise Q3NativeFailure(f"{name.replace('_', '-')} must be positive")
     if args.warmup_seconds < 0 or args.soak_seconds < 0:
         raise Q3NativeFailure("warmup and soak durations must not be negative")
+    if args.warmup_seconds and not args.soak_seconds:
+        raise Q3NativeFailure("warmup requires a measured soak")
     if args.sample_interval_seconds <= 0:
         raise Q3NativeFailure("sample interval must be positive")
     if args.soak_seconds and args.soak_seconds < args.sample_interval_seconds:
@@ -166,6 +168,92 @@ def marker_states(transcript: bytes | bytearray) -> list[dict[str, int]]:
         if parsed is not None:
             states.append(parsed)
     return states
+
+
+def parse_group_members(output: str) -> tuple[int, ...]:
+    output = output.replace("\r", "")
+    match = re.search(r"^Member IDs:\s+([0-9 ]+)$", output, re.MULTILINE)
+    if match is None:
+        raise Q3NativeFailure("procfs group status has no Member IDs")
+    members = tuple(int(value) for value in match.group(1).split())
+    if not members or len(set(members)) != len(members):
+        raise Q3NativeFailure(f"invalid procfs member list: {members}")
+    return tuple(sorted(members))
+
+
+def parse_task_heap(output: str) -> dict[str, int]:
+    output = output.replace("\r", "")
+    values: dict[str, int] = {}
+    for key in ("AllocSize", "AllocBlks"):
+        match = re.search(rf"^{key}:\s*([0-9]+)$", output, re.MULTILINE)
+        if match is None:
+            raise Q3NativeFailure(f"procfs task heap has no {key}")
+        values[key.lower()] = int(match.group(1))
+    return values
+
+
+def parse_group_fd_count(output: str) -> int:
+    rows = 0
+    for line in output.replace("\r", "").splitlines():
+        if re.match(r"^\s*[0-9]+\s+-?[0-9]+\s+[0-9a-fA-F]+\s+-?[0-9]+\s+", line):
+            rows += 1
+    if "FD" not in output or "OFLAGS" not in output:
+        raise Q3NativeFailure("procfs group fd output has no header")
+    return rows
+
+
+def parse_meminfo_used(output: str) -> dict[str, int]:
+    rows: dict[str, int] = {}
+    for line in output.replace("\r", "").splitlines():
+        match = re.match(
+            r"^\s*[0-9]+\s+([0-9]+)\s+[0-9]+\s+[0-9]+\s+[0-9]+"
+            r"\s+[0-9]+\s+[0-9]+\s+(.+?)\s*$",
+            line,
+        )
+        if match is not None:
+            rows[match.group(2)] = int(match.group(1))
+    if not rows:
+        raise Q3NativeFailure("procfs meminfo has no heap rows")
+    return rows
+
+
+def summarize_resource_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    if not samples:
+        raise Q3NativeFailure("resource soak produced no formal samples")
+    member_sets = {tuple(sample["members"]) for sample in samples}
+    if len(member_sets) != 1:
+        raise Q3NativeFailure(f"smart_band member set changed during soak: {member_sets}")
+    baseline = samples[0]
+    final = samples[-1]
+    heap_drift = final["heap_alloc_bytes"] - baseline["heap_alloc_bytes"]
+    fd_drift = final["fd_count"] - baseline["fd_count"]
+    guest_heap_drift = final["guest_heap_used_bytes"] - baseline[
+        "guest_heap_used_bytes"
+    ]
+    if heap_drift > 1024:
+        raise Q3NativeFailure(f"smart_band heap grew by {heap_drift} bytes")
+    if fd_drift != 0:
+        raise Q3NativeFailure(f"smart_band fd count changed by {fd_drift}")
+    return {
+        "heap_verified": True,
+        "fd_verified": True,
+        "members": list(baseline["members"]),
+        "heap_baseline_bytes": baseline["heap_alloc_bytes"],
+        "heap_final_bytes": final["heap_alloc_bytes"],
+        "heap_high_water_bytes": max(item["heap_alloc_bytes"] for item in samples),
+        "heap_drift_bytes": heap_drift,
+        "fd_baseline": baseline["fd_count"],
+        "fd_final": final["fd_count"],
+        "fd_high_water": max(item["fd_count"] for item in samples),
+        "fd_drift": fd_drift,
+        "guest_heap_baseline_bytes": baseline["guest_heap_used_bytes"],
+        "guest_heap_final_bytes": final["guest_heap_used_bytes"],
+        "guest_heap_high_water_bytes": max(
+            item["guest_heap_used_bytes"] for item in samples
+        ),
+        "guest_heap_drift_bytes": guest_heap_drift,
+        "guest_heap_nonincreasing": guest_heap_drift <= 0,
+    }
 
 
 def wait_for_state(
@@ -294,6 +382,7 @@ def require_stable_state(state: dict[str, int]) -> None:
 
 
 def run_soak(
+    boot: Any,
     child: Any,
     console: Any,
     evidence_dir: Path,
@@ -303,14 +392,29 @@ def run_soak(
 ) -> dict[str, Any]:
     total = warmup_seconds + soak_seconds
     if total == 0:
-        return {"enabled": False, "warmup_seconds": 0, "soak_seconds": 0}
+        preflight = boot.sample_resources(0)
+        preflight_path = evidence_dir / "resource-preflight.json"
+        NATIVE.write_json(preflight_path, preflight)
+        return {
+            "enabled": False,
+            "warmup_seconds": 0,
+            "soak_seconds": 0,
+            "resource_preflight": preflight_path.name,
+            "heap_verified": False,
+            "fd_verified": False,
+        }
 
     started = time.monotonic()
+    expected = soak_seconds // interval
     formal_samples: list[dict[str, int]] = []
+    resource_samples: list[dict[str, Any]] = []
     all_objects: list[int] = []
     sample_index = 0
     next_pause = 300
-    while time.monotonic() - started < total:
+    while (
+        time.monotonic() - started < warmup_seconds
+        or len(formal_samples) < expected
+    ):
         inject_motion(console, evidence_dir, sample_index)
         child.pump(float(interval))
         state = marker_states(child.transcript)[-1]
@@ -321,6 +425,7 @@ def run_soak(
         all_objects.append(state["objects"])
         if elapsed >= warmup_seconds:
             formal_samples.append(state)
+            resource_samples.append(boot.sample_resources(len(formal_samples) - 1))
         if elapsed >= next_pause and elapsed + 5 < total:
             click(console, child, evidence_dir, f"soak-pause-{next_pause}",
                   local_point(*SESSION_PRIMARY_POINT))
@@ -333,7 +438,6 @@ def run_soak(
             next_pause += 300
         sample_index += 1
 
-    expected = soak_seconds // interval
     if len(formal_samples) < expected:
         raise Q3NativeFailure(
             f"soak produced {len(formal_samples)} formal samples, expected {expected}"
@@ -347,6 +451,12 @@ def run_soak(
         "".join(json.dumps(item, sort_keys=True) + "\n" for item in formal_samples),
         encoding="utf-8",
     )
+    resources_path = evidence_dir / "soak-resources.jsonl"
+    resources_path.write_text(
+        "".join(json.dumps(item, sort_keys=True) + "\n" for item in resource_samples),
+        encoding="utf-8",
+    )
+    resources = summarize_resource_samples(resource_samples)
     return {
         "enabled": True,
         "warmup_seconds": warmup_seconds,
@@ -355,9 +465,9 @@ def run_soak(
         "formal_samples": len(formal_samples),
         "object_count": all_objects[0] if all_objects else None,
         "max_tick_gap_ms": max(item["tick_gap_max_ms"] for item in formal_samples),
-        "heap_verified": False,
-        "fd_verified": False,
         "samples": samples_path.name,
+        "resource_samples": resources_path.name,
+        **resources,
     }
 
 
@@ -455,14 +565,62 @@ class Boot:
             self.evidence_dir / f"boot-{self.index}-storage-{suffix}.txt",
         )
 
-    def app_pid(self) -> list[int]:
+    def app_pid(self, evidence_name: str | None = None) -> list[int]:
         if self.child is None:
             return []
         output = self.child.send_command(
             "pidof smart_band", self.prompt, self.args.command_timeout,
-            self.evidence_dir / f"boot-{self.index}-pidof.txt",
+            self.evidence_dir / (
+                evidence_name or f"boot-{self.index}-pidof.txt"
+            ),
         )
         return SMOKE.extract_pidof(output)
+
+    def sample_resources(self, sample_index: int) -> dict[str, Any]:
+        if self.child is None:
+            raise Q3NativeFailure("boot is not running")
+        prefix = f"soak-resource-{sample_index:03d}"
+        pids = self.app_pid(f"{prefix}-pidof.txt")
+        if len(pids) != 1:
+            raise Q3NativeFailure(f"expected one smart_band PID, got {pids}")
+        pid = pids[0]
+        group = self.child.send_command(
+            f"cat /proc/{pid}/group/status", self.prompt,
+            self.args.command_timeout,
+            self.evidence_dir / f"{prefix}-group-status.txt",
+        )
+        members = parse_group_members(group)
+        heap_alloc_bytes = 0
+        heap_alloc_blocks = 0
+        for member in members:
+            heap = self.child.send_command(
+                f"cat /proc/{member}/heap", self.prompt,
+                self.args.command_timeout,
+                self.evidence_dir / f"{prefix}-heap-{member}.txt",
+            )
+            parsed = parse_task_heap(heap)
+            heap_alloc_bytes += parsed["allocsize"]
+            heap_alloc_blocks += parsed["allocblks"]
+        fd_output = self.child.send_command(
+            f"cat /proc/{pid}/group/fd", self.prompt,
+            self.args.command_timeout,
+            self.evidence_dir / f"{prefix}-group-fd.txt",
+        )
+        meminfo = self.child.send_command(
+            "cat /proc/meminfo", self.prompt, self.args.command_timeout,
+            self.evidence_dir / f"{prefix}-meminfo.txt",
+        )
+        meminfo_used = parse_meminfo_used(meminfo)
+        return {
+            "sample": sample_index,
+            "pid": pid,
+            "members": list(members),
+            "heap_alloc_bytes": heap_alloc_bytes,
+            "heap_alloc_blocks": heap_alloc_blocks,
+            "fd_count": parse_group_fd_count(fd_output),
+            "guest_heap_used_bytes": sum(meminfo_used.values()),
+            "guest_heap_rows": meminfo_used,
+        }
 
     def stop(self) -> None:
         if self.console is not None:
@@ -607,6 +765,7 @@ def run(args: argparse.Namespace) -> int:
         wait_for_state(active_boot.child, lambda state: state["state"] == STATE_ACTIVE,
                        8.0, "boot2 resumed workout")
         result["soak"] = run_soak(
+            active_boot,
             active_boot.child, active_boot.console, evidence_dir,
             args.warmup_seconds, args.soak_seconds, args.sample_interval_seconds,
         )

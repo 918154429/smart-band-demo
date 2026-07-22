@@ -355,6 +355,9 @@ jobs:
             grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH="/data/smart-band-q3"' \
               "$config"
             grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=y' "$config"
+            grep -Fq 'CONFIG_FS_PROCFS=y' "$config"
+            grep -Fq 'CONFIG_MM_RECORD_PID=y' "$config"
+            grep -Fq 'CONFIG_NSH_PROC_MOUNTPOINT="/proc"' "$config"
           fi
           if ! readelf --symbols --wide "$image" 2>/dev/null | \
                grep -Eq 'smart_band(_main)?'; then
@@ -422,7 +425,7 @@ jobs:
           timeout_minutes=18
           if [ "$soak_seconds" -gt 0 ]; then
             warmup_seconds=300
-            timeout_minutes=50
+            timeout_minutes=70
           fi
           timeout --signal=TERM --kill-after=30s "${timeout_minutes}m" \
             python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_q3_native_e2e.py" \
