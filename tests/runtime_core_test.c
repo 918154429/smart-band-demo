@@ -232,6 +232,22 @@ static smart_band_event_t make_event(smart_band_event_type_t type,
   return event;
 }
 
+static smart_band_notification_input_t make_notification_input(
+  uint32_t id, smart_band_notification_type_t type,
+  smart_band_notification_priority_t priority, const char *body)
+{
+  smart_band_notification_input_t input;
+
+  input.id = id;
+  input.type = type;
+  input.priority = priority;
+  input.source = "runtime-test";
+  input.title = "notification";
+  input.body = body;
+  input.wall_timestamp = UINT64_C(1800000000) + id;
+  return input;
+}
+
 static int test_event_queue(void)
 {
   smart_band_event_queue_t queue;
@@ -279,14 +295,17 @@ static int test_event_queue(void)
   CHECK(!smart_band_event_queue_push(&queue, &event));
   CHECK(queue.dropped == 1);
   event = make_event(SMART_BAND_EVENT_NOTIFICATION_RECEIVED, 0);
-  event.payload.notification.kind = SMART_BAND_NOTIFICATION_CALL;
+  event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_CALL;
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH;
   CHECK(smart_band_event_queue_push(&queue, &event));
   CHECK(queue.evicted == 1);
   CHECK(queue.count == SMART_BAND_EVENT_QUEUE_CAPACITY);
 
   CHECK(smart_band_event_queue_pop(&queue, &popped));
   CHECK(popped.type == SMART_BAND_EVENT_NOTIFICATION_RECEIVED);
-  CHECK(popped.payload.notification.kind == SMART_BAND_NOTIFICATION_CALL);
+  CHECK(popped.payload.notification_received.type ==
+        SMART_BAND_NOTIFICATION_TYPE_CALL);
   CHECK(smart_band_event_queue_pop(&queue, &popped));
   CHECK(popped.payload.generic.code == 1);
 
@@ -314,9 +333,12 @@ static int test_event_queue(void)
   CHECK(!smart_band_event_queue_take(&queue, SMART_BAND_EVENT_NONE,
                                      &popped));
   event = make_event(SMART_BAND_EVENT_NOTIFICATION_RECEIVED, 0);
+  event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_APP;
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
   CHECK(smart_band_event_priority(&event) ==
         SMART_BAND_EVENT_PRIORITY_NORMAL);
-  event.payload.notification.kind = SMART_BAND_NOTIFICATION_CALL;
+  event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_CALL;
   CHECK(smart_band_event_priority(&event) ==
         SMART_BAND_EVENT_PRIORITY_HIGH);
   return 0;
@@ -1041,6 +1063,175 @@ static int test_runtime_deinit_checkpoints_live_workout(void)
   return 0;
 }
 
+static int test_runtime_notification_ingress_and_pressure(void)
+{
+  fake_clock_t fake = {FAKE_WALL_BASE, 100u};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_runtime_t runtime;
+  smart_band_notification_input_t input;
+  smart_band_notification_policy_t policy = {false, false};
+  smart_band_notification_presentation_t presentation;
+  smart_band_event_t event;
+  smart_band_event_t popped;
+  const smart_band_notification_t *stored;
+  uint32_t presented_id;
+  size_t index;
+
+  CHECK(smart_band_runtime_init(&runtime, &source, NULL) == 0);
+  CHECK(smart_band_runtime_set_notification_policy(&runtime, &policy));
+  input = make_notification_input(
+    1u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "first");
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 101u));
+  CHECK(smart_band_runtime_post_notification_action(
+          &runtime, 1u, SMART_BAND_NOTIFICATION_COMMAND_READ, 102u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  stored = smart_band_notification_find(&runtime.notifications.model, 1u);
+  CHECK(stored != NULL && stored->read);
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+  input.body = "updated";
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 103u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+  CHECK(presented_id == 1u && presentation.overlay);
+  CHECK(smart_band_notification_service_ack_presentation(
+          &runtime.notifications, 1u));
+
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 104u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(runtime.last_notification_result ==
+        SMART_BAND_NOTIFICATION_SERVICE_NO_CHANGE);
+  CHECK(runtime.notifications.stats.duplicates == 1u);
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+
+  input = make_notification_input(
+    2u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "incoming call");
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 105u));
+  input = make_notification_input(
+    3u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "important app");
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 106u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+  CHECK(presented_id == 2u && presentation.full_screen);
+
+  policy.workout_active = true;
+  CHECK(smart_band_runtime_set_notification_policy(&runtime, &policy));
+  CHECK(smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+  CHECK(presented_id == 2u && presentation.overlay &&
+        !presentation.full_screen);
+  CHECK(smart_band_runtime_post_notification_action(
+          &runtime, 2u, SMART_BAND_NOTIFICATION_COMMAND_ACCEPT, 106u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+
+  policy.dnd_enabled = true;
+  CHECK(smart_band_runtime_set_notification_policy(&runtime, &policy));
+  input = make_notification_input(
+    4u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "dnd message");
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 107u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 4u) !=
+        NULL);
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &runtime.notifications, &presented_id, &presentation));
+  CHECK(smart_band_runtime_post_notification_action(
+          &runtime, 4u, SMART_BAND_NOTIFICATION_COMMAND_DELETE, 108u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 4u) ==
+        NULL);
+
+  while (smart_band_event_queue_pop(&runtime.events, &popped))
+    {
+    }
+  for (index = 0u; index < SMART_BAND_EVENT_QUEUE_CAPACITY; index++)
+    {
+      event = make_event(SMART_BAND_EVENT_TOUCH_ACTIVITY, (uint32_t)index);
+      CHECK(smart_band_runtime_post(&runtime, &event));
+    }
+  policy.dnd_enabled = false;
+  policy.workout_active = false;
+  CHECK(smart_band_runtime_set_notification_policy(&runtime, &policy));
+  input = make_notification_input(
+    5u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "priority call");
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 109u));
+  CHECK(runtime.events.evicted == 1u);
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 5u) !=
+        NULL);
+
+  while (smart_band_event_queue_pop(&runtime.events, &popped))
+    {
+    }
+  for (index = 0u; index < SMART_BAND_EVENT_QUEUE_CAPACITY; index++)
+    {
+      event = make_event(SMART_BAND_EVENT_STORAGE_FLUSH_REQUEST,
+                         (uint32_t)index);
+      CHECK(smart_band_runtime_post(&runtime, &event));
+    }
+  input = make_notification_input(
+    6u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "retry");
+  CHECK(!smart_band_runtime_post_notification(&runtime, &input, 110u));
+  CHECK(smart_band_event_queue_pop(&runtime.events, &popped));
+  CHECK(smart_band_runtime_post_notification(&runtime, &input, 111u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 6u) !=
+        NULL);
+  CHECK((smart_band_runtime_take_dirty(&runtime) &
+         SMART_BAND_DIRTY_NOTIFICATION) != 0u);
+
+  CHECK(!smart_band_runtime_inject_notification_demo(NULL, 1u, 0u, 0u));
+  CHECK(smart_band_runtime_inject_notification_demo(
+          &runtime, 7u, 1u, 112u));
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(runtime.notifications.stats.received >= 7u);
+  smart_band_runtime_deinit(&runtime);
+  return 0;
+}
+
+static int test_runtime_external_notification_ingress(void)
+{
+  fake_clock_t fake = {FAKE_WALL_BASE, 200u};
+  smart_band_clock_source_t source =
+    {fake_wall_now, fake_monotonic_now, &fake};
+  smart_band_platform_t platform;
+  smart_band_runtime_t runtime;
+  fake_lock_t lock = {0u, 0u, true, false};
+  smart_band_notification_input_t input = make_notification_input(
+    700u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "external");
+
+  smart_band_platform_init_noop(&platform);
+  platform.event_lock.context = &lock;
+  platform.event_lock.lock = fake_lock_enter;
+  platform.event_lock.unlock = fake_lock_leave;
+  CHECK(smart_band_runtime_init_with_platform(
+          &runtime, &source, NULL, &platform) == 0);
+  CHECK(smart_band_runtime_post_notification_external(
+          &runtime, &input, 201u));
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 700u) ==
+        NULL);
+  smart_band_runtime_dispatch_pending(&runtime);
+  CHECK(smart_band_notification_find(&runtime.notifications.model, 700u) !=
+        NULL);
+  smart_band_runtime_deinit(&runtime);
+  CHECK(!smart_band_runtime_post_notification_external(
+          &runtime, &input, 202u));
+  CHECK(lock.lock_calls == lock.unlock_calls);
+  return 0;
+}
+
 int main(void)
 {
   CHECK(test_event_queue() == 0);
@@ -1059,6 +1250,8 @@ int main(void)
   CHECK(test_runtime_dispatches_workout_commands() == 0);
   CHECK(test_immediate_dispatch_samples_current_clock() == 0);
   CHECK(test_runtime_deinit_checkpoints_live_workout() == 0);
+  CHECK(test_runtime_notification_ingress_and_pressure() == 0);
+  CHECK(test_runtime_external_notification_ingress() == 0);
   puts("smart band central runtime production tests passed");
   return 0;
 }

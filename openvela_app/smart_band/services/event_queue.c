@@ -33,10 +33,27 @@ smart_band_event_priority(const smart_band_event_t *event)
       case SMART_BAND_EVENT_BLE_DISCONNECTED:
         return SMART_BAND_EVENT_PRIORITY_HIGH;
       case SMART_BAND_EVENT_NOTIFICATION_RECEIVED:
-        return event->payload.notification.kind ==
-               SMART_BAND_NOTIFICATION_CALL ?
-               SMART_BAND_EVENT_PRIORITY_HIGH :
-               SMART_BAND_EVENT_PRIORITY_NORMAL;
+        if (event->payload.notification_received.type ==
+              SMART_BAND_NOTIFICATION_TYPE_CALL &&
+            event->payload.notification_received.priority <
+              SMART_BAND_NOTIFICATION_PRIORITY_HIGH)
+          {
+            return SMART_BAND_EVENT_PRIORITY_HIGH;
+          }
+
+        switch (event->payload.notification_received.priority)
+          {
+            case SMART_BAND_NOTIFICATION_PRIORITY_LOW:
+              return SMART_BAND_EVENT_PRIORITY_LOW;
+            case SMART_BAND_NOTIFICATION_PRIORITY_NORMAL:
+              return SMART_BAND_EVENT_PRIORITY_NORMAL;
+            case SMART_BAND_NOTIFICATION_PRIORITY_HIGH:
+              return SMART_BAND_EVENT_PRIORITY_HIGH;
+            case SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL:
+              return SMART_BAND_EVENT_PRIORITY_CRITICAL;
+            default:
+              return SMART_BAND_EVENT_PRIORITY_LOW;
+          }
       case SMART_BAND_EVENT_TOUCH_ACTIVITY:
       case SMART_BAND_EVENT_WRIST_RAISED:
       case SMART_BAND_EVENT_SYNC_REQUEST:
@@ -152,6 +169,31 @@ bool smart_band_event_queue_take(smart_band_event_queue_t *queue,
   for (index = 0; index < queue->count; index++)
     {
       if (queue->items[index].type == type)
+        {
+          *event = queue->items[index];
+          remove_at(queue, index);
+          return true;
+        }
+    }
+
+  return false;
+}
+
+bool smart_band_event_queue_take_next_notification(
+  smart_band_event_queue_t *queue, smart_band_event_t *event)
+{
+  size_t index;
+
+  if (queue == NULL || event == NULL)
+    {
+      return false;
+    }
+
+  for (index = 0u; index < queue->count; index++)
+    {
+      if (queue->items[index].type ==
+            SMART_BAND_EVENT_NOTIFICATION_RECEIVED ||
+          queue->items[index].type == SMART_BAND_EVENT_NOTIFICATION_ACTION)
         {
           *event = queue->items[index];
           remove_at(queue, index);

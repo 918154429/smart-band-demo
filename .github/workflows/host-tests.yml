@@ -206,6 +206,8 @@ jobs:
             script: tests/test_storage_transaction.py
           - name: Notification core
             script: tests/test_notification_core.py
+          - name: Notification service
+            script: tests/test_notification_service.py
           - name: Power policy
             script: tests/test_power_policy.py
           - name: Sync protocol
@@ -311,6 +313,7 @@ jobs:
             services/clock.c \
             services/capabilities.c \
             services/runtime.c \
+            services/notification_service.c \
             services/storage_codec.c \
             services/store.c \
             services/storage_transaction.c \

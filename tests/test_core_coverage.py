@@ -35,6 +35,7 @@ CORE_SOURCES = [
     APP_DIR / "services" / "storage_transaction.c",
     APP_DIR / "services" / "history_service.c",
     APP_DIR / "services" / "workout_service.c",
+    APP_DIR / "services" / "notification_service.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "platform" / "storage" / "storage_fault.c",
@@ -91,6 +92,10 @@ NEW_Q3_SOURCES = [
     APP_DIR / "services" / "workout_service.c",
 ]
 
+NEW_Q4_SOURCES = [
+    APP_DIR / "services" / "notification_service.c",
+]
+
 
 @dataclass(frozen=True)
 class CoverageTarget:
@@ -121,8 +126,11 @@ TARGETS = [
             APP_DIR / "services" / "storage_transaction.c",
             APP_DIR / "services" / "history_service.c",
             APP_DIR / "services" / "workout_service.c",
+            APP_DIR / "services" / "notification_service.c",
             APP_DIR / "logic" / "step_normalizer.c",
             APP_DIR / "logic" / "workout_model.c",
+            APP_DIR / "logic" / "notification_model.c",
+            APP_DIR / "logic" / "notification_demo.c",
             APP_DIR / "platform" / "storage" / "storage_fault.c",
             APP_DIR / "platform" / "storage" / "storage_memory.c",
         ),
@@ -211,6 +219,17 @@ TARGETS = [
         (
             APP_DIR / "logic" / "notification_model.c",
             APP_DIR / "logic" / "notification_demo.c",
+        ),
+    ),
+    CoverageTarget(
+        "notification_service",
+        Path(__file__).with_name("notification_service_test.c"),
+        (
+            APP_DIR / "logic" / "notification_model.c",
+            APP_DIR / "logic" / "notification_demo.c",
+            APP_DIR / "services" / "notification_service.c",
+            APP_DIR / "services" / "event_queue.c",
+            APP_DIR / "services" / "event_inbox.c",
         ),
     ),
     CoverageTarget(
@@ -335,6 +354,7 @@ def run_gcovr(build_root: Path) -> None:
         *NEW_W1_SOURCES,
         *NEW_WATCH_FACE_SOURCES,
         *NEW_Q3_SOURCES,
+        *NEW_Q4_SOURCES,
     ]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [

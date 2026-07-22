@@ -33,6 +33,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     services/storage_transaction.c
     services/history_service.c
     services/workout_service.c
+    services/notification_service.c
     services/sync_protocol.c
     platform/platform_noop.c
     platform/loopback/sync_loopback.c

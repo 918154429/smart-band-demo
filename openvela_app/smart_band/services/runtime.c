@@ -1,4 +1,5 @@
 #include "smart_band_runtime.h"
+#include "notification_demo.h"
 
 #include <string.h>
 
@@ -230,11 +231,33 @@ static void dispatch_workout_events(smart_band_runtime_t *runtime)
     }
 }
 
+static void dispatch_notification_events(smart_band_runtime_t *runtime)
+{
+  smart_band_event_t event;
+
+  while (smart_band_event_queue_take_next_notification(&runtime->events,
+                                                        &event))
+    {
+      runtime->last_notification_result =
+        smart_band_notification_service_process(&runtime->notifications,
+                                                &event);
+      runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
+    }
+}
+
 void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime)
 {
-  if (runtime != NULL && runtime->initialized && sample_runtime_clock(runtime))
+  if (runtime != NULL && runtime->initialized)
     {
+      (void)smart_band_runtime_drain_external(
+        runtime, SMART_BAND_EVENT_QUEUE_CAPACITY);
+      if (!sample_runtime_clock(runtime))
+        {
+          return;
+        }
+
       dispatch_workout_events(runtime);
+      dispatch_notification_events(runtime);
     }
 }
 
@@ -292,6 +315,7 @@ static bool advance_runtime(smart_band_runtime_t *runtime,
                         SMART_BAND_DIRTY_HISTORY;
     }
   dispatch_workout_events(runtime);
+  dispatch_notification_events(runtime);
   capture_view_snapshot(&runtime->model, &after);
   runtime->dirty |= view_changes(&before, &after);
 
@@ -364,6 +388,17 @@ int smart_band_runtime_init_with_platform(
     }
 
   smart_band_event_queue_init(&runtime->events);
+  if (smart_band_notification_service_init(&runtime->notifications) != 0)
+    {
+      if (runtime->storage_initialized)
+        {
+          smart_band_store_deinit(&runtime->storage);
+          runtime->storage_initialized = false;
+        }
+      (void)smart_band_event_inbox_close(&runtime->external_events);
+      return -1;
+    }
+  runtime->notifications_initialized = true;
   runtime->last_clock.wall_valid = runtime->last_clock.wall_valid &&
                                    runtime->capabilities.rtc;
   smart_band_state_init(&runtime->model,
@@ -385,6 +420,8 @@ int smart_band_runtime_init_with_platform(
     {
       smart_band_sensor_bridge_deinit(&runtime->sensors);
       runtime->sensors_initialized = false;
+      smart_band_notification_service_reset(&runtime->notifications);
+      runtime->notifications_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -403,6 +440,8 @@ int smart_band_runtime_init_with_platform(
       runtime->history_initialized = false;
       smart_band_sensor_bridge_deinit(&runtime->sensors);
       runtime->sensors_initialized = false;
+      smart_band_notification_service_reset(&runtime->notifications);
+      runtime->notifications_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -427,6 +466,8 @@ int smart_band_runtime_init_with_platform(
       runtime->history_initialized = false;
       smart_band_sensor_bridge_deinit(&runtime->sensors);
       runtime->sensors_initialized = false;
+      smart_band_notification_service_reset(&runtime->notifications);
+      runtime->notifications_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -475,6 +516,10 @@ void smart_band_runtime_deinit(smart_band_runtime_t *runtime)
         }
       smart_band_workout_service_reset(&runtime->workout);
     }
+  if (runtime->notifications_initialized)
+    {
+      smart_band_notification_service_reset(&runtime->notifications);
+    }
   if (runtime->history_initialized)
     {
       smart_band_history_reset(&runtime->history);
@@ -500,8 +545,78 @@ bool smart_band_runtime_post_external(void *context,
 {
   smart_band_runtime_t *runtime = context;
 
-  return runtime != NULL &&
+  return runtime != NULL && runtime->initialized &&
          smart_band_event_inbox_post(&runtime->external_events, event);
+}
+
+bool smart_band_runtime_post_notification(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_input_t *input, uint32_t monotonic_ms)
+{
+  smart_band_event_t event;
+
+  return runtime != NULL && runtime->initialized &&
+         smart_band_notification_event_received(input, monotonic_ms, &event) &&
+         smart_band_runtime_post(runtime, &event);
+}
+
+bool smart_band_runtime_post_notification_external(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_input_t *input, uint32_t monotonic_ms)
+{
+  smart_band_event_t event;
+
+  return runtime != NULL && runtime->initialized &&
+         smart_band_notification_event_received(input, monotonic_ms, &event) &&
+         smart_band_runtime_post_external(runtime, &event);
+}
+
+bool smart_band_runtime_inject_notification_demo(
+  smart_band_runtime_t *runtime, uint32_t seed, uint32_t sequence,
+  uint32_t monotonic_ms)
+{
+  smart_band_notification_t notification;
+  smart_band_notification_input_t input;
+
+  if (!smart_band_notification_demo_build(seed, sequence, &notification))
+    {
+      return false;
+    }
+
+  input.id = notification.id;
+  input.type = notification.type;
+  input.priority = notification.priority;
+  input.source = notification.source;
+  input.title = notification.title;
+  input.body = notification.body;
+  input.wall_timestamp = notification.wall_timestamp;
+  return smart_band_runtime_post_notification(runtime, &input, monotonic_ms);
+}
+
+bool smart_band_runtime_post_notification_action(
+  smart_band_runtime_t *runtime, uint32_t notification_id,
+  smart_band_notification_command_t command, uint32_t monotonic_ms)
+{
+  smart_band_event_t event;
+
+  return runtime != NULL && runtime->initialized &&
+         smart_band_notification_event_action(
+           notification_id, command, monotonic_ms, &event) &&
+         smart_band_runtime_post(runtime, &event);
+}
+
+bool smart_band_runtime_set_notification_policy(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_policy_t *policy)
+{
+  if (runtime == NULL || !runtime->initialized || policy == NULL)
+    {
+      return false;
+    }
+
+  smart_band_notification_service_set_policy(&runtime->notifications, policy);
+  runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
+  return true;
 }
 
 size_t smart_band_runtime_drain_external(smart_band_runtime_t *runtime,

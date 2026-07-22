@@ -10,6 +10,7 @@ CSRCS += services/event_queue.c services/event_inbox.c services/clock.c
 CSRCS += services/capabilities.c services/runtime.c platform/platform_noop.c
 CSRCS += services/storage_codec.c services/store.c services/storage_transaction.c
 CSRCS += services/history_service.c services/workout_service.c
+CSRCS += services/notification_service.c
 CSRCS += services/sync_protocol.c
 CSRCS += platform/loopback/sync_loopback.c
 CSRCS += platform/storage/storage_memory.c platform/storage/storage_file.c
