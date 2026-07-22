@@ -117,6 +117,8 @@ bool smart_band_event_queue_take(smart_band_event_queue_t *queue,
                                  smart_band_event_t *event);
 bool smart_band_event_queue_take_next_notification(
   smart_band_event_queue_t *queue, smart_band_event_t *event);
+bool smart_band_event_queue_take_next_domain(
+  smart_band_event_queue_t *queue, smart_band_event_t *event);
 size_t smart_band_event_queue_count(const smart_band_event_queue_t *queue);
 smart_band_event_priority_t
 smart_band_event_priority(const smart_band_event_t *event);

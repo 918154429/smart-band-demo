@@ -142,6 +142,7 @@ static int test_validation_sizes_and_recovery(void)
   smart_band_event_t event;
   smart_band_notification_presentation_t presentation;
   uint32_t id;
+  uint32_t generation;
   volatile size_t stats_size =
     sizeof(smart_band_notification_service_stats_t);
   volatile size_t event_size = sizeof(smart_band_event_t);
@@ -157,7 +158,7 @@ static int test_validation_sizes_and_recovery(void)
         event_size * SMART_BAND_EVENT_QUEUE_CAPACITY + 128u);
   CHECK(service_size <=
         sizeof(smart_band_notification_t) * SMART_BAND_NOTIFICATION_CAPACITY +
-          512u);
+          1024u);
   printf("notification sizes: event=%zu queue=%zu inbox=%zu service=%zu "
          "stats=%zu\n",
          sizeof(smart_band_event_t), sizeof(smart_band_event_queue_t),
@@ -168,8 +169,9 @@ static int test_validation_sizes_and_recovery(void)
   CHECK(smart_band_notification_service_init(NULL) != 0);
   CHECK(smart_band_notification_service_init(&service) == 0);
   CHECK(!smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
-  CHECK(!smart_band_notification_service_ack_presentation(&service, 1u));
+          &service, &id, &generation, &presentation));
+  CHECK(!smart_band_notification_service_ack_presentation(
+          &service, 1u, 1u));
   CHECK(!smart_band_notification_service_process(NULL, &event));
   CHECK(smart_band_notification_service_process(&service, NULL) ==
         SMART_BAND_NOTIFICATION_SERVICE_INVALID);
@@ -239,6 +241,7 @@ static int test_overlong_copy_and_exact_duplicate(void)
   smart_band_event_t event;
   char long_text[4096];
   uint32_t id;
+  uint32_t generation;
 
   memset(long_text, 'x', sizeof(long_text));
   long_text[sizeof(long_text) - 1u] = '\0';
@@ -263,9 +266,11 @@ static int test_overlong_copy_and_exact_duplicate(void)
   CHECK(strcmp(stored->title, event.payload.notification_received.title) == 0);
   CHECK(strcmp(stored->body, event.payload.notification_received.body) == 0);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 10u && presentation.overlay);
-  CHECK(smart_band_notification_service_ack_presentation(&service, id));
+  CHECK(generation != 0u);
+  CHECK(smart_band_notification_service_ack_presentation(
+          &service, id, generation));
 
   CHECK(smart_band_notification_service_process(&service, &event) ==
         SMART_BAND_NOTIFICATION_SERVICE_NO_CHANGE);
@@ -274,7 +279,10 @@ static int test_overlong_copy_and_exact_duplicate(void)
   CHECK(service.stats.duplicates == 1u);
   CHECK(service.stats.presentations == 1u);
   CHECK(!smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
+  CHECK(smart_band_notification_service_get_active_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 10u && service.presentation_acknowledged);
   return 0;
 }
 
@@ -290,57 +298,358 @@ static int test_call_pending_peek_ack_and_policy(void)
   smart_band_notification_policy_t policy = {false, false};
   smart_band_notification_presentation_t presentation;
   uint32_t id;
+  uint32_t generation;
 
   CHECK(smart_band_notification_service_init(&service) == 0);
   CHECK(receive(&service, &call, 20u,
                 SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 20u && presentation.full_screen && !presentation.overlay);
 
   CHECK(receive(&service, &app, 21u,
                 SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 20u && presentation.full_screen);
-  CHECK(!smart_band_notification_service_ack_presentation(&service, 21u));
+  CHECK(!smart_band_notification_service_ack_presentation(
+          &service, 21u, generation));
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 20u);
 
   policy.workout_active = true;
-  smart_band_notification_service_set_policy(&service, &policy);
+  smart_band_notification_service_set_policy(&service, &policy, 22u);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 20u && !presentation.full_screen && presentation.overlay);
 
   policy.dnd_enabled = true;
-  smart_band_notification_service_set_policy(&service, &policy);
+  smart_band_notification_service_set_policy(&service, &policy, 23u);
   CHECK(!smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   app.id = 22u;
   CHECK(receive(&service, &app, 22u,
                 SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
   CHECK(smart_band_notification_find(&service.model, 22u) != NULL);
   CHECK(!smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
 
   policy.dnd_enabled = false;
-  smart_band_notification_service_set_policy(&service, &policy);
+  smart_band_notification_service_set_policy(&service, &policy, 24u);
   call.id = 23u;
   CHECK(receive(&service, &call, 23u,
                 SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
   CHECK(id == 23u && presentation.overlay && !presentation.full_screen);
   policy.workout_active = false;
-  smart_band_notification_service_set_policy(&service, &policy);
+  smart_band_notification_service_set_policy(&service, &policy, 25u);
   CHECK(smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
-  CHECK(id == 23u && presentation.overlay && !presentation.full_screen);
-  CHECK(smart_band_notification_service_ack_presentation(&service, 23u));
+          &service, &id, &generation, &presentation));
+  CHECK(id == 23u && presentation.full_screen && !presentation.overlay);
+  CHECK(smart_band_notification_service_ack_presentation(
+          &service, 23u, generation));
   CHECK(!smart_band_notification_service_peek_presentation(
-          &service, &id, &presentation));
+          &service, &id, &generation, &presentation));
+  CHECK(smart_band_notification_service_get_active_presentation(
+          &service, &id, &generation, &presentation));
+  return 0;
+}
+
+static int test_lifecycle_effects_wrap_and_call_backlog(void)
+{
+  smart_band_notification_service_t service;
+  smart_band_notification_input_t input =
+    make_input(40u, SMART_BAND_NOTIFICATION_TYPE_APP,
+               SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, 40u);
+  smart_band_notification_presentation_t presentation;
+  smart_band_notification_haptic_t haptic;
+  uint32_t id;
+  uint32_t generation;
+  uint32_t first_call_generation;
+  uint32_t wrapped_start = UINT32_MAX - 1000u;
+
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  CHECK(receive(&service, &input, 1000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 40u && presentation.overlay &&
+        service.pending_deadline_ms == 6000u);
+  CHECK(!smart_band_notification_service_ack_presentation(
+          &service, id, generation + 1u));
+  CHECK(smart_band_notification_service_ack_presentation(
+          &service, id, generation));
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(smart_band_notification_service_get_active_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(service.presentation_acknowledged);
+  CHECK(smart_band_notification_service_peek_haptic(
+          &service, &id, &generation, &haptic));
+  CHECK(id == 40u && haptic == SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE);
+  CHECK(!smart_band_notification_service_peek_wake(
+          &service, &id, &generation));
+  CHECK(smart_band_notification_service_ack_haptic(
+          &service, 40u, generation));
+  CHECK(!smart_band_notification_service_peek_haptic(
+          &service, &id, &generation, &haptic));
+  CHECK(!smart_band_notification_service_tick(&service, 5999u));
+  CHECK(smart_band_notification_service_tick(&service, 6000u));
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+
+  input.id = 41u;
+  CHECK(receive(&service, &input, wrapped_start,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.presentation_has_deadline &&
+        service.pending_deadline_ms == 3999u);
+  CHECK(!smart_band_notification_service_tick(&service, 3998u));
+  CHECK(smart_band_notification_service_tick(&service, 3999u));
+  CHECK(smart_band_notification_service_peek_haptic(
+          &service, &id, &generation, &haptic));
+  CHECK(id == 41u);
+  CHECK(smart_band_notification_service_ack_haptic(
+          &service, id, generation));
+
+  input.id = 42u;
+  input.priority = SMART_BAND_NOTIFICATION_PRIORITY_HIGH;
+  CHECK(receive(&service, &input, 7000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 42u && presentation.wake_request);
+  CHECK(smart_band_notification_service_ack_presentation(
+          &service, id, generation));
+  CHECK(smart_band_notification_service_peek_wake(
+          &service, &id, &generation));
+  CHECK(id == 42u);
+  CHECK(smart_band_notification_service_ack_wake(
+          &service, id, generation));
+  CHECK(smart_band_notification_service_peek_haptic(
+          &service, &id, &generation, &haptic));
+  CHECK(id == 42u && haptic == SMART_BAND_NOTIFICATION_HAPTIC_NORMAL);
+  CHECK(smart_band_notification_service_ack_haptic(
+          &service, id, generation));
+  CHECK(service.effect_count == 0u);
+
+  input = make_input(50u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+                     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, 50u);
+  CHECK(receive(&service, &input, 8000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &first_call_generation, &presentation));
+  CHECK(id == 50u && presentation.full_screen &&
+        !service.presentation_has_deadline);
+  input.id = 51u;
+  CHECK(receive(&service, &input, 8001u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.call_backlog_count == 1u);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 50u && generation == first_call_generation);
+  CHECK(smart_band_notification_service_ack_presentation(
+          &service, id, generation));
+  CHECK(!smart_band_notification_service_tick(&service, UINT32_MAX));
+  CHECK(action(&service, 50u, SMART_BAND_NOTIFICATION_COMMAND_ACCEPT,
+               SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 51u && generation != first_call_generation &&
+        presentation.full_screen);
+  CHECK(!smart_band_notification_service_ack_presentation(
+          &service, 50u, first_call_generation));
+  CHECK(smart_band_notification_service_peek_haptic(
+          &service, &id, &generation, &haptic));
+  CHECK(id == 51u && haptic == SMART_BAND_NOTIFICATION_HAPTIC_URGENT);
+  CHECK(action(&service, 51u, SMART_BAND_NOTIFICATION_COMMAND_REJECT,
+               SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(!smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(service.call_backlog_count == 0u && service.effect_count == 0u);
+
+  service.next_generation = UINT32_MAX;
+  input = make_input(60u, SMART_BAND_NOTIFICATION_TYPE_APP,
+                     SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, 60u);
+  CHECK(receive(&service, &input, 9000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(smart_band_notification_service_peek_presentation(
+          &service, &id, &generation, &presentation));
+  CHECK(id == 60u && generation == 1u);
+  return 0;
+}
+
+static int test_call_normalization_and_effect_pressure(void)
+{
+  smart_band_notification_service_t service;
+  smart_band_notification_input_t input =
+    make_input(100u, SMART_BAND_NOTIFICATION_TYPE_APP,
+               SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, 100u);
+  smart_band_event_t event;
+  smart_band_notification_haptic_t haptic;
+  const smart_band_notification_t *stored;
+  char body[32];
+  uint32_t id;
+  uint32_t generation;
+  uint32_t index;
+
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  for (index = 0u; index < 20u; index++)
+    {
+      (void)snprintf(body, sizeof(body), "update-%u", index);
+      input.body = body;
+      input.wall_timestamp = index;
+      CHECK(receive(&service, &input, index,
+                    SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+      CHECK(service.effect_count == 1u);
+    }
+
+  smart_band_notification_service_reset(&service);
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  for (index = 0u; index < SMART_BAND_NOTIFICATION_CAPACITY; index++)
+    {
+      input = make_input(
+        UINT32_C(1000) + index, SMART_BAND_NOTIFICATION_TYPE_APP,
+        SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, index);
+      CHECK(receive(&service, &input, index,
+                    SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+    }
+  CHECK(service.effect_count == SMART_BAND_NOTIFICATION_EFFECT_CAPACITY);
+
+  input = make_input(2000u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+                     SMART_BAND_NOTIFICATION_PRIORITY_LOW, 2000u);
+  CHECK(smart_band_notification_event_received(&input, 2000u, &event));
+  CHECK(event.payload.notification_received.priority ==
+        SMART_BAND_NOTIFICATION_PRIORITY_HIGH);
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_LOW;
+  CHECK(smart_band_notification_service_process(&service, &event) ==
+        SMART_BAND_NOTIFICATION_SERVICE_APPLIED);
+  stored = smart_band_notification_find(&service.model, 2000u);
+  CHECK(stored != NULL &&
+        stored->priority == SMART_BAND_NOTIFICATION_PRIORITY_HIGH);
+  CHECK(service.effect_count == SMART_BAND_NOTIFICATION_EFFECT_CAPACITY);
+  CHECK(smart_band_notification_find(&service.model, 1000u) == NULL);
+
+  while (smart_band_notification_service_peek_haptic(
+           &service, &id, &generation, &haptic) && id != 2000u)
+    {
+      CHECK(smart_band_notification_service_ack_haptic(
+              &service, id, generation));
+    }
+  CHECK(id == 2000u && haptic == SMART_BAND_NOTIFICATION_HAPTIC_URGENT);
+  CHECK(smart_band_notification_service_peek_wake(
+          &service, &id, &generation));
+  CHECK(id == 2000u);
+
+  for (index = 0u; index < SMART_BAND_NOTIFICATION_CAPACITY; index++)
+    {
+      input = make_input(
+        UINT32_C(3000) + index, SMART_BAND_NOTIFICATION_TYPE_SYSTEM,
+        SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL, index);
+      CHECK(receive(
+              &service, &input, UINT32_C(3000) + index,
+              index < SMART_BAND_NOTIFICATION_CAPACITY - 1u ?
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED :
+                SMART_BAND_NOTIFICATION_SERVICE_REJECTED) == 0);
+    }
+  CHECK(smart_band_notification_find(&service.model, 2000u) != NULL);
+  CHECK(action(&service, 2000u, SMART_BAND_NOTIFICATION_COMMAND_ACCEPT,
+               SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(!service.presentation_pending);
+
+  smart_band_notification_service_reset(&service);
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  input = make_input(4000u, SMART_BAND_NOTIFICATION_TYPE_APP,
+                     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, 4000u);
+  CHECK(receive(&service, &input, 4000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.presentation_pending && service.effect_count == 1u);
+  input.priority = SMART_BAND_NOTIFICATION_PRIORITY_LOW;
+  input.body = "center-only update";
+  CHECK(receive(&service, &input, 4001u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(!service.presentation_pending && service.effect_count == 0u);
+
+  input = make_input(5000u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+                     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, 5000u);
+  CHECK(receive(&service, &input, 5000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  input.id = 5001u;
+  CHECK(receive(&service, &input, 5001u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.call_backlog_count == 1u);
+  input.body = "updated queued call";
+  CHECK(receive(&service, &input, 5002u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.call_backlog_count == 1u);
+  CHECK(action(&service, 5001u, SMART_BAND_NOTIFICATION_COMMAND_REJECT,
+               SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.call_backlog_count == 0u);
+  CHECK(action(&service, 5000u, SMART_BAND_NOTIFICATION_COMMAND_REJECT,
+               SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(!service.presentation_pending);
+  return 0;
+}
+
+static int test_effect_capacity_fallback(void)
+{
+  smart_band_notification_service_t service;
+  smart_band_notification_input_t input =
+    make_input(6000u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+               SMART_BAND_NOTIFICATION_PRIORITY_HIGH, 6000u);
+  size_t index;
+  bool found = false;
+
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  service.effect_count = SMART_BAND_NOTIFICATION_EFFECT_CAPACITY;
+  for (index = 0u; index < service.effect_count; index++)
+    {
+      service.effects[index].notification_id = (uint32_t)index + 1u;
+      service.effects[index].generation = (uint32_t)index + 1u;
+      service.effects[index].priority =
+        SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
+      service.effects[index].haptic = SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE;
+      service.effects[index].haptic_pending = true;
+    }
+  CHECK(receive(&service, &input, 6000u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.effect_count == SMART_BAND_NOTIFICATION_EFFECT_CAPACITY);
+  for (index = 0u; index < service.effect_count; index++)
+    {
+      if (service.effects[index].notification_id == 6000u)
+        {
+          found = true;
+          CHECK(service.effects[index].generation >
+                SMART_BAND_NOTIFICATION_EFFECT_CAPACITY);
+        }
+    }
+  CHECK(found);
+
+  smart_band_notification_service_reset(&service);
+  CHECK(smart_band_notification_service_init(&service) == 0);
+  service.effect_count = SMART_BAND_NOTIFICATION_EFFECT_CAPACITY;
+  for (index = 0u; index < service.effect_count; index++)
+    {
+      service.effects[index].notification_id = (uint32_t)index + 1u;
+      service.effects[index].generation = (uint32_t)index + 1u;
+      service.effects[index].priority =
+        SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL;
+      service.effects[index].is_call = true;
+      service.effects[index].haptic = SMART_BAND_NOTIFICATION_HAPTIC_URGENT;
+      service.effects[index].haptic_pending = true;
+      service.effects[index].wake_pending = true;
+    }
+  input = make_input(6001u, SMART_BAND_NOTIFICATION_TYPE_APP,
+                     SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, 6001u);
+  CHECK(receive(&service, &input, 6001u,
+                SMART_BAND_NOTIFICATION_SERVICE_APPLIED) == 0);
+  CHECK(service.effect_count == SMART_BAND_NOTIFICATION_EFFECT_CAPACITY);
+  for (index = 0u; index < service.effect_count; index++)
+    {
+      CHECK(service.effects[index].notification_id != 6001u);
+    }
   return 0;
 }
 
@@ -574,6 +883,9 @@ int main(void)
   CHECK(test_validation_sizes_and_recovery() == 0);
   CHECK(test_overlong_copy_and_exact_duplicate() == 0);
   CHECK(test_call_pending_peek_ack_and_policy() == 0);
+  CHECK(test_lifecycle_effects_wrap_and_call_backlog() == 0);
+  CHECK(test_call_normalization_and_effect_pressure() == 0);
+  CHECK(test_effect_capacity_fallback() == 0);
   CHECK(test_accept_reject_and_delete() == 0);
   CHECK(test_full_protected_and_recovery() == 0);
   CHECK(test_thousand_mixed_receives() == 0);

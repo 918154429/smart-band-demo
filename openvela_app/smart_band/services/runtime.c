@@ -193,54 +193,79 @@ static bool sample_runtime_clock(smart_band_runtime_t *runtime)
   return true;
 }
 
-static void dispatch_workout_events(smart_band_runtime_t *runtime)
+static void sync_notification_policy(smart_band_runtime_t *runtime)
 {
-  smart_band_event_t event;
+  smart_band_notification_policy_t policy = runtime->notifications.policy;
+  uint32_t generation_before = runtime->notifications.pending_generation;
+  bool pending_before = runtime->notifications.presentation_pending;
 
-  while (smart_band_event_queue_take(
-           &runtime->events, SMART_BAND_EVENT_WORKOUT_COMMAND, &event))
+  policy.workout_active =
+    smart_band_workout_service_is_live(&runtime->workout);
+  if (memcmp(&policy, &runtime->notifications.policy, sizeof(policy)) != 0)
     {
-      smart_band_workout_command_t command =
-        (smart_band_workout_command_t)event.payload.workout.command;
-
-      if (command == SMART_BAND_WORKOUT_COMMAND_START)
+      smart_band_notification_service_set_policy(
+        &runtime->notifications, &policy,
+        runtime->last_clock.monotonic_ms);
+      if (pending_before != runtime->notifications.presentation_pending ||
+          generation_before != runtime->notifications.pending_generation)
         {
-          runtime->last_workout_result = smart_band_workout_service_start(
-            &runtime->workout,
-            (smart_band_workout_mode_t)event.payload.workout.mode,
-            runtime->last_clock.elapsed_ms, runtime->last_clock.wall_time,
-            runtime->last_clock.wall_valid);
+          runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
         }
-      else
-        {
-          runtime->last_workout_result = smart_band_workout_service_command(
-            &runtime->workout, command, runtime->last_clock.elapsed_ms,
-            runtime->last_clock.wall_time, runtime->last_clock.wall_valid,
-            runtime->last_clock.wall_rollback);
-        }
-      runtime->dirty |= SMART_BAND_DIRTY_WORKOUT |
-                        SMART_BAND_DIRTY_HISTORY;
-    }
-
-  while (smart_band_event_queue_take(
-           &runtime->events, SMART_BAND_EVENT_WORKOUT_CHECKPOINT, &event))
-    {
-      (void)event;
-      (void)smart_band_workout_service_checkpoint(
-        &runtime->workout, runtime->last_clock.elapsed_ms);
     }
 }
 
-static void dispatch_notification_events(smart_band_runtime_t *runtime)
+static void dispatch_workout_event(smart_band_runtime_t *runtime,
+                                   const smart_band_event_t *event)
+{
+  smart_band_workout_command_t command =
+    (smart_band_workout_command_t)event->payload.workout.command;
+
+  if (command == SMART_BAND_WORKOUT_COMMAND_START)
+    {
+      runtime->last_workout_result = smart_band_workout_service_start(
+        &runtime->workout,
+        (smart_band_workout_mode_t)event->payload.workout.mode,
+        runtime->last_clock.elapsed_ms, runtime->last_clock.wall_time,
+        runtime->last_clock.wall_valid);
+    }
+  else
+    {
+      runtime->last_workout_result = smart_band_workout_service_command(
+        &runtime->workout, command, runtime->last_clock.elapsed_ms,
+        runtime->last_clock.wall_time, runtime->last_clock.wall_valid,
+        runtime->last_clock.wall_rollback);
+    }
+  runtime->dirty |= SMART_BAND_DIRTY_WORKOUT | SMART_BAND_DIRTY_HISTORY;
+}
+
+static void dispatch_domain_events(smart_band_runtime_t *runtime)
 {
   smart_band_event_t event;
 
-  while (smart_band_event_queue_take_next_notification(&runtime->events,
-                                                        &event))
+  while (smart_band_event_queue_take_next_domain(&runtime->events, &event))
     {
-      runtime->last_notification_result =
-        smart_band_notification_service_process(&runtime->notifications,
-                                                &event);
+      if (event.type == SMART_BAND_EVENT_WORKOUT_COMMAND)
+        {
+          dispatch_workout_event(runtime, &event);
+        }
+      else if (event.type == SMART_BAND_EVENT_WORKOUT_CHECKPOINT)
+        {
+          (void)smart_band_workout_service_checkpoint(
+            &runtime->workout, runtime->last_clock.elapsed_ms);
+        }
+      else
+        {
+          sync_notification_policy(runtime);
+          runtime->last_notification_result =
+            smart_band_notification_service_process(&runtime->notifications,
+                                                    &event);
+          runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
+        }
+    }
+  sync_notification_policy(runtime);
+  if (smart_band_notification_service_tick(
+        &runtime->notifications, runtime->last_clock.monotonic_ms))
+    {
       runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
     }
 }
@@ -256,8 +281,7 @@ void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime)
           return;
         }
 
-      dispatch_workout_events(runtime);
-      dispatch_notification_events(runtime);
+      dispatch_domain_events(runtime);
     }
 }
 
@@ -314,8 +338,7 @@ static bool advance_runtime(smart_band_runtime_t *runtime,
       runtime->dirty |= SMART_BAND_DIRTY_WORKOUT |
                         SMART_BAND_DIRTY_HISTORY;
     }
-  dispatch_workout_events(runtime);
-  dispatch_notification_events(runtime);
+  dispatch_domain_events(runtime);
   capture_view_snapshot(&runtime->model, &after);
   runtime->dirty |= view_changes(&before, &after);
 
@@ -602,7 +625,14 @@ bool smart_band_runtime_set_notification_policy(
       return false;
     }
 
-  smart_band_notification_service_set_policy(&runtime->notifications, policy);
+  {
+    smart_band_notification_policy_t derived = *policy;
+
+    derived.workout_active =
+      smart_band_workout_service_is_live(&runtime->workout);
+    smart_band_notification_service_set_policy(
+      &runtime->notifications, &derived, runtime->last_clock.monotonic_ms);
+  }
   runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
   return true;
 }

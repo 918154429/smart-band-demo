@@ -216,6 +216,34 @@ bool smart_band_event_queue_take_next_notification(
   return false;
 }
 
+bool smart_band_event_queue_take_next_domain(
+  smart_band_event_queue_t *queue, smart_band_event_t *event)
+{
+  size_t index;
+
+  if (queue == NULL || event == NULL)
+    {
+      return false;
+    }
+
+  for (index = 0u; index < queue->count; index++)
+    {
+      smart_band_event_type_t type = queue->items[index].type;
+
+      if (type == SMART_BAND_EVENT_WORKOUT_COMMAND ||
+          type == SMART_BAND_EVENT_WORKOUT_CHECKPOINT ||
+          type == SMART_BAND_EVENT_NOTIFICATION_RECEIVED ||
+          type == SMART_BAND_EVENT_NOTIFICATION_ACTION)
+        {
+          *event = queue->items[index];
+          remove_at(queue, index);
+          return true;
+        }
+    }
+
+  return false;
+}
+
 size_t smart_band_event_queue_count(const smart_band_event_queue_t *queue)
 {
   return queue == NULL ? 0 : queue->count;
