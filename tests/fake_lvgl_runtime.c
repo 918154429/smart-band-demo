@@ -328,6 +328,30 @@ lv_obj_t *fake_lvgl_obj_parent(const lv_obj_t *object)
   return object_is_live(object) ? object->parent : NULL;
 }
 
+lv_coord_t fake_lvgl_obj_absolute_x(const lv_obj_t *object)
+{
+  lv_coord_t value = 0;
+
+  while (object_is_live(object))
+    {
+      value += object->x;
+      object = object->parent;
+    }
+  return value;
+}
+
+lv_coord_t fake_lvgl_obj_absolute_y(const lv_obj_t *object)
+{
+  lv_coord_t value = 0;
+
+  while (object_is_live(object))
+    {
+      value += object->y;
+      object = object->parent;
+    }
+  return value;
+}
+
 lv_obj_t *fake_lvgl_find_text(lv_obj_t *subtree, const char *text,
                               size_t occurrence)
 {
@@ -373,24 +397,100 @@ void fake_lvgl_send_event(lv_obj_t *object, lv_event_code_t code)
     }
 }
 
+static lv_obj_t *hit_test_recursive(lv_obj_t *object, lv_coord_t parent_x,
+                                    lv_coord_t parent_y, lv_coord_t x,
+                                    lv_coord_t y)
+{
+  lv_coord_t absolute_x;
+  lv_coord_t absolute_y;
+  lv_obj_t *child;
+  lv_obj_t *hit;
+
+  if (!object_is_live(object) ||
+      (object->flags & LV_OBJ_FLAG_HIDDEN) != 0u)
+    {
+      return NULL;
+    }
+
+  absolute_x = parent_x + object->x;
+  absolute_y = parent_y + object->y;
+  if (x < absolute_x || y < absolute_y ||
+      x >= absolute_x + object->width ||
+      y >= absolute_y + object->height)
+    {
+      return NULL;
+    }
+
+  for (child = object->last_child; child != NULL;
+       child = child->previous_sibling)
+    {
+      hit = hit_test_recursive(child, absolute_x, absolute_y, x, y);
+      if (hit != NULL)
+        {
+          return hit;
+        }
+    }
+
+  return (object->flags & LV_OBJ_FLAG_CLICKABLE) != 0u ? object : NULL;
+}
+
+lv_obj_t *fake_lvgl_send_event_at(lv_obj_t *root, lv_coord_t x,
+                                  lv_coord_t y, lv_event_code_t code)
+{
+  lv_obj_t *target = hit_test_recursive(root, 0, 0, x, y);
+
+  fake_lvgl_set_pointer(x, y);
+  if (target != NULL)
+    {
+      fake_lvgl_send_event(target, code);
+    }
+  return target;
+}
+
 void fake_lvgl_set_tick(uint32_t tick) { g_tick = tick; }
 
 size_t fake_lvgl_advance_tick(uint32_t delta_ms)
 {
-  lv_timer_t *timer;
+  uint32_t target = g_tick + delta_ms;
   size_t callbacks = 0;
 
-  g_tick += delta_ms;
-  for (timer = g_timers; timer != NULL; timer = timer->next)
+  for (;;)
     {
-      while ((int32_t)(g_tick - timer->next_due) >= 0)
+      lv_timer_t *timer;
+      lv_timer_t *next_timer = NULL;
+      uint32_t next_distance = UINT32_MAX;
+
+      for (timer = g_timers; timer != NULL; timer = timer->next)
         {
-          timer->next_due += timer->period;
-          timer->callback(timer);
-          callbacks++;
+          uint32_t distance;
+
+          if ((int32_t)(target - timer->next_due) < 0)
+            {
+              continue;
+            }
+          distance = (int32_t)(timer->next_due - g_tick) <= 0 ?
+            0u : timer->next_due - g_tick;
+          if (next_timer == NULL || distance < next_distance)
+            {
+              next_timer = timer;
+              next_distance = distance;
+            }
         }
+
+      if (next_timer == NULL)
+        {
+          break;
+        }
+      if (next_distance != 0u)
+        {
+          g_tick = next_timer->next_due;
+        }
+      next_timer->next_due += next_timer->period;
+      next_timer->callback(next_timer);
+      callbacks++;
     }
 
+  g_tick = target;
   return callbacks;
 }
 

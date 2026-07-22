@@ -18,10 +18,14 @@ void fake_lvgl_fail_timer_create_at(size_t nth);
 const char *fake_lvgl_obj_text(const lv_obj_t *object);
 bool fake_lvgl_obj_has_flag(const lv_obj_t *object, uint32_t flag);
 lv_obj_t *fake_lvgl_obj_parent(const lv_obj_t *object);
+lv_coord_t fake_lvgl_obj_absolute_x(const lv_obj_t *object);
+lv_coord_t fake_lvgl_obj_absolute_y(const lv_obj_t *object);
 lv_obj_t *fake_lvgl_find_text(lv_obj_t *subtree, const char *text,
                               size_t occurrence);
 void fake_lvgl_set_pointer(lv_coord_t x, lv_coord_t y);
 void fake_lvgl_send_event(lv_obj_t *object, lv_event_code_t code);
+lv_obj_t *fake_lvgl_send_event_at(lv_obj_t *root, lv_coord_t x,
+                                  lv_coord_t y, lv_event_code_t code);
 void fake_lvgl_set_tick(uint32_t tick);
 size_t fake_lvgl_advance_tick(uint32_t delta_ms);
 

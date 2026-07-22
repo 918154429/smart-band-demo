@@ -32,6 +32,7 @@ PRODUCTION_SOURCES = [
     APP_DIR / "services" / "notification_service.c",
     APP_DIR / "services" / "sync_protocol.c",
     APP_DIR / "platform" / "platform_noop.c",
+    APP_DIR / "platform" / "event_mutex.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "platform" / "storage" / "storage_fault.c",
     APP_DIR / "platform" / "storage" / "storage_memory.c",
@@ -55,6 +56,7 @@ PRODUCTION_SOURCES = [
     APP_DIR / "ui" / "lvgl" / "watch_pages.c",
     APP_DIR / "ui" / "lvgl" / "workout_view.c",
     APP_DIR / "ui" / "lvgl" / "history_view.c",
+    APP_DIR / "ui" / "lvgl" / "notification_view.c",
     APP_DIR / "icon_assets.c",
     APP_DIR / "smart_band_apps.c",
     APP_DIR / "apps" / "weather_app.c",
@@ -124,11 +126,12 @@ def compile_and_run() -> None:
                 f"/Fo{temp}{os.sep}", f"/Fe:{output}",
             ]
         else:
+            thread_flags = ["-pthread"] if os.name != "nt" else []
             command = [
                 compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                 "-DCONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=1",
                 "-pedantic", f"-I{FAKE_LVGL_DIR}", f"-I{INCLUDE_DIR}",
-                *sources, "-o", str(output),
+                *sources, *thread_flags, "-o", str(output),
             ]
 
         print("compiling complete production UI and app source set:",
