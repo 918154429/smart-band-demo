@@ -33,6 +33,18 @@ smart_band_event_priority(const smart_band_event_t *event)
       case SMART_BAND_EVENT_BLE_DISCONNECTED:
         return SMART_BAND_EVENT_PRIORITY_HIGH;
       case SMART_BAND_EVENT_NOTIFICATION_RECEIVED:
+        if (event->payload.notification_received.type <
+              SMART_BAND_NOTIFICATION_TYPE_CALL ||
+            event->payload.notification_received.type >
+              SMART_BAND_NOTIFICATION_TYPE_SYSTEM ||
+            event->payload.notification_received.priority <
+              SMART_BAND_NOTIFICATION_PRIORITY_LOW ||
+            event->payload.notification_received.priority >
+              SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL)
+          {
+            return SMART_BAND_EVENT_PRIORITY_LOW;
+          }
+
         if (event->payload.notification_received.type ==
               SMART_BAND_NOTIFICATION_TYPE_CALL &&
             event->payload.notification_received.priority <

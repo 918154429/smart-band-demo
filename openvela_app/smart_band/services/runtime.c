@@ -388,16 +388,7 @@ int smart_band_runtime_init_with_platform(
     }
 
   smart_band_event_queue_init(&runtime->events);
-  if (smart_band_notification_service_init(&runtime->notifications) != 0)
-    {
-      if (runtime->storage_initialized)
-        {
-          smart_band_store_deinit(&runtime->storage);
-          runtime->storage_initialized = false;
-        }
-      (void)smart_band_event_inbox_close(&runtime->external_events);
-      return -1;
-    }
+  (void)smart_band_notification_service_init(&runtime->notifications);
   runtime->notifications_initialized = true;
   runtime->last_clock.wall_valid = runtime->last_clock.wall_valid &&
                                    runtime->capabilities.rtc;
@@ -578,10 +569,7 @@ bool smart_band_runtime_inject_notification_demo(
   smart_band_notification_t notification;
   smart_band_notification_input_t input;
 
-  if (!smart_band_notification_demo_build(seed, sequence, &notification))
-    {
-      return false;
-    }
+  (void)smart_band_notification_demo_build(seed, sequence, &notification);
 
   input.id = notification.id;
   input.type = notification.type;

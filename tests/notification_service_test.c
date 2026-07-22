@@ -134,6 +134,7 @@ static int model_invariants(const smart_band_notification_model_t *model)
 static int test_validation_sizes_and_recovery(void)
 {
   smart_band_notification_service_t service;
+  smart_band_event_queue_t queue;
   smart_band_notification_model_t model_before;
   smart_band_notification_input_t input =
     make_input(1u, SMART_BAND_NOTIFICATION_TYPE_APP,
@@ -173,6 +174,28 @@ static int test_validation_sizes_and_recovery(void)
           0u, SMART_BAND_NOTIFICATION_COMMAND_READ, 0u, &event));
   CHECK(!smart_band_notification_event_action(
           1u, (smart_band_notification_command_t)99, 0u, &event));
+
+  smart_band_event_queue_init(&queue);
+  for (size_t index = 0u; index < SMART_BAND_EVENT_QUEUE_CAPACITY; index++)
+    {
+      event = make_generic_event(SMART_BAND_EVENT_TOUCH_ACTIVITY,
+                                 (uint32_t)index);
+      CHECK(smart_band_event_queue_push(&queue, &event));
+    }
+  memset(&event, 0, sizeof(event));
+  event.type = SMART_BAND_EVENT_NOTIFICATION_RECEIVED;
+  event.payload.notification_received.type = SMART_BAND_NOTIFICATION_TYPE_CALL;
+  event.payload.notification_received.priority =
+    (smart_band_notification_priority_t)-1;
+  CHECK(smart_band_event_priority(&event) == SMART_BAND_EVENT_PRIORITY_LOW);
+  CHECK(!smart_band_event_queue_push(&queue, &event));
+  event.payload.notification_received.type =
+    (smart_band_notification_type_t)99;
+  event.payload.notification_received.priority =
+    SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL;
+  CHECK(smart_band_event_priority(&event) == SMART_BAND_EVENT_PRIORITY_LOW);
+  CHECK(!smart_band_event_queue_push(&queue, &event));
+  CHECK(queue.evicted == 0u && queue.dropped == 2u);
 
   CHECK(smart_band_notification_event_received(&input, 1u, &event));
   event.payload.notification_received
