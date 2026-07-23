@@ -43,6 +43,9 @@ typedef struct
   smart_band_workout_service_result_t last_workout_result;
   smart_band_notification_service_t notifications;
   smart_band_notification_service_result_t last_notification_result;
+  uint64_t notification_wake_applied_count;
+  uint32_t last_notification_wake_id;
+  uint32_t last_notification_wake_generation;
   smart_band_power_manager_t power;
   uint32_t dirty;
   bool initialized;

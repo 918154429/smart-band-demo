@@ -267,8 +267,16 @@ static void apply_power_events(smart_band_runtime_t *runtime,
   if ((power_events & SMART_BAND_POWER_EVENT_NOTIFICATION) != 0u &&
       wake_notification_id != 0u && wake_generation != 0u)
     {
-      (void)smart_band_notification_service_ack_wake(
-        &runtime->notifications, wake_notification_id, wake_generation);
+      if (smart_band_notification_service_ack_wake(
+            &runtime->notifications, wake_notification_id, wake_generation))
+        {
+          if (runtime->notification_wake_applied_count < UINT64_MAX)
+            {
+              runtime->notification_wake_applied_count++;
+            }
+          runtime->last_notification_wake_id = wake_notification_id;
+          runtime->last_notification_wake_generation = wake_generation;
+        }
     }
   runtime->dirty |= (power_events &
     (SMART_BAND_POWER_EVENT_BUTTON | SMART_BAND_POWER_EVENT_TOUCH |

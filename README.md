@@ -41,6 +41,7 @@ openvela_app/smart_band/include 公共头文件、模型和图标声明
 openvela_app/smart_band/assets  项目图标与演示图片资源
 demo/                           浏览器静态演示页面，便于无模拟器时录屏
 docs/                           openvela 复现说明与演示说明
+docs/gemini-s1-target-board.md  Gemini-S1 暂定目标板、能力矩阵与硬件 Gate
 scripts/                        复现、headless runtime 与模拟器传感器验证脚本
 tests/                          本机基础逻辑测试
 LICENSE                         本仓库原创代码和资源的开源许可证
@@ -73,6 +74,18 @@ THIRD_PARTY_NOTICES.md          第三方依赖声明
 持久化默认保持关闭。只有将 `LVX_DEMO_SMART_BAND_STORAGE_PATH` 配置为一个已经存在且
 可写的目录时，应用才会启用 file backend；空字符串继续使用显式 no-op backend。应用
 不会创建目录、猜测分区或声明目标板文件系统具备原子写语义。
+
+## 暂定目标开发板
+
+真机采购与适配候选暂定为 **润芯微 Rivotek Gemini-S1（全志 R528）**。该型号已有
+openvela 5.2 官方认证和公开 `r528s3-gemini-s1` BSP；公开 `nsh_minidisplay` 配置包含
+LVGL/NuttX/libuv、ILI9341、GT911 touch、uORB、Wi-Fi 和 Bluetooth LE/GATT。
+
+Gemini-S1 当前不属于上面的“已验证目标环境”。本仓库尚未完成该板 compile/link、
+boot、显示、触摸、存储、真实 provider、BLE 或功耗验证；实物 SKU/revision、恢复工具
+和写入范围也待确认。现有 goldfish `trunk-5.4` 固定基线继续保留，板卡使用单独冻结的
+contest BSP 基线。详细边界和 Gate 见
+[`docs/gemini-s1-target-board.md`](docs/gemini-s1-target-board.md)。
 
 ## 接入 openvela 工程
 
@@ -255,7 +268,8 @@ python3 scripts/smoke_openvela_emulator.py \
 `scripts/run_native_e2e.py` 的 framebuffer 截图、结构化状态与 golden ROI 门禁覆盖；
 Browser 测试只覆盖 Web demo，不作为 native 证据。
 
-如果使用开发板，完成烧录后在串口 shell 中执行同样的命令：
+如果使用已经完成 HW0/HW1、确认 board config 并经当次授权烧录的开发板，可在串口
+shell 中执行同样的命令。Gemini-S1 当前尚未完成这些前置 Gate：
 
 ```sh
 smart_band
