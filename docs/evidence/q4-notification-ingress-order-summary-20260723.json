@@ -33,6 +33,17 @@
       "services/notification_service.c": "94.9% (465/490)"
     }
   },
+  "github_ci": {
+    "commit": "cc0be669d859908b1beb672aaebbf6961d73f640",
+    "host_tests": {
+      "run_id": 29975646888,
+      "status": "passed"
+    },
+    "browser_tests": {
+      "run_id": 29975646864,
+      "status": "passed"
+    }
+  },
   "host_abi_bytes": {
     "event": 240,
     "queue": 3864,

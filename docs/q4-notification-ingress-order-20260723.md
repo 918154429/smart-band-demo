@@ -68,6 +68,16 @@ Independent Linux verification used the outer development host
 - `services/event_inbox.c`: `98.9% (91/92)`;
 - `services/notification_service.c`: `94.9% (465/490)`.
 
+GitHub CI for commit `cc0be669d859908b1beb672aaebbf6961d73f640`
+completed successfully:
+
+- Host tests run
+  [`29975646888`](https://github.com/918154429/smart-band-demo/actions/runs/29975646888):
+  all GCC, Clang, MSVC, coverage, UI compile, and evidence jobs passed;
+- Browser tests run
+  [`29975646864`](https://github.com/918154429/smart-band-demo/actions/runs/29975646864):
+  Chromium passed.
+
 The regression matrix includes non-NUL-terminated valid spans, empty spans,
 ASCII and valid two/three/four-byte sequences, exact and partial capacity
 boundaries, invalid UTF-8 classes, embedded NUL, the external-receive/local-
