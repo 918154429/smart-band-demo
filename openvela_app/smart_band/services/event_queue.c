@@ -13,6 +13,19 @@ static void remove_at(smart_band_event_queue_t *queue, size_t index)
   queue->count--;
 }
 
+static bool sequence_before(const smart_band_event_t *left,
+                            const smart_band_event_t *right)
+{
+  if (left->ingress_sequence == 0u || right->ingress_sequence == 0u ||
+      left->ingress_sequence == right->ingress_sequence)
+    {
+      return false;
+    }
+
+  return right->ingress_sequence - left->ingress_sequence <
+         (UINT64_MAX / 2u) + 1u;
+}
+
 smart_band_event_priority_t
 smart_band_event_priority(const smart_band_event_t *event)
 {
@@ -127,11 +140,38 @@ bool smart_band_event_queue_push(smart_band_event_queue_t *queue,
             }
         }
 
-      if (incoming_priority <=
+      if (incoming_priority <
           smart_band_event_priority(&queue->items[lowest_index]))
         {
           queue->dropped++;
           return false;
+        }
+
+      if (incoming_priority ==
+          smart_band_event_priority(&queue->items[lowest_index]))
+        {
+          size_t latest_index = 0u;
+          bool found_later = false;
+
+          for (index = 0u; index < queue->count; index++)
+            {
+              if (smart_band_event_priority(&queue->items[index]) ==
+                    incoming_priority &&
+                  sequence_before(event, &queue->items[index]) &&
+                  (!found_later || sequence_before(
+                     &queue->items[latest_index], &queue->items[index])))
+                {
+                  latest_index = index;
+                  found_later = true;
+                }
+            }
+
+          if (!found_later)
+            {
+              queue->dropped++;
+              return false;
+            }
+          lowest_index = latest_index;
         }
 
       remove_at(queue, lowest_index);
@@ -156,7 +196,10 @@ bool smart_band_event_queue_pop(smart_band_event_queue_t *queue,
   for (index = 1; index < queue->count; index++)
     {
       if (smart_band_event_priority(&queue->items[index]) >
-          smart_band_event_priority(&queue->items[selected]))
+            smart_band_event_priority(&queue->items[selected]) ||
+          (smart_band_event_priority(&queue->items[index]) ==
+             smart_band_event_priority(&queue->items[selected]) &&
+           sequence_before(&queue->items[index], &queue->items[selected])))
         {
           selected = index;
         }
@@ -172,6 +215,8 @@ bool smart_band_event_queue_take(smart_band_event_queue_t *queue,
                                  smart_band_event_t *event)
 {
   size_t index;
+  size_t selected = 0u;
+  bool found = false;
 
   if (queue == NULL || event == NULL || type == SMART_BAND_EVENT_NONE)
     {
@@ -182,19 +227,30 @@ bool smart_band_event_queue_take(smart_band_event_queue_t *queue,
     {
       if (queue->items[index].type == type)
         {
-          *event = queue->items[index];
-          remove_at(queue, index);
-          return true;
+          if (!found || sequence_before(&queue->items[index],
+                                        &queue->items[selected]))
+            {
+              selected = index;
+              found = true;
+            }
         }
     }
 
-  return false;
+  if (!found)
+    {
+      return false;
+    }
+  *event = queue->items[selected];
+  remove_at(queue, selected);
+  return true;
 }
 
 bool smart_band_event_queue_take_next_notification(
   smart_band_event_queue_t *queue, smart_band_event_t *event)
 {
   size_t index;
+  size_t selected = 0u;
+  bool found = false;
 
   if (queue == NULL || event == NULL)
     {
@@ -207,19 +263,30 @@ bool smart_band_event_queue_take_next_notification(
             SMART_BAND_EVENT_NOTIFICATION_RECEIVED ||
           queue->items[index].type == SMART_BAND_EVENT_NOTIFICATION_ACTION)
         {
-          *event = queue->items[index];
-          remove_at(queue, index);
-          return true;
+          if (!found || sequence_before(&queue->items[index],
+                                        &queue->items[selected]))
+            {
+              selected = index;
+              found = true;
+            }
         }
     }
 
-  return false;
+  if (!found)
+    {
+      return false;
+    }
+  *event = queue->items[selected];
+  remove_at(queue, selected);
+  return true;
 }
 
 bool smart_band_event_queue_take_next_domain(
   smart_band_event_queue_t *queue, smart_band_event_t *event)
 {
   size_t index;
+  size_t selected = 0u;
+  bool found = false;
 
   if (queue == NULL || event == NULL)
     {
@@ -235,13 +302,22 @@ bool smart_band_event_queue_take_next_domain(
           type == SMART_BAND_EVENT_NOTIFICATION_RECEIVED ||
           type == SMART_BAND_EVENT_NOTIFICATION_ACTION)
         {
-          *event = queue->items[index];
-          remove_at(queue, index);
-          return true;
+          if (!found || sequence_before(&queue->items[index],
+                                        &queue->items[selected]))
+            {
+              selected = index;
+              found = true;
+            }
         }
     }
 
-  return false;
+  if (!found)
+    {
+      return false;
+    }
+  *event = queue->items[selected];
+  remove_at(queue, selected);
+  return true;
 }
 
 size_t smart_band_event_queue_count(const smart_band_event_queue_t *queue)

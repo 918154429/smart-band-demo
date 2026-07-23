@@ -960,6 +960,32 @@ static smart_band_notification_input_t make_notification(
   return input;
 }
 
+static bool post_notification_external_cstr(
+  const smart_band_notification_input_t *input, uint32_t monotonic_ms)
+{
+  smart_band_notification_utf8_input_t utf8;
+
+  if (input == NULL || input->source == NULL || input->title == NULL ||
+      input->body == NULL)
+    {
+      return false;
+    }
+  utf8.id = input->id;
+  utf8.type = input->type;
+  utf8.priority = input->priority;
+  utf8.source.data = input->source;
+  utf8.source.length = strlen(input->source);
+  utf8.title.data = input->title;
+  utf8.title.length = strlen(input->title);
+  utf8.body.data = input->body;
+  utf8.body.length = strlen(input->body);
+  utf8.wall_timestamp = input->wall_timestamp;
+  return smart_band_lvgl_post_notification_external(&utf8, monotonic_ms);
+}
+
+#define POST_NOTIFICATION_EXTERNAL_CSTR(input, monotonic_ms) \
+  post_notification_external_cstr((input), (monotonic_ms))
+
 static int test_notification_overlay_pump_and_timeout(void)
 {
   ui_tree_t tree;
@@ -976,11 +1002,11 @@ static int test_notification_overlay_pump_and_timeout(void)
   lv_obj_t *target;
 
   fake_lvgl_reset();
-  CHECK(!smart_band_lvgl_post_notification_external(&first, 0u));
+  CHECK(!POST_NOTIFICATION_EXTERNAL_CSTR(&first, 0u));
   lv_obj_set_size(lv_scr_act(), 320, 480);
   CHECK(smart_band_lvgl_create(NULL) == 0);
   CHECK(navigate_to_apps(&tree) == 0);
-  CHECK(smart_band_lvgl_post_notification_external(&first, 300u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&first, 300u));
   CHECK(fake_lvgl_advance_tick(49u) == 0u);
   CHECK(find_visible_text("Message one", 0u) == NULL);
   CHECK(fake_lvgl_advance_tick(1u) == 1u);
@@ -1011,11 +1037,11 @@ static int test_notification_overlay_pump_and_timeout(void)
 
   CHECK(click_object_center(find_visible_text("Dismiss", 0u)) != NULL);
   CHECK(find_visible_text("Message one", 0u) == NULL);
-  CHECK(smart_band_lvgl_post_notification_external(&first, 350u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&first, 350u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Message one", 0u) == NULL);
 
-  CHECK(smart_band_lvgl_post_notification_external(&second, 400u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&second, 400u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Timeout card", 0u) != NULL);
   (void)fake_lvgl_advance_tick(4949u);
@@ -1024,7 +1050,7 @@ static int test_notification_overlay_pump_and_timeout(void)
   CHECK(find_visible_text("Timeout card", 0u) == NULL);
 
   smart_band_lvgl_destroy();
-  CHECK(!smart_band_lvgl_post_notification_external(&second, 5400u));
+  CHECK(!POST_NOTIFICATION_EXTERNAL_CSTR(&second, 5400u));
   CHECK(resources_are_zero());
   return 0;
 }
@@ -1057,7 +1083,7 @@ static int test_notification_haptic_platform_contract(void)
     501u, SMART_BAND_NOTIFICATION_TYPE_APP,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter OK",
     "Play before ack");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 0u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 0u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.play_calls == 1u && fake.pulse_count == 2u);
   CHECK(fake.pulses[0].on_ms == 70u && fake.pulses[0].off_ms == 50u &&
@@ -1079,7 +1105,7 @@ static int test_notification_haptic_platform_contract(void)
     502u, SMART_BAND_NOTIFICATION_TYPE_APP,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter busy",
     "Retry same generation");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 50u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 50u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.play_calls == 1u);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
@@ -1103,7 +1129,7 @@ static int test_notification_haptic_platform_contract(void)
     503u, SMART_BAND_NOTIFICATION_TYPE_APP,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter IO",
     "Retain pending on IO");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 150u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 150u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.play_calls == 1u);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
@@ -1125,7 +1151,7 @@ static int test_notification_haptic_platform_contract(void)
     504u, SMART_BAND_NOTIFICATION_TYPE_APP,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Fallback",
     "Structured simulator marker");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 250u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 250u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.play_calls == 1u && logger.haptic_lines == 1u &&
         logger.wake_lines == 4u);
@@ -1140,7 +1166,7 @@ static int test_notification_haptic_platform_contract(void)
     505u, SMART_BAND_NOTIFICATION_TYPE_APP,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Log failure",
     "Best effort does not block ack");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 300u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 300u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
   CHECK(diagnostics.haptic_events == 5u &&
@@ -1160,7 +1186,7 @@ static int test_notification_haptic_platform_contract(void)
     506u, SMART_BAND_NOTIFICATION_TYPE_SMS,
     SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "Platform", "Subtle",
     "Single pulse mapping");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 400u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 400u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.pulse_count == 1u && fake.pulses[0].on_ms == 40u &&
         fake.pulses[0].off_ms == 0u && fake.pulses[0].strength == 35u);
@@ -1168,7 +1194,7 @@ static int test_notification_haptic_platform_contract(void)
     507u, SMART_BAND_NOTIFICATION_TYPE_CALL,
     SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Urgent",
     "Three pulse mapping");
-  CHECK(smart_band_lvgl_post_notification_external(&input, 450u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&input, 450u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(fake.pulse_count == 3u);
   CHECK(fake.pulses[0].on_ms == 120u && fake.pulses[0].off_ms == 70u &&
@@ -1220,7 +1246,7 @@ static int test_notification_effects_dnd_long_text_and_content_update(void)
   CHECK(diagnostics.haptic_events == 0u &&
         diagnostics.wake_requests == 0u);
 
-  CHECK(smart_band_lvgl_post_notification_external(&update, 0u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&update, 0u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Original notice", 0u) != NULL);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
@@ -1236,7 +1262,7 @@ static int test_notification_effects_dnd_long_text_and_content_update(void)
 
   update.title = "Updated notice";
   update.body = long_body;
-  CHECK(smart_band_lvgl_post_notification_external(&update, 50u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&update, 50u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Original notice", 0u) == NULL);
   CHECK(find_visible_text("Updated notice", 0u) != NULL);
@@ -1259,7 +1285,7 @@ static int test_notification_effects_dnd_long_text_and_content_update(void)
         diagnostics.last_haptic_generation ==
           diagnostics.last_wake_generation);
 
-  CHECK(smart_band_lvgl_post_notification_external(&update, 100u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&update, 100u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
   CHECK(diagnostics.haptic_events == 2u &&
@@ -1268,7 +1294,7 @@ static int test_notification_effects_dnd_long_text_and_content_update(void)
 
   policy.dnd_enabled = true;
   CHECK(smart_band_lvgl_set_notification_policy(&policy));
-  CHECK(smart_band_lvgl_post_notification_external(&dnd, 150u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&dnd, 150u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("DND retained", 0u) == NULL);
   CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
@@ -1312,7 +1338,7 @@ static int test_notification_center_actions_and_paging(void)
         (uint32_t)(101u + index), SMART_BAND_NOTIFICATION_TYPE_APP,
         SMART_BAND_NOTIFICATION_PRIORITY_LOW, "Mail", titles[index],
         "Center only");
-      CHECK(smart_band_lvgl_post_notification_external(
+      CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(
               &input, (uint32_t)index));
     }
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
@@ -1423,7 +1449,7 @@ static int test_notification_call_capture_and_backlog(void)
   lv_obj_set_size(lv_scr_act(), 320, 480);
   CHECK(smart_band_lvgl_create(NULL) == 0);
   CHECK(inspect_ui_tree(&tree) == 0);
-  CHECK(smart_band_lvgl_post_notification_external(&alice, 0u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&alice, 0u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Alice", 0u) != NULL);
   call_layer = fake_lvgl_obj_parent(find_visible_text("Alice", 0u));
@@ -1448,7 +1474,7 @@ static int test_notification_call_capture_and_backlog(void)
   CHECK(!fake_lvgl_obj_has_flag(tree.face, LV_OBJ_FLAG_HIDDEN));
   CHECK(fake_lvgl_obj_has_flag(tree.heart, LV_OBJ_FLAG_HIDDEN));
 
-  CHECK(smart_band_lvgl_post_notification_external(&bob, 50u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&bob, 50u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Alice", 0u) != NULL);
   CHECK(find_visible_text("Bob", 0u) == NULL);
@@ -1490,7 +1516,7 @@ static int test_workout_call_overlay_is_non_blocking(void)
   (void)fake_lvgl_advance_tick(3700u);
   CHECK(find_visible_text("Active", 0u) != NULL);
 
-  CHECK(smart_band_lvgl_post_notification_external(&call, 4000u));
+  CHECK(POST_NOTIFICATION_EXTERNAL_CSTR(&call, 4000u));
   CHECK(fake_lvgl_advance_tick(50u) == 1u);
   CHECK(find_visible_text("Coach", 0u) != NULL);
   overlay = fake_lvgl_obj_parent(find_visible_text("Coach", 0u));
@@ -1503,6 +1529,52 @@ static int test_workout_call_overlay_is_non_blocking(void)
   CHECK(click_object_center(find_visible_text("Reject", 0u)) != NULL);
   CHECK(find_visible_text("Coach", 0u) == NULL);
 
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+  return 0;
+}
+
+#undef POST_NOTIFICATION_EXTERNAL_CSTR
+
+static int test_notification_public_utf8_ingress(void)
+{
+  static const char source[] = {'A', 'd', 'a', 'p', 't', 'e', 'r'};
+  static const unsigned char title_bytes[] =
+    {'N', 'o', 't', 'i', 'c', 'e', ' ',
+     0xf0u, 0x9fu, 0x94u, 0x94u, 0u};
+  static const unsigned char body[] =
+    {0xe4u, 0xb8u, 0xadu, 0xe6u, 0x96u, 0x87u,
+     ' ', 'U', 'T', 'F', '-', '8'};
+  static const unsigned char invalid[] = {0xedu, 0xa0u, 0x80u};
+  const char *title = (const char *)title_bytes;
+  smart_band_notification_utf8_input_t input;
+
+  memset(&input, 0, sizeof(input));
+  input.id = 601u;
+  input.type = SMART_BAND_NOTIFICATION_TYPE_APP;
+  input.priority = SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
+  input.source.data = source;
+  input.source.length = sizeof(source);
+  input.title.data = title;
+  input.title.length = sizeof(title_bytes) - 1u;
+  input.body.data = (const char *)body;
+  input.body.length = sizeof(body);
+  input.wall_timestamp = 601u;
+
+  fake_lvgl_reset();
+  CHECK(!smart_band_lvgl_post_notification_external(&input, 0u));
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(smart_band_lvgl_post_notification_external(&input, 0u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text(title, 0u) != NULL);
+
+  input.id = 602u;
+  input.title.data = (const char *)invalid;
+  input.title.length = sizeof(invalid);
+  CHECK(!smart_band_lvgl_post_notification_external(&input, 50u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text(title, 0u) != NULL);
   smart_band_lvgl_destroy();
   CHECK(resources_are_zero());
   return 0;
@@ -1569,6 +1641,7 @@ int main(void)
   CHECK(test_notification_center_failure_rollback() == 0);
   CHECK(test_notification_call_capture_and_backlog() == 0);
   CHECK(test_workout_call_overlay_is_non_blocking() == 0);
+  CHECK(test_notification_public_utf8_ingress() == 0);
   CHECK(test_watch_face_mount_failure_rollback() == 0);
   CHECK(test_watch_face_picker_switch_soak() == 0);
   CHECK(test_create_destroy_navigation_soak() == 0);

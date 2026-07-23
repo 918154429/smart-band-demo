@@ -2028,7 +2028,8 @@ void smart_band_lvgl_destroy(void)
 }
 
 bool smart_band_lvgl_post_notification_external(
-  const smart_band_notification_input_t *input, uint32_t monotonic_ms)
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms)
 {
   return g_ui.runtime.initialized &&
          smart_band_runtime_post_notification_external(

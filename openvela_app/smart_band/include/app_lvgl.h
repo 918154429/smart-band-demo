@@ -19,7 +19,8 @@ void smart_band_lvgl_destroy(void);
 /* Thread-safe for concurrent producers only while the created application is
  * alive. This copies the input through the locked external inbox. */
 bool smart_band_lvgl_post_notification_external(
-  const smart_band_notification_input_t *input, uint32_t monotonic_ms);
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms);
 /* UI-thread controller hook. External producers must continue to use the
  * locked notification ingress above. */
 bool smart_band_lvgl_set_notification_policy(

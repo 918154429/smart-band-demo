@@ -878,6 +878,144 @@ static int test_inbox_wrap_priority_and_lock_recovery(void)
   return 0;
 }
 
+static int test_explicit_length_utf8_ingress(void)
+{
+  static const unsigned char source_utf8[] =
+    {0xe6u, 0x9du, 0xa5u, 0xe6u, 0xbau, 0x90u};
+  static const unsigned char title_utf8[] =
+    {0xf0u, 0x9fu, 0x94u, 0x94u};
+  static const unsigned char body_utf8[] =
+    {'A', 0xc2u, 0xa2u, 0xe2u, 0x82u, 0xacu,
+     0xf0u, 0x90u, 0x8du, 0x88u};
+  static const unsigned char invalid_continuation[] = {0x80u};
+  static const unsigned char invalid_overlong_2[] = {0xc0u, 0x80u};
+  static const unsigned char invalid_overlong_3[] =
+    {0xe0u, 0x80u, 0x80u};
+  static const unsigned char invalid_surrogate[] =
+    {0xedu, 0xa0u, 0x80u};
+  static const unsigned char invalid_overlong_4[] =
+    {0xf0u, 0x80u, 0x80u, 0x80u};
+  static const unsigned char invalid_too_high[] =
+    {0xf4u, 0x90u, 0x80u, 0x80u};
+  static const unsigned char invalid_truncated[] = {0xe2u, 0x82u};
+  static const unsigned char invalid_nul[] = {'A', 0u, 'B'};
+  static const struct
+  {
+    const unsigned char *data;
+    size_t length;
+  } invalid[] = {
+    {invalid_continuation, sizeof(invalid_continuation)},
+    {invalid_overlong_2, sizeof(invalid_overlong_2)},
+    {invalid_overlong_3, sizeof(invalid_overlong_3)},
+    {invalid_surrogate, sizeof(invalid_surrogate)},
+    {invalid_overlong_4, sizeof(invalid_overlong_4)},
+    {invalid_too_high, sizeof(invalid_too_high)},
+    {invalid_truncated, sizeof(invalid_truncated)},
+    {invalid_nul, sizeof(invalid_nul)},
+  };
+  smart_band_notification_utf8_input_t input;
+  smart_band_event_t event;
+  smart_band_event_t zero;
+  unsigned char boundary[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY + 3u];
+  size_t index;
+
+  memset(&input, 0, sizeof(input));
+  input.id = 900u;
+  input.type = SMART_BAND_NOTIFICATION_TYPE_APP;
+  input.priority = SMART_BAND_NOTIFICATION_PRIORITY_NORMAL;
+  input.source.data = (const char *)source_utf8;
+  input.source.length = sizeof(source_utf8);
+  input.title.data = (const char *)title_utf8;
+  input.title.length = sizeof(title_utf8);
+  input.body.data = (const char *)body_utf8;
+  input.body.length = sizeof(body_utf8);
+  input.wall_timestamp = UINT64_C(123456789);
+  CHECK(smart_band_notification_event_received_utf8(&input, 77u, &event));
+  CHECK(event.monotonic_ms == 77u);
+  CHECK(memcmp(event.payload.notification_received.source, source_utf8,
+               sizeof(source_utf8)) == 0);
+  CHECK(memcmp(event.payload.notification_received.title, title_utf8,
+               sizeof(title_utf8)) == 0);
+  CHECK(memcmp(event.payload.notification_received.body, body_utf8,
+               sizeof(body_utf8)) == 0);
+  CHECK(event.payload.notification_received.source[sizeof(source_utf8)] ==
+        '\0');
+
+  input.source.data = NULL;
+  input.source.length = 0u;
+  CHECK(smart_band_notification_event_received_utf8(&input, 78u, &event));
+  CHECK(event.payload.notification_received.source[0] == '\0');
+
+  memset(boundary, 'a', sizeof(boundary));
+  boundary[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY - 2u] = 0xe2u;
+  boundary[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY - 1u] = 0x82u;
+  boundary[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY] = 0xacu;
+  boundary[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY + 1u] = 'Z';
+  input.source.data = (const char *)boundary;
+  input.source.length = SMART_BAND_NOTIFICATION_SOURCE_CAPACITY + 2u;
+  CHECK(smart_band_notification_event_received_utf8(&input, 79u, &event));
+  CHECK(strlen(event.payload.notification_received.source) ==
+        SMART_BAND_NOTIFICATION_SOURCE_CAPACITY - 2u);
+  CHECK(strchr(event.payload.notification_received.source, 'Z') == NULL);
+
+  memset(&zero, 0, sizeof(zero));
+  for (index = 0u; index < sizeof(invalid) / sizeof(invalid[0]); index++)
+    {
+      input.source.data = (const char *)invalid[index].data;
+      input.source.length = invalid[index].length;
+      memset(&event, 0xa5, sizeof(event));
+      CHECK(!smart_band_notification_event_received_utf8(
+              &input, (uint32_t)index, &event));
+      CHECK(memcmp(&event, &zero, sizeof(event)) == 0);
+    }
+
+  input.source.data = NULL;
+  input.source.length = 1u;
+  CHECK(!smart_band_notification_event_received_utf8(&input, 80u, &event));
+  CHECK(!smart_band_notification_event_received_utf8(NULL, 80u, &event));
+  CHECK(!smart_band_notification_event_received_utf8(&input, 80u, NULL));
+  return 0;
+}
+
+static int test_main_ingress_sequencer_contract(void)
+{
+  smart_band_event_inbox_t inbox;
+  smart_band_event_queue_t queue;
+  smart_band_event_lock_t lock_ops;
+  fake_lock_t lock = {0u, 0u, true, false};
+  smart_band_event_t event;
+  smart_band_event_t popped;
+
+  lock_ops.context = &lock;
+  lock_ops.lock = fake_lock_enter;
+  lock_ops.unlock = fake_lock_leave;
+  CHECK(smart_band_event_inbox_init(&inbox, &lock_ops));
+  smart_band_event_queue_init(&queue);
+  event = make_generic_event(SMART_BAND_EVENT_TOUCH_ACTIVITY, 1u);
+  CHECK(!smart_band_event_inbox_post_main(NULL, &queue, &event));
+  CHECK(!smart_band_event_inbox_post_main(&inbox, NULL, &event));
+  CHECK(!smart_band_event_inbox_post_main(&inbox, &queue, NULL));
+
+  lock.allow = false;
+  CHECK(!smart_band_event_inbox_post_main(&inbox, &queue, &event));
+  lock.allow = true;
+  CHECK(smart_band_event_inbox_post_main(&inbox, &queue, &event));
+  CHECK(smart_band_event_queue_pop(&queue, &popped));
+  CHECK(popped.ingress_sequence == 1u);
+
+  inbox.next_sequence = UINT64_MAX;
+  event.payload.generic.code = 2u;
+  CHECK(smart_band_event_inbox_post_main(&inbox, &queue, &event));
+  CHECK(smart_band_event_queue_pop(&queue, &popped));
+  CHECK(popped.ingress_sequence == 1u);
+
+  CHECK(smart_band_event_inbox_close(&inbox));
+  CHECK(!smart_band_event_inbox_post_main(&inbox, &queue, &event));
+  CHECK(lock.lock_calls == lock.unlock_calls + 1u);
+  CHECK(!lock.held);
+  return 0;
+}
+
 int main(void)
 {
   CHECK(test_validation_sizes_and_recovery() == 0);
@@ -890,6 +1028,8 @@ int main(void)
   CHECK(test_full_protected_and_recovery() == 0);
   CHECK(test_thousand_mixed_receives() == 0);
   CHECK(test_inbox_wrap_priority_and_lock_recovery() == 0);
+  CHECK(test_explicit_length_utf8_ingress() == 0);
+  CHECK(test_main_ingress_sequencer_contract() == 0);
   puts("smart band notification service tests passed");
   return 0;
 }

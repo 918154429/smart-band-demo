@@ -81,12 +81,15 @@ bool smart_band_runtime_post(smart_band_runtime_t *runtime,
                              const smart_band_event_t *event);
 bool smart_band_runtime_post_external(void *context,
                                       const smart_band_event_t *event);
+/* UI-thread/trusted C-string helper. Adapters and concurrent producers must
+ * use the explicit-length UTF-8 external ingress below. */
 bool smart_band_runtime_post_notification(
   smart_band_runtime_t *runtime,
   const smart_band_notification_input_t *input, uint32_t monotonic_ms);
 bool smart_band_runtime_post_notification_external(
   smart_band_runtime_t *runtime,
-  const smart_band_notification_input_t *input, uint32_t monotonic_ms);
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms);
 bool smart_band_runtime_inject_notification_demo(
   smart_band_runtime_t *runtime, uint32_t seed, uint32_t sequence,
   uint32_t monotonic_ms);

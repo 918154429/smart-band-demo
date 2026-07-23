@@ -43,6 +43,7 @@ typedef struct
 {
   smart_band_event_type_t type;
   uint32_t monotonic_ms;
+  uint64_t ingress_sequence;
   union
   {
     struct
@@ -101,6 +102,7 @@ typedef struct
   unsigned int dropped;
   unsigned int evicted;
   smart_band_event_lock_t lock;
+  uint64_t next_sequence;
   bool accepting;
 } smart_band_event_inbox_t;
 
@@ -127,6 +129,12 @@ bool smart_band_event_inbox_init(smart_band_event_inbox_t *inbox,
 bool smart_band_event_inbox_close(smart_band_event_inbox_t *inbox);
 bool smart_band_event_inbox_post(smart_band_event_inbox_t *inbox,
                                  const smart_band_event_t *event);
+/* UI-thread posts and external posts share this inbox sequencer. This keeps
+ * accepted domain events totally ordered even when an older external event
+ * is drained after a newer main-queue event. */
+bool smart_band_event_inbox_post_main(smart_band_event_inbox_t *inbox,
+                                      smart_band_event_queue_t *queue,
+                                      const smart_band_event_t *event);
 bool smart_band_event_inbox_pop(smart_band_event_inbox_t *inbox,
                                 smart_band_event_t *event);
 

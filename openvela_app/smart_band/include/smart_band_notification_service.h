@@ -121,6 +121,9 @@ bool smart_band_notification_service_ack_wake(
 bool smart_band_notification_event_received(
   const smart_band_notification_input_t *input, uint32_t monotonic_ms,
   smart_band_event_t *event);
+bool smart_band_notification_event_received_utf8(
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms, smart_band_event_t *event);
 bool smart_band_notification_event_action(
   uint32_t id, smart_band_notification_command_t command,
   uint32_t monotonic_ms, smart_band_event_t *event);

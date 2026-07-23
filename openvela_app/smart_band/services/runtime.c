@@ -551,7 +551,8 @@ bool smart_band_runtime_post(smart_band_runtime_t *runtime,
                              const smart_band_event_t *event)
 {
   return runtime != NULL && runtime->initialized &&
-         smart_band_event_queue_push(&runtime->events, event);
+         smart_band_event_inbox_post_main(&runtime->external_events,
+                                          &runtime->events, event);
 }
 
 bool smart_band_runtime_post_external(void *context,
@@ -576,12 +577,14 @@ bool smart_band_runtime_post_notification(
 
 bool smart_band_runtime_post_notification_external(
   smart_band_runtime_t *runtime,
-  const smart_band_notification_input_t *input, uint32_t monotonic_ms)
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms)
 {
   smart_band_event_t event;
 
   return runtime != NULL && runtime->initialized &&
-         smart_band_notification_event_received(input, monotonic_ms, &event) &&
+         smart_band_notification_event_received_utf8(
+           input, monotonic_ms, &event) &&
          smart_band_runtime_post_external(runtime, &event);
 }
 

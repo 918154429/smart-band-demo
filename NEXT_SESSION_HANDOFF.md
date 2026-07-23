@@ -631,9 +631,15 @@ notification effect 仍以 service generation 为 ACK key；Q4 standalone 的 wa
 - 已验证 Host run `29972675675` 55/55、Browser run `29972675670` 1/1。
 - 证据：`docs/q4-notification-effects-20260723.md` 与对应 JSON。
 
-Q4 C Gate 仍保持 open。剩余项是 reviewed native notification journey、explicit-length
-UTF-8 ingress、cross-inbox/main total ordering，以及 target ELF/map/stack 证据。不得把
-fake-LVGL marker 声称为真实震动、真实显示唤醒或真机能力。
+Q4 explicit-length UTF-8 ingress 与 cross-inbox/main total ordering 已在后续切片闭合：
+严格 UTF-8/embedded-NUL 校验、完整码点前缀截断、共享 64-bit sequence、wrap 与同优先级
+满载保序均已覆盖；外层开发机 GCC coverage 为 overall `93.0%`，event queue `97.5%`、
+inbox `98.9%`、notification service `94.9%`。证据见
+`docs/q4-notification-ingress-order-20260723.md` 与对应 JSON。
+
+Q4 C Gate 仍保持 open。剩余项仅为 reviewed native notification journey，以及 target
+ELF/真实 linker map/task stack 证据。不得把 fake-LVGL marker 声称为真实震动、真实显示
+唤醒或真机能力。
 
 ### 12.3 Q5 当前结论
 
@@ -669,7 +675,8 @@ device config、Notification Inbox、Linux client、simulator bridge、GATT mapp
 ### 12.5 下一续接顺序与边界
 
 1. 先确认 PR14/PR16/PR17 最新文档 head 的 Host/Browser checks 全绿且工作树 clean。
-2. Q4 继续关闭 12.2 的四项 C Gate 软件/目标构建证据；未闭合前不把 C Gate 标绿。
+2. Q4 继续关闭 12.2 剩余的 native reviewed journey 与 target ELF/map/stack 证据；未闭合前
+   不把 C Gate 标绿。
 3. Q6 下一软件切片优先 automatic timeout/retry driver 和可观测 metrics，再扩业务 domain；
    所有同步调度必须咨询 Q5 的 `smart_band_runtime_allows_sync()`。
 4. Q5 只可继续改善 host/native 软件证据；没有目标板测量时实际功耗 Gate 始终红色。

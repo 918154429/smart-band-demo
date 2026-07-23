@@ -42,6 +42,98 @@ static void copy_text(char *destination, size_t capacity, const char *source)
   destination[length] = '\0';
 }
 
+static bool copy_utf8_span(char *destination, size_t capacity,
+                           const smart_band_notification_utf8_span_t *span)
+{
+  const unsigned char *bytes;
+  size_t input_index = 0u;
+  size_t output_length = 0u;
+  bool truncated = false;
+
+  if (destination == NULL || capacity == 0u || span == NULL ||
+      (span->data == NULL && span->length != 0u))
+    {
+      return false;
+    }
+
+  bytes = (const unsigned char *)span->data;
+  while (input_index < span->length)
+    {
+      unsigned char first = bytes[input_index];
+      size_t width;
+
+      if (first == 0u)
+        {
+          return false;
+        }
+      else if (first <= 0x7fu)
+        {
+          width = 1u;
+        }
+      else if (first >= 0xc2u && first <= 0xdfu)
+        {
+          width = 2u;
+        }
+      else if (first >= 0xe0u && first <= 0xefu)
+        {
+          width = 3u;
+        }
+      else if (first >= 0xf0u && first <= 0xf4u)
+        {
+          width = 4u;
+        }
+      else
+        {
+          return false;
+        }
+
+      if (width > span->length - input_index)
+        {
+          return false;
+        }
+
+      if (width >= 2u &&
+          (bytes[input_index + 1u] < 0x80u ||
+           bytes[input_index + 1u] > 0xbfu))
+        {
+          return false;
+        }
+      if (width >= 3u &&
+          (bytes[input_index + 2u] < 0x80u ||
+           bytes[input_index + 2u] > 0xbfu))
+        {
+          return false;
+        }
+      if (width == 4u &&
+          (bytes[input_index + 3u] < 0x80u ||
+           bytes[input_index + 3u] > 0xbfu))
+        {
+          return false;
+        }
+      if ((first == 0xe0u && bytes[input_index + 1u] < 0xa0u) ||
+          (first == 0xedu && bytes[input_index + 1u] > 0x9fu) ||
+          (first == 0xf0u && bytes[input_index + 1u] < 0x90u) ||
+          (first == 0xf4u && bytes[input_index + 1u] > 0x8fu))
+        {
+          return false;
+        }
+
+      if (!truncated && width < capacity - output_length)
+        {
+          memcpy(&destination[output_length], &bytes[input_index], width);
+          output_length += width;
+        }
+      else
+        {
+          truncated = true;
+        }
+      input_index += width;
+    }
+
+  destination[output_length] = '\0';
+  return true;
+}
+
 static bool terminated_received_payload(const smart_band_event_t *event)
 {
   return event->payload.notification_received
@@ -867,6 +959,40 @@ bool smart_band_notification_event_received(
             sizeof(event->payload.notification_received.title), input->title);
   copy_text(event->payload.notification_received.body,
             sizeof(event->payload.notification_received.body), input->body);
+  event->payload.notification_received.wall_timestamp = input->wall_timestamp;
+  return true;
+}
+
+bool smart_band_notification_event_received_utf8(
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms, smart_band_event_t *event)
+{
+  if (input == NULL || event == NULL || input->id == 0u ||
+      !valid_type(input->type) || !valid_priority(input->priority))
+    {
+      return false;
+    }
+
+  memset(event, 0, sizeof(*event));
+  event->type = SMART_BAND_EVENT_NOTIFICATION_RECEIVED;
+  event->monotonic_ms = monotonic_ms;
+  event->payload.notification_received.id = input->id;
+  event->payload.notification_received.type = input->type;
+  event->payload.notification_received.priority =
+    normalize_priority(input->type, input->priority);
+  if (!copy_utf8_span(event->payload.notification_received.source,
+                      sizeof(event->payload.notification_received.source),
+                      &input->source) ||
+      !copy_utf8_span(event->payload.notification_received.title,
+                      sizeof(event->payload.notification_received.title),
+                      &input->title) ||
+      !copy_utf8_span(event->payload.notification_received.body,
+                      sizeof(event->payload.notification_received.body),
+                      &input->body))
+    {
+      memset(event, 0, sizeof(*event));
+      return false;
+    }
   event->payload.notification_received.wall_timestamp = input->wall_timestamp;
   return true;
 }
