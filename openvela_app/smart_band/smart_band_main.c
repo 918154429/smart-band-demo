@@ -1,11 +1,33 @@
 #include <nuttx/config.h>
 
 #include <stdio.h>
+#include <string.h>
 #include <uv.h>
 
 #include <lvgl/lvgl.h>
 
 #include "app_lvgl.h"
+
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+#  define SMART_BAND_Q4_SCENARIO_PREFIX "--q4-native-scenario="
+
+static const char *q4_native_scenario_from_args(int argc, char *argv[])
+{
+  size_t prefix_length = strlen(SMART_BAND_Q4_SCENARIO_PREFIX);
+
+  if (argc == 1)
+    {
+      return NULL;
+    }
+  if (argc != 2 || argv == NULL || argv[1] == NULL ||
+      strncmp(argv[1], SMART_BAND_Q4_SCENARIO_PREFIX, prefix_length) != 0 ||
+      argv[1][prefix_length] == '\0')
+    {
+      return "";
+    }
+  return argv[1] + prefix_length;
+}
+#endif
 
 static void smart_band_lv_nuttx_uv_loop(uv_loop_t *loop,
                                         lv_nuttx_result_t *result)
@@ -33,9 +55,20 @@ int main(int argc, char *argv[])
   lv_nuttx_dsc_t info;
   lv_nuttx_result_t result;
   uv_loop_t ui_loop;
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  const char *q4_native_scenario = q4_native_scenario_from_args(argc, argv);
 
+  if (q4_native_scenario != NULL && q4_native_scenario[0] == '\0')
+    {
+      printf("smart_band:q4:inject:v1 scenario=invalid phase=rejected "
+             "accepted=0 requested=0\n");
+      fflush(stdout);
+      return 2;
+    }
+#else
   (void)argc;
   (void)argv;
+#endif
 
   lv_memset(&ui_loop, 0, sizeof(uv_loop_t));
 
@@ -64,6 +97,17 @@ int main(int argc, char *argv[])
       lv_deinit();
       return 1;
     }
+
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  if (q4_native_scenario != NULL &&
+      !smart_band_lvgl_inject_q4_native_scenario_for_test(q4_native_scenario))
+    {
+      smart_band_lvgl_destroy();
+      lv_nuttx_deinit(&result);
+      lv_deinit();
+      return 2;
+    }
+#endif
 
   printf("smart_band: UI ready\n");
   fflush(stdout);

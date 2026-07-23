@@ -92,6 +92,7 @@ typedef struct
   uint32_t diagnostic_last_wake_generation;
   smart_band_notification_haptic_t diagnostic_last_haptic;
   smart_band_platform_result_t diagnostic_last_haptic_platform_result;
+  lv_timer_t *diagnostic_q4_timer;
   smart_band_lvgl_effect_log_for_test_t effect_log_for_test;
   void *effect_log_context;
 #endif
@@ -218,6 +219,89 @@ static void emit_q4_diagnostics(void)
          (unsigned int)g_ui.runtime.notifications.effect_count,
          g_ui.runtime.external_events.dropped);
   fflush(stdout);
+}
+
+static void emit_q4_inject_marker(const char *scenario, const char *phase,
+                                  size_t accepted, size_t requested)
+{
+  printf("smart_band:q4:inject:v1 scenario=%s phase=%s "
+         "accepted=%u requested=%u\n",
+         scenario, phase, (unsigned int)accepted, (unsigned int)requested);
+  fflush(stdout);
+}
+
+static bool diagnostic_post_notification(
+  uint32_t id, smart_band_notification_type_t type,
+  smart_band_notification_priority_t priority, const char *source,
+  const char *title, const char *body)
+{
+  smart_band_notification_utf8_input_t input;
+
+  if (source == NULL || title == NULL || body == NULL)
+    {
+      return false;
+    }
+
+  memset(&input, 0, sizeof(input));
+  input.id = id;
+  input.type = type;
+  input.priority = priority;
+  input.source.data = source;
+  input.source.length = strlen(source);
+  input.title.data = title;
+  input.title.length = strlen(title);
+  input.body.data = body;
+  input.body.length = strlen(body);
+  input.wall_timestamp = UINT64_C(1700000000) + id;
+  return smart_band_lvgl_post_notification_external(&input, lv_tick_get());
+}
+
+static void diagnostic_q4_timer_done(lv_timer_t *timer)
+{
+  if (g_ui.diagnostic_q4_timer == timer)
+    {
+      g_ui.diagnostic_q4_timer = NULL;
+    }
+  lv_timer_del(timer);
+}
+
+static void diagnostic_q4_ordinary_update_cb(lv_timer_t *timer)
+{
+  static const char long_utf8_body[] =
+    "\xe9\x95\xbf\xe6\x96\x87\xe9\x80\x9a\xe7\x9f\xa5\xe6\xad\xa3\xe5\x9c\xa8"
+    "\xe9\xaa\x8c\xe8\xaf\x81 UTF-8 \xe5\xae\x89\xe5\x85\xa8\xe6\x88\xaa\xe6\x96\xad"
+    "\xef\xbc\x8c\xe5\xa4\x9a\xe5\xad\x97\xe8\x8a\x82\xe5\xad\x97\xe7\xac\xa6\xe5\xbf\x85"
+    "\xe9\xa1\xbb\xe4\xbf\x9d\xe6\x8c\x81\xe5\xae\x8c\xe6\x95\xb4\xe3\x80\x82"
+    "\xe9\x95\xbf\xe6\x96\x87\xe9\x80\x9a\xe7\x9f\xa5\xe6\xad\xa3\xe5\x9c\xa8"
+    "\xe9\xaa\x8c\xe8\xaf\x81 UTF-8 \xe5\xae\x89\xe5\x85\xa8\xe6\x88\xaa\xe6\x96\xad"
+    "\xef\xbc\x8c\xe5\xa4\x9a\xe5\xad\x97\xe8\x8a\x82\xe5\xad\x97\xe7\xac\xa6\xe5\xbf\x85"
+    "\xe9\xa1\xbb\xe4\xbf\x9d\xe6\x8c\x81\xe5\xae\x8c\xe6\x95\xb4\xe3\x80\x82";
+  bool accepted = diagnostic_post_notification(
+    701u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Messages",
+    "Native message updated", long_utf8_body);
+
+  emit_q4_inject_marker("ordinary", "updated", accepted ? 1u : 0u, 1u);
+  diagnostic_q4_timer_done(timer);
+}
+
+static void diagnostic_q4_workout_poll_cb(lv_timer_t *timer)
+{
+  smart_band_workout_snapshot_t workout;
+  bool accepted;
+
+  if (!smart_band_workout_service_snapshot(&g_ui.runtime.workout, &workout) ||
+      workout.state != SMART_BAND_WORKOUT_STATE_ACTIVE)
+    {
+      return;
+    }
+
+  accepted = diagnostic_post_notification(
+    731u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Coach",
+    "Workout call remains non-blocking");
+  emit_q4_inject_marker("workout", "active", accepted ? 1u : 0u, 1u);
+  diagnostic_q4_timer_done(timer);
 }
 #endif
 
@@ -1886,7 +1970,11 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
   if (g_ui.root != NULL || g_ui.runtime_timer != NULL ||
       g_ui.event_pump_timer != NULL || g_ui.runtime.initialized ||
-      g_ui.event_mutex.initialized)
+      g_ui.event_mutex.initialized
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      || g_ui.diagnostic_q4_timer != NULL
+#endif
+     )
     {
       smart_band_lvgl_destroy();
     }
@@ -1992,6 +2080,14 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
 void smart_band_lvgl_destroy(void)
 {
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  if (g_ui.diagnostic_q4_timer != NULL)
+    {
+      lv_timer_del(g_ui.diagnostic_q4_timer);
+      g_ui.diagnostic_q4_timer = NULL;
+    }
+#endif
+
   if (g_ui.event_pump_timer != NULL)
     {
       lv_timer_del(g_ui.event_pump_timer);
@@ -2081,8 +2177,101 @@ bool smart_band_lvgl_get_diagnostics(
 bool smart_band_lvgl_diagnostics_is_idle(void)
 {
   return g_ui.root == NULL && g_ui.runtime_timer == NULL &&
-         g_ui.event_pump_timer == NULL && !g_ui.runtime.initialized &&
+         g_ui.event_pump_timer == NULL &&
+         g_ui.diagnostic_q4_timer == NULL && !g_ui.runtime.initialized &&
          !g_ui.event_mutex.initialized;
+}
+
+bool smart_band_lvgl_inject_q4_native_scenario_for_test(
+  const char *scenario)
+{
+  static const char *const center_titles[] =
+  {
+    "Center one", "Center two", "Center three", "Center four", "Center five"
+  };
+  smart_band_notification_policy_t policy = {true, false};
+  size_t accepted = 0u;
+  size_t index;
+
+  if (!g_ui.runtime.initialized || scenario == NULL ||
+      g_ui.diagnostic_q4_timer != NULL)
+    {
+      return false;
+    }
+
+  if (strcmp(scenario, "ordinary") == 0)
+    {
+      bool initial = diagnostic_post_notification(
+        701u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+        SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "Messages",
+        "Native message", "Initial explicit-length notification");
+
+      emit_q4_inject_marker("ordinary", "initial", initial ? 1u : 0u, 1u);
+      if (!initial)
+        {
+          return false;
+        }
+      g_ui.diagnostic_q4_timer = lv_timer_create(
+        diagnostic_q4_ordinary_update_cb, 2500u, NULL);
+      return g_ui.diagnostic_q4_timer != NULL;
+    }
+
+  if (strcmp(scenario, "center") == 0)
+    {
+      if (!smart_band_lvgl_set_notification_policy(&policy))
+        {
+          emit_q4_inject_marker("center", "ready", 0u, 5u);
+          return false;
+        }
+      for (index = 0u; index < 5u; index++)
+        {
+          if (diagnostic_post_notification(
+                711u + (uint32_t)index, SMART_BAND_NOTIFICATION_TYPE_APP,
+                SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Inbox",
+                center_titles[index], "DND-retained center row"))
+            {
+              accepted++;
+            }
+        }
+      emit_q4_inject_marker("center", "ready", accepted, 5u);
+      return accepted == 5u;
+    }
+
+  if (strcmp(scenario, "calls") == 0)
+    {
+      if (diagnostic_post_notification(
+            721u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+            SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Alice",
+            "First native incoming call"))
+        {
+          accepted++;
+        }
+      if (diagnostic_post_notification(
+            722u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+            SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Bob",
+            "Promoted native incoming call"))
+        {
+          accepted++;
+        }
+      emit_q4_inject_marker("calls", "ready", accepted, 2u);
+      return accepted == 2u;
+    }
+
+  if (strcmp(scenario, "workout") == 0)
+    {
+      g_ui.diagnostic_q4_timer = lv_timer_create(
+        diagnostic_q4_workout_poll_cb, 100u, NULL);
+      if (g_ui.diagnostic_q4_timer == NULL)
+        {
+          emit_q4_inject_marker("workout", "failed", 0u, 1u);
+          return false;
+        }
+      emit_q4_inject_marker("workout", "armed", 0u, 1u);
+      return true;
+    }
+
+  emit_q4_inject_marker(scenario, "rejected", 0u, 0u);
+  return false;
 }
 
 bool smart_band_lvgl_set_haptic_adapter_for_test(

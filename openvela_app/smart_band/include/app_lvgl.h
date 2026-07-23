@@ -50,6 +50,8 @@ typedef bool (*smart_band_lvgl_effect_log_for_test_t)(void *context,
 bool smart_band_lvgl_get_diagnostics(
   smart_band_lvgl_diagnostics_t *diagnostics);
 bool smart_band_lvgl_diagnostics_is_idle(void);
+bool smart_band_lvgl_inject_q4_native_scenario_for_test(
+  const char *scenario);
 bool smart_band_lvgl_set_haptic_adapter_for_test(
   const smart_band_haptic_t *haptic);
 bool smart_band_lvgl_set_effect_logger_for_test(

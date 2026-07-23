@@ -684,3 +684,73 @@ device config、Notification Inbox、Linux client、simulator bridge、GATT mapp
 4. Q5 只可继续改善 host/native 软件证据；没有目标板测量时实际功耗 Gate 始终红色。
 5. 不烧录 Gemini-S1、不写 flash/bootloader、不声明真实 BLE/震动/功耗，不 force-push、不
    删除远端分支、不发布 release。硬件动作仍需逐次明确授权。
+
+## 13. 2026-07-23 Q4 native Gate harness 待实跑状态
+
+### 13.1 当前实现
+
+Q4 C Gate 最后两项的采证路径已经实现，但尚未完成 fresh OpenVela run：
+
+- diagnostics-only `--q4-native-scenario=<ordinary|center|calls|workout>`；
+- ordinary 701 initial + 2.5 秒 same-ID 长 UTF-8 update；
+- DND Center IDs 711–715、Mark read、Delete；
+- Alice 721 Accept、Bob 722 Reject 与全屏输入隔离；
+- Workout ACTIVE 后 Coach Call 731、non-blocking overlay、Pause、Reject；
+- 四个隔离 emulator boot，严格 Q3/Q4/inject/haptic/wake marker；
+- 每个 checkpoint 的 NSH `ps` stack coloration，逐样本强制最差路径余量 `>=25%`；
+- PNG、transcript、run-id/runtime attributed cleanup 与根/嵌套哈希 manifest；
+- `vela_ap.elf`、`nuttx.map`、`System.map`、SHA、section/readelf、symbols/map 行采集。
+
+所有场景只走 production explicit-length external ingress。正常无参数启动零副作用；
+simulator haptic 与 wake marker 继续明确为 simulated/synthetic，不代表真实震动或显示唤醒。
+详细契约见 `docs/q4-native-gate-harness-20260723.md`。
+
+### 13.2 已通过、尚未通过
+
+已通过：
+
+- 本地 Host-equivalent 22 个脚本；
+- `tests/test_q4_native_e2e.py` 13/13；
+- MSVC `/W4 /WX` production UI；
+- Browser/Chromium 7/7；
+- 外层 `ubuntu24-hushen` 的 GCC strict UI、notification service、central runtime 和
+  Q4 runner 当时快照 12/12，目录 `/data/smart-band-q4-native-20260723T1150CST`；
+- C/runner 独立静态审计完成；发现的 stack threshold、兜底清理与相对哈希三项证据漏洞
+  已修复，最新已暂存快照的只读复审无阻断项。
+
+尚未通过：
+
+- 当前代码的 PR14 Host/Browser CI；
+- fresh fixed OpenVela build 与四场景真实 emulator journey；
+- native PNG 人工复核；
+- artifact manifest 全量复算；
+- target ELF/linker map/task stack 数值审计。
+
+因此 Q4 C Gate 仍为 **open**，路线图勾选保持 `[ ]`。
+
+### 13.3 精确续接动作
+
+1. 普通提交并推送当前实现，等待 PR14 Host/Browser 全绿。
+2. 触发：
+
+```powershell
+gh workflow run openvela-nightly.yml `
+  --ref codex/q4-notifications `
+  -f build_jobs=4 `
+  -f q3_native_e2e=false `
+  -f q3_soak_seconds=0 `
+  -f q4_native_e2e=true
+```
+
+3. 监控到终态，下载 artifact，复算全部 `evidence.sha256`。
+4. 人工逐张复核所有 native PNG，尤其确认 ordinary initial/update 标题不同。
+5. 审计四场景 JSON/checks/cleanup、ELF/map/SHA/symbols 与 stack high-water/minimum margin。
+6. 只有全部通过后，才写正式 Q4 C Gate evidence、更新路线图并决定 PR14 合并。
+
+### 13.4 远端拓扑与硬件边界
+
+- 默认开发远端是外层 `ubuntu24-hushen`；新工作只留在允许的 `/data` 路径。
+- `codex-2c8g` 是两核 Codex/共享 Sub2API 中转子机，不是默认开发机。
+- RK3568 是独立硬件子机；当前 Goldfish native Gate 不需要触达它。
+- 单独执行 `test -d /data` 只能探测当前登录主机，不能判定整体拓扑。
+- 未经逐次明确授权，不烧录、不写 flash、不修改 bootloader。

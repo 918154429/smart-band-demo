@@ -1534,6 +1534,104 @@ static int test_workout_call_overlay_is_non_blocking(void)
   return 0;
 }
 
+static int test_q4_native_diagnostic_scenarios(void)
+{
+  ui_tree_t tree;
+  smart_band_lvgl_diagnostics_t diagnostics;
+  lv_obj_t *workout;
+  lv_obj_t *walk;
+  lv_obj_t *overlay;
+
+  fake_lvgl_reset();
+  CHECK(!smart_band_lvgl_inject_q4_native_scenario_for_test("ordinary"));
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(!smart_band_lvgl_inject_q4_native_scenario_for_test(NULL));
+  CHECK(!smart_band_lvgl_inject_q4_native_scenario_for_test("unknown"));
+  CHECK(smart_band_lvgl_inject_q4_native_scenario_for_test("ordinary"));
+  CHECK(!smart_band_lvgl_inject_q4_native_scenario_for_test("center"));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("Native message", 0u) != NULL);
+  (void)fake_lvgl_advance_tick(2449u);
+  CHECK(find_visible_text("Native message", 0u) != NULL);
+  CHECK(find_visible_text("Native message updated", 0u) == NULL);
+  (void)fake_lvgl_advance_tick(1u);
+  CHECK(find_visible_text("Native message", 0u) == NULL);
+  CHECK(find_visible_text("Native message updated", 0u) != NULL);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.wake_requests == 1u);
+  CHECK(diagnostics.last_haptic_notification_id == 701u &&
+        diagnostics.last_wake_notification_id == 701u);
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(smart_band_lvgl_inject_q4_native_scenario_for_test("center"));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("Center one", 0u) == NULL);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 0u &&
+        diagnostics.wake_requests == 0u);
+  CHECK(navigate_to_apps(&tree) == 0);
+  fake_lvgl_send_event(find_visible_text("Notifications", 0u),
+                       LV_EVENT_CLICKED);
+  CHECK(find_visible_text("New: Inbox / Center five", 0u) != NULL);
+  CHECK(find_visible_text("New: Inbox / Center two", 0u) != NULL);
+  CHECK(find_visible_text("New: Inbox / Center one", 0u) == NULL);
+  CHECK(click_object_center(find_visible_text("Next", 0u)) != NULL);
+  CHECK(find_visible_text("New: Inbox / Center one", 0u) != NULL);
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(smart_band_lvgl_inject_q4_native_scenario_for_test("calls"));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("Alice", 0u) != NULL);
+  CHECK(find_visible_text("Bob", 0u) == NULL);
+  CHECK(click_object_center(find_visible_text("Accept", 0u)) != NULL);
+  CHECK(find_visible_text("Alice", 0u) == NULL);
+  CHECK(find_visible_text("Bob", 0u) != NULL);
+  CHECK(click_object_center(find_visible_text("Reject", 0u)) != NULL);
+  CHECK(find_visible_text("Bob", 0u) == NULL);
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(smart_band_lvgl_inject_q4_native_scenario_for_test("workout"));
+  CHECK(navigate_to_apps(&tree) == 0);
+  workout = find_visible_text("Workout", 0u);
+  CHECK(workout != NULL);
+  fake_lvgl_send_event(workout, LV_EVENT_CLICKED);
+  walk = find_visible_text("Walk", 0u);
+  CHECK(walk != NULL);
+  fake_lvgl_send_event(walk, LV_EVENT_CLICKED);
+  (void)fake_lvgl_advance_tick(3700u);
+  CHECK(find_visible_text("Active", 0u) != NULL);
+  CHECK(find_visible_text("Coach", 0u) == NULL);
+  (void)fake_lvgl_advance_tick(100u);
+  CHECK(find_visible_text("Coach", 0u) != NULL);
+  overlay = fake_lvgl_obj_parent(find_visible_text("Coach", 0u));
+  CHECK(overlay != NULL &&
+        lv_obj_get_width(overlay) < lv_obj_get_width(tree.screen));
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+
+  fake_lvgl_reset();
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(smart_band_lvgl_inject_q4_native_scenario_for_test("workout"));
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+  return 0;
+}
+
 #undef POST_NOTIFICATION_EXTERNAL_CSTR
 
 static int test_notification_public_utf8_ingress(void)
@@ -1641,6 +1739,7 @@ int main(void)
   CHECK(test_notification_center_failure_rollback() == 0);
   CHECK(test_notification_call_capture_and_backlog() == 0);
   CHECK(test_workout_call_overlay_is_non_blocking() == 0);
+  CHECK(test_q4_native_diagnostic_scenarios() == 0);
   CHECK(test_notification_public_utf8_ingress() == 0);
   CHECK(test_watch_face_mount_failure_rollback() == 0);
   CHECK(test_watch_face_picker_switch_soak() == 0);
