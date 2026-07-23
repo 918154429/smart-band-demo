@@ -85,6 +85,12 @@ cd /home/dhy/openvela
 真实 provider 额外需要 `SENSORS`、`UORB` 和
 `LVX_DEMO_SMART_BAND_USE_SENSORS`；关闭 provider 时可仅运行模拟数据。
 
+当前真机候选暂定为 Gemini-S1，但它不是本仓库已经验证的运行环境。现有 nightly 与
+复现脚本固定的是 goldfish `trunk-5.4`；Gemini-S1 公开 BSP 当前位于
+`dev-ai-contest-2026`。两条基线必须分别冻结、构建和留证，不能把 goldfish 输出或
+`.config` 复用为板卡证据。板卡状态见
+[`gemini-s1-target-board.md`](gemini-s1-target-board.md)。
+
 ## 2.1 Skill 一键复现流程
 
 本仓库内置复现 skill：
@@ -301,31 +307,47 @@ python3 "$DEMO_ROOT/scripts/smoke_openvela_emulator.py" \
 替代该检查。启动前脚本还会检查四项运行产物，以及 emulator、headless QEMU 和
 `libOpenglRender.so` 的宿主动态库；缺少 `libGL.so.1` 时会在启动前明确失败。
 
-## 7. 开发板运行
+## 7. Gemini-S1 开发板运行
 
-开发板流程取决于板级配置，通用步骤为：
+Gemini-S1 的公开参考配置为：
+
+```text
+vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/nsh_minidisplay
+```
+
+该目录当前只在 upstream `dev-ai-contest-2026` BSP 中公开，现有 `trunk-5.4` checkout
+不包含它。先在隔离 checkout 中冻结 manifest 与全部项目 SHA，再执行 G0 compile/link-only：
 
 ```sh
 cd "$OPENVELA_ROOT"
-./build.sh <board-config> -j2
+./build.sh \
+  vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/nsh_minidisplay \
+  -j2
 ```
 
-烧录后进入串口 shell：
+这条命令目前是 upstream 参考入口，不是本仓库已通过的板卡构建结果。G0 只允许构建，
+不得写硬件。只有实物 revision、恢复镜像/流程、供电与分区、目标 config 和写入范围全部
+复核，并取得用户对当次操作的明确授权后，才能执行厂商烧录流程。
+
+经授权烧录且启动到 NSH 后，在串口 shell 执行：
 
 ```sh
 smart_band
 ```
 
-如果开发板没有 goldfish 电池设备，电池相关 UI 会保留默认或模型值，不影响其他页面。
+Gemini-S1 的真实电池设备节点尚未确认；当前 `sensor_bridge.c` 仍打开
+`/dev/charge/goldfish_battery`。完成 board battery provider 前，电池 UI 只能使用模型回退
+值，不构成真实电池或充电验证。公开板载环境传感器也不等于心率、step counter 或
+accelerometer；这些节点必须在 HW4 逐项确认。
 
 ## 8. 验收步骤
 
 建议按以下顺序验收：
 
 1. 启动 `smart_band`，确认进入表盘页面。
-2. 表盘页面检查当前时间、日期、电量、温度和健康摘要。
-3. 左滑进入心率页，确认 bpm 正常刷新。
-4. 左滑进入计步页，使用 `-` 和 `+` 调整目标步数。
+2. 表盘页面检查当前时间、日期、电量、温度和健康摘要，并记录各项 source/capability。
+3. 左滑进入心率页；无外接心率设备时必须明确为 model fallback，不得记作真实 bpm。
+4. 左滑进入计步页，使用 `-` 和 `+` 调整目标步数；无 step/accel 节点时保留降级结论。
 5. 左滑进入应用中心，点击各应用图标进入详情页。
 6. 进入倒计时，使用 `-1m`、`+1m`、`Start/Pause`、`Reset` 验证可调时间。
 7. 进入 2048、扫雷、俄罗斯方块，确认触摸和按钮可用。
