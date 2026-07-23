@@ -331,13 +331,15 @@ static int runtime_init(const smart_band_clock_source_t *clock_source)
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH)
   if (CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH[0] != '\0')
     {
-      smart_band_platform_result_t result = smart_band_storage_file_init(
+      smart_band_platform_result_t storage_result =
+        smart_band_storage_file_init(
         &g_ui.storage_file, CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH,
         &platform.storage);
 
-      if (result != SMART_BAND_PLATFORM_OK)
+      if (storage_result != SMART_BAND_PLATFORM_OK)
         {
-          fprintf(stderr, "smart_band: storage unavailable (%d)\n", result);
+          fprintf(stderr, "smart_band: storage unavailable (%d)\n",
+                  storage_result);
           smart_band_platform_init_noop(&platform);
         }
     }
