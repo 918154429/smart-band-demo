@@ -824,15 +824,11 @@ static int test_sync_loopback_contract(void)
   CHECK(actual == 2);
   CHECK(output[0] == 0);
   CHECK(transport.ops->stop(transport.context) == SMART_BAND_PLATFORM_OK);
+  CHECK(loopback.count == 0u);
   CHECK(transport.ops->poll(transport.context, output, sizeof(output),
                             &actual) == SMART_BAND_PLATFORM_BUSY);
   CHECK(transport.ops->start(transport.context, fake_event_sink, &sink) ==
         SMART_BAND_PLATFORM_OK);
-  while (loopback.count > 0)
-    {
-      CHECK(transport.ops->poll(transport.context, output, sizeof(output),
-                                &actual) == SMART_BAND_PLATFORM_OK);
-    }
   CHECK(transport.ops->poll(transport.context, output, sizeof(output),
                             &actual) == SMART_BAND_PLATFORM_BUSY);
   CHECK(transport.ops->stop(transport.context) == SMART_BAND_PLATFORM_OK);

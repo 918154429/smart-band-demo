@@ -1,0 +1,30 @@
+{
+  "name": "sync-v1-history-capabilities",
+  "transaction_id": "0x11223344",
+  "history_transaction_id": "0xa1b2c3d4",
+  "mtu": 64,
+  "feature_bits": "0x00000001",
+  "history_resume_cursor": 0,
+  "history_total": 7,
+  "history_record": {
+    "day_key": 20260701,
+    "steps": 10000,
+    "active_seconds": 1800,
+    "calories_milli_kcal": 220000,
+    "heart_weighted_bpm_seconds": 51000,
+    "heart_duration_seconds": 600,
+    "heart_min_bpm": 55,
+    "heart_max_bpm": 130,
+    "source_flags": 3,
+    "flags": 3
+  },
+  "capabilities_frame_hex": "53 42 01 00 02 00 00 00 09 00 44 33 22 11 00 00 00 00 02 01 00 01 00 00 00 40 00 e8 1e",
+  "history_request_frame_hex": "53 42 01 00 02 00 00 00 03 00 d4 c3 b2 a1 00 00 00 00 03 00 00 75 d1",
+  "history_data_frame_hex": "53 42 01 00 01 03 00 00 21 00 d4 c3 b2 a1 00 00 00 00 04 00 00 07 00 5d 27 35 01 10 27 00 00 08 07 00 00 60 5b 03 00 38 c7 00 00 58 02 00 00 37 82 03 03 3a e4",
+  "history_ack_frame_hex": "53 42 01 00 03 00 00 00 03 00 d4 c3 b2 a1 00 00 00 00 05 01 00 06 40",
+  "malformed": [
+    {"name": "truncated", "prefix_length": 28},
+    {"name": "bad_crc", "xor_offset": 28, "xor_mask": 128},
+    {"name": "wrong_message", "xor_offset": 18, "xor_mask": 6}
+  ]
+}

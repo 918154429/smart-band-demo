@@ -51,6 +51,7 @@ CORE_SOURCES = [
     APP_DIR / "logic" / "power_policy.c",
     APP_DIR / "logic" / "watch_face_settings.c",
     APP_DIR / "services" / "sync_protocol.c",
+    APP_DIR / "services" / "sync_service.c",
     APP_DIR / "apps" / "timer_app.c",
     APP_DIR / "apps" / "stopwatch_app.c",
 ]
@@ -253,6 +254,15 @@ TARGETS = [
         "sync_protocol",
         Path(__file__).with_name("sync_protocol_test.c"),
         (APP_DIR / "services" / "sync_protocol.c",),
+    ),
+    CoverageTarget(
+        "sync_service",
+        Path(__file__).with_name("sync_service_test.c"),
+        (
+            APP_DIR / "services" / "sync_service.c",
+            APP_DIR / "services" / "sync_protocol.c",
+            APP_DIR / "platform" / "loopback" / "sync_loopback.c",
+        ),
     ),
 ]
 

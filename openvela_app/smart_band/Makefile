@@ -13,6 +13,7 @@ CSRCS += services/storage_codec.c services/store.c services/storage_transaction.
 CSRCS += services/history_service.c services/workout_service.c
 CSRCS += services/notification_service.c
 CSRCS += services/sync_protocol.c
+CSRCS += services/sync_service.c
 CSRCS += platform/loopback/sync_loopback.c
 CSRCS += platform/storage/storage_memory.c platform/storage/storage_file.c
 CSRCS += platform/storage/storage_fault.c

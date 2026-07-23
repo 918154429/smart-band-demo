@@ -4,6 +4,15 @@
 
 #include <string.h>
 
+static void loopback_clear_delivery(smart_band_sync_loopback_t *loopback)
+{
+  memset(loopback->frames, 0, sizeof(loopback->frames));
+  memset(&loopback->held_frame, 0, sizeof(loopback->held_frame));
+  loopback->head = 0u;
+  loopback->count = 0u;
+  loopback->holding_reorder_frame = false;
+}
+
 static smart_band_platform_result_t
 loopback_start(void *context, smart_band_event_sink_t event_sink,
                void *event_context)
@@ -34,24 +43,18 @@ static smart_band_platform_result_t loopback_stop(void *context)
   loopback->started = false;
   loopback->event_sink = NULL;
   loopback->event_context = NULL;
+  loopback_clear_delivery(loopback);
   return SMART_BAND_PLATFORM_OK;
 }
 
 static smart_band_platform_result_t
-loopback_send(void *context, const void *buffer, size_t size)
+enqueue_frame(smart_band_sync_loopback_t *loopback, const void *buffer,
+              size_t size)
 {
-  smart_band_sync_loopback_t *loopback = context;
   smart_band_event_t event;
   size_t tail;
 
-  if (loopback == NULL || buffer == NULL || size == 0 ||
-      size > SMART_BAND_SYNC_LOOPBACK_MTU)
-    {
-      return SMART_BAND_PLATFORM_INVALID;
-    }
-
-  if (!loopback->started ||
-      loopback->count == SMART_BAND_SYNC_LOOPBACK_CAPACITY)
+  if (loopback->count == SMART_BAND_SYNC_LOOPBACK_CAPACITY)
     {
       return SMART_BAND_PLATFORM_BUSY;
     }
@@ -75,6 +78,87 @@ loopback_send(void *context, const void *buffer, size_t size)
 }
 
 static smart_band_platform_result_t
+loopback_send(void *context, const void *buffer, size_t size)
+{
+  smart_band_sync_loopback_t *loopback = context;
+  smart_band_platform_result_t result;
+
+  if (loopback == NULL || buffer == NULL || size == 0 ||
+      size > SMART_BAND_SYNC_LOOPBACK_MTU)
+    {
+      return SMART_BAND_PLATFORM_INVALID;
+    }
+  if (!loopback->started)
+    {
+      return SMART_BAND_PLATFORM_BUSY;
+    }
+  if (loopback->faults.disconnect_next)
+    {
+      loopback->faults.disconnect_next = false;
+      loopback->started = false;
+      loopback->event_sink = NULL;
+      loopback->event_context = NULL;
+      loopback_clear_delivery(loopback);
+      return SMART_BAND_PLATFORM_BUSY;
+    }
+  if (loopback->faults.drop_next)
+    {
+      loopback->faults.drop_next = false;
+      loopback->dropped_frames++;
+      return SMART_BAND_PLATFORM_OK;
+    }
+  if (loopback->faults.reorder_next_pair &&
+      !loopback->holding_reorder_frame)
+    {
+      memcpy(loopback->held_frame.data, buffer, size);
+      loopback->held_frame.size = size;
+      loopback->holding_reorder_frame = true;
+      return SMART_BAND_PLATFORM_OK;
+    }
+  if (loopback->holding_reorder_frame)
+    {
+      if (loopback->count + 2u > SMART_BAND_SYNC_LOOPBACK_CAPACITY)
+        {
+          return SMART_BAND_PLATFORM_BUSY;
+        }
+      result = enqueue_frame(loopback, buffer, size);
+      if (result != SMART_BAND_PLATFORM_OK)
+        {
+          return result;
+        }
+      result = enqueue_frame(loopback, loopback->held_frame.data,
+                             loopback->held_frame.size);
+      if (result == SMART_BAND_PLATFORM_OK)
+        {
+          loopback->holding_reorder_frame = false;
+          loopback->faults.reorder_next_pair = false;
+          loopback->held_frame.size = 0u;
+        }
+      return result;
+    }
+  if (loopback->faults.duplicate_next)
+    {
+      if (loopback->count + 2u > SMART_BAND_SYNC_LOOPBACK_CAPACITY)
+        {
+          return SMART_BAND_PLATFORM_BUSY;
+        }
+      loopback->faults.duplicate_next = false;
+      result = enqueue_frame(loopback, buffer, size);
+      if (result != SMART_BAND_PLATFORM_OK)
+        {
+          return result;
+        }
+      result = enqueue_frame(loopback, buffer, size);
+      if (result == SMART_BAND_PLATFORM_OK)
+        {
+          loopback->duplicated_frames++;
+        }
+      return result;
+    }
+  return enqueue_frame(loopback, buffer, size);
+}
+
+static smart_band_platform_result_t
 loopback_poll(void *context, void *buffer, size_t capacity,
               size_t *actual_size)
 {
@@ -93,6 +177,12 @@ loopback_poll(void *context, void *buffer, size_t capacity,
 
   if (!loopback->started || loopback->count == 0)
     {
+      return SMART_BAND_PLATFORM_BUSY;
+    }
+
+  if (loopback->faults.delay_polls != 0u)
+    {
+      loopback->faults.delay_polls--;
       return SMART_BAND_PLATFORM_BUSY;
     }
 
@@ -137,6 +227,30 @@ void smart_band_sync_loopback_init(smart_band_sync_loopback_t *loopback)
   if (loopback != NULL)
     {
       memset(loopback, 0, sizeof(*loopback));
+    }
+}
+
+void smart_band_sync_loopback_set_faults(
+  smart_band_sync_loopback_t *loopback,
+  const smart_band_sync_loopback_faults_t *faults)
+{
+  if (loopback != NULL)
+    {
+      if (faults == NULL)
+        {
+          memset(&loopback->faults, 0, sizeof(loopback->faults));
+          loopback->holding_reorder_frame = false;
+          loopback->held_frame.size = 0u;
+        }
+      else
+        {
+          loopback->faults = *faults;
+          if (!faults->reorder_next_pair)
+            {
+              loopback->holding_reorder_frame = false;
+              loopback->held_frame.size = 0u;
+            }
+        }
     }
 }
 
