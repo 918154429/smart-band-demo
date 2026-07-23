@@ -116,6 +116,9 @@ void smart_band_state_begin_sensor_cycle_at(smart_band_state_t *state,
                                             time_t wall_now,
                                             uint64_t monotonic_ms,
                                             bool wall_rollback);
+void smart_band_state_begin_sensor_cycle_masked_at(
+  smart_band_state_t *state, time_t wall_now, uint64_t monotonic_ms,
+  bool wall_rollback, uint32_t metric_mask);
 bool smart_band_state_publish_metric(smart_band_state_t *state,
                                      smart_band_metric_t metric,
                                      int value,

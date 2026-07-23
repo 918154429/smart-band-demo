@@ -36,6 +36,7 @@ CORE_SOURCES = [
     APP_DIR / "services" / "history_service.c",
     APP_DIR / "services" / "workout_service.c",
     APP_DIR / "services" / "notification_service.c",
+    APP_DIR / "services" / "power_manager.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
     APP_DIR / "platform" / "storage" / "storage_fault.c",
@@ -96,6 +97,10 @@ NEW_Q4_SOURCES = [
     APP_DIR / "services" / "notification_service.c",
 ]
 
+NEW_Q5_SOURCES = [
+    APP_DIR / "services" / "power_manager.c",
+]
+
 
 @dataclass(frozen=True)
 class CoverageTarget:
@@ -127,10 +132,12 @@ TARGETS = [
             APP_DIR / "services" / "history_service.c",
             APP_DIR / "services" / "workout_service.c",
             APP_DIR / "services" / "notification_service.c",
+            APP_DIR / "services" / "power_manager.c",
             APP_DIR / "logic" / "step_normalizer.c",
             APP_DIR / "logic" / "workout_model.c",
             APP_DIR / "logic" / "notification_model.c",
             APP_DIR / "logic" / "notification_demo.c",
+            APP_DIR / "logic" / "power_policy.c",
             APP_DIR / "platform" / "storage" / "storage_fault.c",
             APP_DIR / "platform" / "storage" / "storage_memory.c",
         ),
@@ -236,6 +243,14 @@ TARGETS = [
         "power_policy",
         Path(__file__).with_name("power_policy_test.c"),
         (APP_DIR / "logic" / "power_policy.c",),
+    ),
+    CoverageTarget(
+        "power_manager",
+        Path(__file__).with_name("power_manager_test.c"),
+        (
+            APP_DIR / "logic" / "power_policy.c",
+            APP_DIR / "services" / "power_manager.c",
+        ),
     ),
     CoverageTarget(
         "watch_face_settings",
@@ -355,6 +370,7 @@ def run_gcovr(build_root: Path) -> None:
         *NEW_WATCH_FACE_SOURCES,
         *NEW_Q3_SOURCES,
         *NEW_Q4_SOURCES,
+        *NEW_Q5_SOURCES,
     ]:
         relative = source.relative_to(ROOT).as_posix()
         runtime_command = [

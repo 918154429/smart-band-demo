@@ -28,7 +28,6 @@ smart_band_event_priority(const smart_band_event_t *event)
         return SMART_BAND_EVENT_PRIORITY_CRITICAL;
       case SMART_BAND_EVENT_WORKOUT_COMMAND:
       case SMART_BAND_EVENT_NOTIFICATION_ACTION:
-      case SMART_BAND_EVENT_POWER_TIMEOUT:
       case SMART_BAND_EVENT_BLE_CONNECTED:
       case SMART_BAND_EVENT_BLE_DISCONNECTED:
         return SMART_BAND_EVENT_PRIORITY_HIGH;
@@ -72,6 +71,7 @@ smart_band_event_priority(const smart_band_event_t *event)
       case SMART_BAND_EVENT_SYNC_ACK:
         return SMART_BAND_EVENT_PRIORITY_NORMAL;
       case SMART_BAND_EVENT_METRICS_UPDATED:
+      case SMART_BAND_EVENT_POWER_TIMEOUT:
       case SMART_BAND_EVENT_NONE:
       default:
         return SMART_BAND_EVENT_PRIORITY_LOW;
@@ -233,7 +233,10 @@ bool smart_band_event_queue_take_next_domain(
       if (type == SMART_BAND_EVENT_WORKOUT_COMMAND ||
           type == SMART_BAND_EVENT_WORKOUT_CHECKPOINT ||
           type == SMART_BAND_EVENT_NOTIFICATION_RECEIVED ||
-          type == SMART_BAND_EVENT_NOTIFICATION_ACTION)
+          type == SMART_BAND_EVENT_NOTIFICATION_ACTION ||
+          type == SMART_BAND_EVENT_TOUCH_ACTIVITY ||
+          type == SMART_BAND_EVENT_WRIST_RAISED ||
+          type == SMART_BAND_EVENT_POWER_TIMEOUT)
         {
           *event = queue->items[index];
           remove_at(queue, index);

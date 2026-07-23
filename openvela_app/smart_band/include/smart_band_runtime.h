@@ -7,6 +7,7 @@
 #include "smart_band_clock.h"
 #include "smart_band_event.h"
 #include "smart_band_platform.h"
+#include "smart_band_power_manager.h"
 #include "smart_band_store.h"
 #include "smart_band_history.h"
 #include "smart_band_notification_service.h"
@@ -42,6 +43,10 @@ typedef struct
   smart_band_workout_service_result_t last_workout_result;
   smart_band_notification_service_t notifications;
   smart_band_notification_service_result_t last_notification_result;
+  uint64_t notification_wake_applied_count;
+  uint32_t last_notification_wake_id;
+  uint32_t last_notification_wake_generation;
+  smart_band_power_manager_t power;
   uint32_t dirty;
   bool initialized;
   bool sensors_initialized;
@@ -49,6 +54,7 @@ typedef struct
   bool history_initialized;
   bool workout_initialized;
   bool notifications_initialized;
+  bool power_initialized;
 } smart_band_runtime_t;
 
 typedef uint32_t smart_band_dirty_flags_t;
@@ -65,7 +71,8 @@ typedef uint32_t smart_band_dirty_flags_t;
 #define SMART_BAND_DIRTY_WORKOUT     (1u << 8)
 #define SMART_BAND_DIRTY_HISTORY     (1u << 9)
 #define SMART_BAND_DIRTY_NOTIFICATION (1u << 10)
-#define SMART_BAND_DIRTY_ALL         ((1u << 11) - 1u)
+#define SMART_BAND_DIRTY_POWER       (1u << 11)
+#define SMART_BAND_DIRTY_ALL         ((1u << 12) - 1u)
 
 int smart_band_runtime_init(
   smart_band_runtime_t *runtime,
@@ -102,6 +109,14 @@ void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime);
 bool smart_band_runtime_tick(smart_band_runtime_t *runtime,
                              bool active_app_visible);
 bool smart_band_runtime_refresh_sensors(smart_band_runtime_t *runtime);
+bool smart_band_runtime_wake(smart_band_runtime_t *runtime,
+                             smart_band_power_wake_reason_t reason);
+bool smart_band_runtime_power_snapshot(
+  const smart_band_runtime_t *runtime,
+  smart_band_power_manager_snapshot_t *snapshot);
+bool smart_band_runtime_render_due(smart_band_runtime_t *runtime,
+                                   bool urgent);
+bool smart_band_runtime_allows_sync(const smart_band_runtime_t *runtime);
 void smart_band_runtime_mark_dirty(smart_band_runtime_t *runtime,
                                    smart_band_dirty_flags_t flags);
 smart_band_dirty_flags_t

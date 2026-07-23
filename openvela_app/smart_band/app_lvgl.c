@@ -65,6 +65,7 @@ typedef struct
   lv_timer_t *event_pump_timer;
   smart_band_event_mutex_t event_mutex;
   smart_band_runtime_t runtime;
+  uint64_t observed_notification_wake_count;
   smart_band_storage_file_t storage_file;
   lv_coord_t screen_w;
   lv_coord_t screen_h;
@@ -103,6 +104,8 @@ static void page_drag_cb(lv_event_t *event);
 static void dot_click_cb(lv_event_t *event);
 static void enable_touch_navigation(lv_obj_t *obj);
 static void enable_touch_navigation_tree(lv_obj_t *obj);
+static void enable_touch_navigation_children(lv_obj_t *obj);
+static void enable_touch_wake_tree(lv_obj_t *obj);
 static void set_page_visible(lv_obj_t *page, bool visible);
 static void app_icon_cb(lv_event_t *event);
 static void system_icon_cb(lv_event_t *event);
@@ -110,6 +113,7 @@ static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
 static void render_page(void);
 static void render_pending(void);
+static void render_pending_scheduled(bool urgent);
 static void consume_notification_effects(void);
 static void workout_action_cb(void *context,
                               smart_band_workout_view_action_t action);
@@ -323,15 +327,15 @@ static bool emit_simulated_haptic(uint32_t notification_id,
   return emit_effect_log(line);
 }
 
-static bool emit_synthetic_wake(uint32_t notification_id,
-                                uint32_t generation)
+static bool emit_applied_notification_wake(uint32_t notification_id,
+                                           uint32_t generation)
 {
   char line[176];
 
   (void)snprintf(
     line, sizeof(line),
     "smart_band:q4:wake:v1 notification_id=%lu generation=%lu "
-    "reason=notification synthetic=1 power_transition=0",
+    "reason=notification synthetic=0 power_transition=1",
     (unsigned long)notification_id, (unsigned long)generation);
   return emit_effect_log(line);
 }
@@ -372,9 +376,8 @@ static size_t notification_haptic_pulses(
   return 0u;
 }
 
-/* These consumers deliberately acknowledge only their own service-owned
- * effect generation. Visual acknowledgement remains in notification_view.
- * The wake marker is synthetic evidence only; Q5 owns power-state changes. */
+/* The application owns the haptic adapter effect. Notification wake effects
+ * are consumed only by the runtime power manager in Q5. */
 static void consume_notification_effects(void)
 {
   uint32_t notification_id;
@@ -432,26 +435,28 @@ static void consume_notification_effects(void)
 #endif
     }
 
-  while (smart_band_notification_service_peek_wake(
-           &g_ui.runtime.notifications, &notification_id, &generation))
+  if (g_ui.observed_notification_wake_count !=
+      g_ui.runtime.notification_wake_applied_count)
     {
-      if (!emit_synthetic_wake(notification_id, generation))
+      if (!emit_applied_notification_wake(
+            g_ui.runtime.last_notification_wake_id,
+            g_ui.runtime.last_notification_wake_generation))
         {
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
           g_ui.diagnostic_wake_log_dropped++;
 #endif
         }
-      if (!smart_band_notification_service_ack_wake(
-            &g_ui.runtime.notifications, notification_id, generation))
-        {
-          break;
-        }
+      g_ui.observed_notification_wake_count =
+        g_ui.runtime.notification_wake_applied_count;
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
       g_ui.diagnostic_wake_requests++;
-      g_ui.diagnostic_last_wake_notification_id = notification_id;
-      g_ui.diagnostic_last_wake_generation = generation;
+      g_ui.diagnostic_last_wake_notification_id =
+        g_ui.runtime.last_notification_wake_id;
+      g_ui.diagnostic_last_wake_generation =
+        g_ui.runtime.last_notification_wake_generation;
 #endif
     }
+
 }
 
 static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
@@ -930,6 +935,11 @@ static void open_system_view(smart_band_system_view_t system_view)
         &g_ui.notification_view, g_ui.app_content);
     }
 
+  if (result == 0)
+    {
+      enable_touch_navigation_children(g_ui.app_content);
+    }
+
   if (result != 0)
     {
       smart_band_workout_view_unmount(&g_ui.workout_view);
@@ -969,6 +979,10 @@ static void open_app(smart_band_app_id_t id)
     {
       lv_obj_clean(g_ui.app_content);
       set_label_text(g_ui.app_title, "App failed");
+    }
+  else
+    {
+      enable_touch_navigation_children(g_ui.app_content);
     }
 
   set_page_visible(g_ui.apps_launcher, false);
@@ -1522,6 +1536,16 @@ static void render_pending(void)
     }
 }
 
+static void render_pending_scheduled(bool urgent)
+{
+  if (smart_band_runtime_peek_dirty(&g_ui.runtime) !=
+        SMART_BAND_DIRTY_NONE &&
+      smart_band_runtime_render_due(&g_ui.runtime, urgent))
+    {
+      render_pending();
+    }
+}
+
 static void app_icon_cb(lv_event_t *event)
 {
   smart_band_app_id_t id =
@@ -1614,6 +1638,9 @@ static void workout_action_cb(void *context,
 {
   (void)context;
 
+  (void)smart_band_runtime_wake(&g_ui.runtime,
+                                SMART_BAND_POWER_WAKE_TOUCH);
+
   switch (action)
     {
       case SMART_BAND_WORKOUT_VIEW_ACTION_START_WALK:
@@ -1673,6 +1700,9 @@ static void notification_action_cb(
 {
   (void)context;
 
+  (void)smart_band_runtime_wake(&g_ui.runtime,
+                                SMART_BAND_POWER_WAKE_TOUCH);
+
   if (smart_band_runtime_post_notification_action(
         &g_ui.runtime, notification_id, command, lv_tick_get()))
     {
@@ -1706,7 +1736,7 @@ static void timer_cb(lv_timer_t *timer)
   (void)smart_band_runtime_tick(
     &g_ui.runtime, g_ui.runtime.model.page == SMART_BAND_PAGE_APPS);
 
-  render_pending();
+  render_pending_scheduled(false);
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
   emit_q3_diagnostics();
   emit_q4_diagnostics();
@@ -1721,7 +1751,9 @@ static void event_pump_timer_cb(lv_timer_t *timer)
 #endif
   smart_band_runtime_dispatch_pending(&g_ui.runtime);
   consume_notification_effects();
-  render_pending();
+  render_pending_scheduled(
+    (smart_band_runtime_peek_dirty(&g_ui.runtime) &
+     (SMART_BAND_DIRTY_NOTIFICATION | SMART_BAND_DIRTY_POWER)) != 0u);
 }
 
 static void next_page(void)
@@ -1747,6 +1779,12 @@ static void page_drag_cb(lv_event_t *event)
   lv_coord_t dy;
   lv_coord_t threshold = max_coord(sx(36), 28);
   uint32_t press_duration;
+
+  if (code == LV_EVENT_PRESSED)
+    {
+      (void)smart_band_runtime_wake(&g_ui.runtime,
+                                    SMART_BAND_POWER_WAKE_TOUCH);
+    }
 
   if (g_ui.system_view != SMART_BAND_SYSTEM_VIEW_NONE ||
       smart_band_notification_view_captures_input(&g_ui.notification_view))
@@ -1871,6 +1909,48 @@ static void enable_touch_navigation_tree(lv_obj_t *obj)
     }
 }
 
+static void touch_wake_cb(lv_event_t *event)
+{
+  if (lv_event_get_code(event) == LV_EVENT_PRESSED)
+    {
+      (void)smart_band_runtime_wake(&g_ui.runtime,
+                                    SMART_BAND_POWER_WAKE_TOUCH);
+    }
+}
+
+static void enable_touch_navigation_children(lv_obj_t *obj)
+{
+  uint32_t child_count;
+
+  if (obj == NULL)
+    {
+      return;
+    }
+
+  child_count = lv_obj_get_child_count(obj);
+  for (uint32_t i = 0; i < child_count; i++)
+    {
+      enable_touch_navigation_tree(lv_obj_get_child(obj, i));
+    }
+}
+
+static void enable_touch_wake_tree(lv_obj_t *obj)
+{
+  uint32_t child_count;
+
+  if (obj == NULL)
+    {
+      return;
+    }
+
+  lv_obj_add_event_cb(obj, touch_wake_cb, LV_EVENT_PRESSED, NULL);
+  child_count = lv_obj_get_child_count(obj);
+  for (uint32_t i = 0; i < child_count; i++)
+    {
+      enable_touch_wake_tree(lv_obj_get_child(obj, i));
+    }
+}
+
 int smart_band_lvgl_create(lv_obj_t *parent)
 {
   lv_obj_t *parent_root = parent != NULL ? parent : lv_scr_act();
@@ -1958,6 +2038,9 @@ int smart_band_lvgl_create(lv_obj_t *parent)
       g_ui.root = NULL;
       return -1;
     }
+  enable_touch_wake_tree(
+    smart_band_notification_view_presentation_root(
+      &g_ui.notification_view));
 
   g_ui.runtime_timer = lv_timer_create(timer_cb, 1000, NULL);
   if (g_ui.runtime_timer == NULL)

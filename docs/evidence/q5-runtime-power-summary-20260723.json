@@ -1,0 +1,124 @@
+{
+  "schema": "smart-band-q5-runtime-power-summary/v1",
+  "date": "2026-07-23",
+  "scope": "runtime-power-software-policy",
+  "status": "passed",
+  "actual_power_gate_e": "red",
+  "measured_power_claim": false,
+  "implementation_commit": "c49929b18cc21b88cc3ababc516a63fbe944193e",
+  "integration_commit": "9ba5e9069a794eca5b7ad6a14e141c46a6b8492e",
+  "pull_request": "https://github.com/918154429/smart-band-demo/pull/17",
+  "pull_request_final": {
+    "checks_passed": 59,
+    "checks_total": 59,
+    "merge_state": "CLEAN"
+  },
+  "runs": {
+    "host": {
+      "id": 29973330134,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29973330134",
+      "conclusion": "success",
+      "jobs_passed": 58,
+      "jobs_total": 58
+    },
+    "browser": {
+      "id": 29973330198,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29973330198",
+      "conclusion": "success",
+      "jobs_passed": 1,
+      "jobs_total": 1
+    }
+  },
+  "power_states": [
+    "ACTIVE",
+    "DIMMED",
+    "SCREEN_OFF"
+  ],
+  "wake_contract": {
+    "notification_wake_owner": "runtime-power-manager-only",
+    "flow": [
+      "notification-service-peek-wake",
+      "accumulate-power-event-bitmask",
+      "power-manager-handle",
+      "notification-service-ack-wake-after-accepted-policy-result"
+    ],
+    "presentation_generation_used_as_wake": false,
+    "application_consumes_notification_wake": false,
+    "same_dispatch_events_coalesced": true,
+    "priority_high_to_low": [
+      "button",
+      "touch",
+      "notification",
+      "wrist",
+      "charging"
+    ],
+    "timeout_can_override_real_wake": false
+  },
+  "policy_gates": {
+    "idle_screen_off": {
+      "motion_sampling": false,
+      "checkpoint": false,
+      "sync": false,
+      "heart_sampling_period_ms": 5000
+    },
+    "workout_screen_off": {
+      "motion_sampling": true,
+      "checkpoint": true,
+      "sync": false,
+      "heart_sampling_period_ms": 1000
+    },
+    "sync_boundary": "smart_band_runtime_allows_sync"
+  },
+  "render_evidence": {
+    "event_pump_period_ms": 50,
+    "screen_off_render_period_ms": 1000,
+    "test_window_ms": 60000,
+    "assertion": "renders-times-10-less-than-pumps",
+    "host_scheduler_reduction_greater_than_percent": 90,
+    "physical_power_measurement": false
+  },
+  "lifecycle_evidence": {
+    "deinit_from_screen_off_restores_display_enabled": true,
+    "deinit_from_screen_off_restores_brightness_percent": 100
+  },
+  "saturation_evidence": {
+    "clock_width_bits": 64,
+    "render_deadline_uint64_max_fires_once": true,
+    "heart_deadline_uint64_max_fires_once": true,
+    "permanently_due_after_saturation": false
+  },
+  "stress_evidence": {
+    "cycles": 1000,
+    "expected_transitions": 3000,
+    "observed_transitions": 3000,
+    "platform_pending_after_cycles": false
+  },
+  "verified": [
+    "runtime-owned-active-dimmed-screen-off-policy",
+    "single-owner-notification-wake-effect",
+    "peek-apply-then-ack-notification-wake",
+    "same-dispatch-wake-bitmask-coalescing",
+    "frozen-wake-priority",
+    "normal-overlay-without-wake-does-not-wake-screen-off",
+    "idle-screen-off-motion-sampling-disabled",
+    "workout-screen-off-motion-sampling-retained",
+    "idle-screen-off-checkpoint-denied",
+    "workout-screen-off-checkpoint-accepted",
+    "screen-off-sync-denied",
+    "state-specific-heart-sampling",
+    "render-cadence-consumed-by-application",
+    "host-scheduler-render-reduction-greater-than-90-percent",
+    "deinit-restores-display-and-brightness",
+    "uint64-saturated-deadlines-fire-once",
+    "1000-cycle-3000-transition-stress",
+    "gcc-clang-msvc-strict-builds"
+  ],
+  "gate_e_open": [
+    "gemini-s1-target-firmware-and-driver-validation",
+    "instrumented-state-current-measurements",
+    "transition-energy-measurements",
+    "mcu-sleep-residency-measurements",
+    "ble-radio-energy-impact",
+    "battery-life-projection-and-acceptance-receipt"
+  ]
+}
