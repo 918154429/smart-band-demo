@@ -1,0 +1,101 @@
+{
+  "schema": "smart-band-q4-notification-effects-summary/v1",
+  "date": "2026-07-23",
+  "scope": "notification-effects-and-input-capture",
+  "status": "passed",
+  "c_gate": "open",
+  "implementation_commit": "9a5ab901a8e15e81cf61e8de98ba7a888687f592",
+  "integration_commit": "f6185d402b9847210e69e228ce51e95205ce1c3b",
+  "pull_request": "https://github.com/918154429/smart-band-demo/pull/14",
+  "runs": {
+    "aggregate": {
+      "jobs_passed": 56,
+      "jobs_total": 56
+    },
+    "host": {
+      "id": 29972675675,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29972675675",
+      "head_commit": "f6185d402b9847210e69e228ce51e95205ce1c3b",
+      "conclusion": "success",
+      "jobs_passed": 55,
+      "jobs_total": 55
+    },
+    "browser": {
+      "id": 29972675670,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29972675670",
+      "head_commit": "f6185d402b9847210e69e228ce51e95205ce1c3b",
+      "conclusion": "success",
+      "jobs_passed": 1,
+      "jobs_total": 1
+    }
+  },
+  "haptic_contract": {
+    "source": "notification-service-peek-haptic",
+    "ack_key": [
+      "notification-id",
+      "generation"
+    ],
+    "platform_adapter": "runtime.platform.haptic.ops.play",
+    "pulse_count": {
+      "subtle": 1,
+      "normal": 2,
+      "urgent": 3
+    },
+    "result_policy": {
+      "ok": "ack-exact-generation",
+      "busy": "retain-exact-generation-and-retry-next-pump",
+      "io": "retain-exact-generation-and-retry-next-pump",
+      "unavailable": "emit-structured-simulator-marker-then-ack-exact-generation",
+      "invalid_or_other_failure": "retain-exact-generation"
+    },
+    "structured_fallback_marker": "smart_band:q4:haptic:v1",
+    "logger_failure": {
+      "blocks_completed_effect_ack": false,
+      "counter": "haptic_log_dropped"
+    }
+  },
+  "wake_contract": {
+    "source": "notification-service-peek-wake",
+    "ack": "notification-service-ack-wake",
+    "derived_from_presentation": false,
+    "structured_marker": "smart_band:q4:wake:v1",
+    "reason": "notification",
+    "synthetic": true,
+    "power_transition": false,
+    "future_power_owner": "Q5-runtime-power-manager",
+    "logger_failure": {
+      "blocks_ack": false,
+      "counter": "wake_log_dropped"
+    }
+  },
+  "verified": [
+    "haptic-adapter-ok-ack-after-play",
+    "haptic-adapter-busy-same-generation-retry",
+    "haptic-adapter-io-same-generation-retry",
+    "haptic-adapter-unavailable-structured-fallback",
+    "subtle-normal-urgent-one-two-three-pulse-mapping",
+    "haptic-and-wake-logger-drop-counters",
+    "synthetic-wake-service-peek-ack-contract",
+    "dnd-retains-notification-without-presentation-effects",
+    "bounded-long-text-overlay-and-center-layout",
+    "same-id-content-update-new-generation-without-exact-duplicate-replay",
+    "fullscreen-call-corner-bottom-click-and-horizontal-input-capture",
+    "fullscreen-capture-guards-app-system-back-goal-dot-and-drag-actions",
+    "workout-call-nonblocking-overlay",
+    "gcc-clang-msvc-strict-builds",
+    "chromium-browser-job"
+  ],
+  "claim_boundaries": {
+    "physical_vibration_claimed": false,
+    "real_power_transition_claimed": false,
+    "power_consumption_claimed": false,
+    "ble_transport_claimed": false,
+    "gemini_s1_target_execution_claimed": false
+  },
+  "open": [
+    "reviewed-native-notification-journey",
+    "explicit-length-utf8-ingress",
+    "cross-inbox-main-queue-total-order",
+    "target-elf-map-and-stack-budget"
+  ]
+}
