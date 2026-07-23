@@ -1,0 +1,132 @@
+{
+  "schema": "smart-band-q6-history-sync-loopback-summary/v1",
+  "date": "2026-07-23",
+  "scope": "resumable-daily-history-sync-and-faulted-loopback",
+  "status": "passed",
+  "q6_gate": "open",
+  "slice_only": true,
+  "implementation_commit": "8c52e7bd552e62f8b54c790f81157b2765ee915b",
+  "integration_commit": "f0f227936dda48a221f14c0ac619ba05dbc39032",
+  "pull_request": {
+    "number": 16,
+    "url": "https://github.com/918154429/smart-band-demo/pull/16",
+    "state": "OPEN",
+    "merge_state": "CLEAN",
+    "head": "f0f227936dda48a221f14c0ac619ba05dbc39032",
+    "base_branch": "codex/q4-notifications",
+    "head_branch": "codex/q6-sync"
+  },
+  "checks": {
+    "queried_date": "2026-07-23",
+    "passed": 59,
+    "total": 59,
+    "conclusion": "success",
+    "runs": {
+      "host": {
+        "id": 29972934272,
+        "url": "https://github.com/918154429/smart-band-demo/actions/runs/29972934272",
+        "conclusion": "success",
+        "jobs_passed": 58,
+        "jobs_total": 58
+      },
+      "browser": {
+        "id": 29972934359,
+        "url": "https://github.com/918154429/smart-band-demo/actions/runs/29972934359",
+        "conclusion": "success",
+        "jobs_passed": 1,
+        "jobs_total": 1
+      }
+    }
+  },
+  "protocol_contract": {
+    "version": 1,
+    "byte_order": "little-endian",
+    "history_window_max_records": 30,
+    "flow_control": "stop-and-wait",
+    "messages": [
+      "capabilities",
+      "history-request",
+      "history-data",
+      "history-ack"
+    ],
+    "golden_vectors": [
+      "capabilities",
+      "history-request",
+      "history-data",
+      "daily-record",
+      "history-ack"
+    ]
+  },
+  "verified": [
+    "early-ack-rejected-before-data-send",
+    "awaiting-ack-set-only-after-successful-data-encode",
+    "first-data-frame-freezes-expected-total",
+    "later-total-drift-rejected-without-client-state-change",
+    "ack-buffer-failure-does-not-commit-record-cursor-or-total",
+    "same-transaction-resume-uses-immutable-30-record-snapshot",
+    "new-transaction-reads-fresh-rolling-history-snapshot",
+    "dropped-data-byte-identical-retry",
+    "lost-ack-idempotent-data-and-ack-retry",
+    "duplicate-data-and-ack-idempotence",
+    "out-of-order-future-data-rejection",
+    "delayed-poll-preserves-queued-frame",
+    "disconnect-and-resume-from-acknowledged-cursor",
+    "seven-record-field-by-field-resume-equality",
+    "stop-and-disconnect-clear-queued-and-held-reorder-frames",
+    "capabilities-request-data-record-and-ack-golden-vectors",
+    "crc-and-malformed-frame-rejection"
+  ],
+  "fault_loopback": [
+    "drop",
+    "duplicate",
+    "reorder",
+    "poll-delay",
+    "disconnect"
+  ],
+  "local_msvc": {
+    "date": "2026-07-23",
+    "flags": [
+      "/std:c11",
+      "/W4",
+      "/WX"
+    ],
+    "tests": [
+      {
+        "command": "python tests/test_sync_service.py",
+        "status": "passed"
+      },
+      {
+        "command": "python tests/test_sync_protocol.py",
+        "status": "passed",
+        "malformed_frames": 10000,
+        "sync_protocol_c_line_coverage_percent": 100.0
+      },
+      {
+        "command": "python tests/test_runtime_core.py",
+        "status": "passed"
+      },
+      {
+        "command": "python tests/test_ui_compile.py",
+        "status": "passed"
+      }
+    ]
+  },
+  "open": [
+    "automatic-timeout-retry-driver",
+    "live-metrics-sync",
+    "workout-session-history-sync",
+    "device-configuration-sync",
+    "notification-inbox-sync",
+    "linux-client",
+    "simulator-bridge",
+    "gatt-binding",
+    "real-ble-transport",
+    "physical-device-interoperability-and-power-evidence"
+  ],
+  "claims_excluded": [
+    "q6-complete",
+    "gatt-service-complete",
+    "real-ble-success",
+    "physical-device-throughput-range-or-power"
+  ]
+}

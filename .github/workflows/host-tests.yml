@@ -212,6 +212,8 @@ jobs:
             script: tests/test_power_policy.py
           - name: Sync protocol
             script: tests/test_sync_protocol.py
+          - name: Sync service
+            script: tests/test_sync_service.py
         toolchain:
           - os: ubuntu-latest
             compiler: gcc

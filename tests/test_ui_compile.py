@@ -31,6 +31,7 @@ PRODUCTION_SOURCES = [
     APP_DIR / "services" / "workout_service.c",
     APP_DIR / "services" / "notification_service.c",
     APP_DIR / "services" / "sync_protocol.c",
+    APP_DIR / "services" / "sync_service.c",
     APP_DIR / "platform" / "platform_noop.c",
     APP_DIR / "platform" / "event_mutex.c",
     APP_DIR / "platform" / "loopback" / "sync_loopback.c",
