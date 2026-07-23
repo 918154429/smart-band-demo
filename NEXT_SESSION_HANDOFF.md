@@ -1,11 +1,12 @@
 # smart-band-demo 下一会话交接
 
-更新时间：2026-07-22（Asia/Shanghai）
+更新时间：2026-07-23（Asia/Shanghai）
 
 > 复赛工程以根目录 `FINALS_TOP_TIER_ROADMAP.md` 为主路线。Q0、Q1、W1、Q2 A Gate 与
-> Q3 B/D 软件 Gate 已全绿；下一主线切片进入 Q4 C 消息提醒闭环。
+> Q3 B/D 软件 Gate 已全绿；Q4 主机侧通知闭环、Q5 软件电源策略和 Q6 history
+> loopback 切片均已进入独立 PR，当前继续补 Q4 C Gate 与 Q6 后续软件范围。
 >
-> **当前唯一权威续接状态见第 11 节。** 第 7-10 节仅保留 Q3 的阶段性历史；其中所有
+> **当前唯一权威续接状态见第 12 节。** 第 7-11 节仅保留此前阶段历史；其中所有
 > `OPEN`、红色 Gate、未运行 soak、heap/fd 未验证和“下一步”命令均已失效，不得执行。
 
 ## 1. 仓库、权限与边界
@@ -602,3 +603,75 @@ git status --short --branch
   roadmap、handoff 和 `docs/gemini-s1-target-board.md` 改动。
 - 不 force-push、不改写历史、不删除远端分支/标签、不发布正式 release；如与用户新指令冲突，
   以新指令为准。
+
+## 12. 2026-07-23 Q4/Q5/Q6 软件并行续接状态
+
+### 12.1 分支与 PR 拓扑
+
+- `origin/master`：`3e1aa5819f3818e1e06a2e2d4749d72dbd8dc1ea`，PR15 普通 merge 后的
+  Q3 最终文档基线。
+- Q4 worktree：`smart-band-demo-q4-notifications`，分支 `codex/q4-notifications`，
+  [PR14](https://github.com/918154429/smart-band-demo/pull/14)，以 `master` 为 base。
+- Q5 worktree：`smart-band-demo-q5-power`，分支 `codex/q5-power`，
+  [PR17](https://github.com/918154429/smart-band-demo/pull/17)，以 Q4 分支为 stacked base。
+- Q6 worktree：`smart-band-demo-q6-sync`，分支 `codex/q6-sync`，
+  [PR16](https://github.com/918154429/smart-band-demo/pull/16)，以 Q4 分支为 stacked base。
+- 三条分支均使用普通提交/普通 merge；没有 force-push、历史改写或远端分支删除。
+
+### 12.2 Q4 当前结论
+
+Q4 已完成 application event mutex、50 ms event pump、Notification Center、普通 overlay、
+全屏 Call、workout non-blocking Call、输入捕获、platform haptic adapter、BUSY/IO retry、
+UNAVAILABLE structured fallback、logger drop 统计，以及 DND/长文本/same-ID UI journey。
+notification effect 仍以 service generation 为 ACK key；Q4 standalone 的 wake marker 明确是
+`synthetic=1 power_transition=0`。
+
+- 功能修复：`9a5ab901a8e15e81cf61e8de98ba7a888687f592`。
+- master 集成：`f6185d402b9847210e69e228ce51e95205ce1c3b`。
+- 已验证 Host run `29972675675` 55/55、Browser run `29972675670` 1/1。
+- 证据：`docs/q4-notification-effects-20260723.md` 与对应 JSON。
+
+Q4 C Gate 仍保持 open。剩余项是 reviewed native notification journey、explicit-length
+UTF-8 ingress、cross-inbox/main total ordering，以及 target ELF/map/stack 证据。不得把
+fake-LVGL marker 声称为真实震动、真实显示唤醒或真机能力。
+
+### 12.3 Q5 当前结论
+
+Q5 软件策略切片已经接入 runtime-owned power manager：ACTIVE/DIMMED/SCREEN_OFF、typed
+wake、同 pump bitmask、render/heart due、sensor sampling mask、checkpoint/sync gate、
+display/backlight/sleep adapter 与 lifecycle restore。notification wake 的唯一 owner 是
+runtime power consumer，流程固定为 `peek_wake -> 合并 power events -> policy accepted ->
+ack_wake`；application 只消费 haptic，并观察已完成的 power wake 生成 marker，不再二次 ACK。
+
+- 功能提交：`c49929b18cc21b88cc3ababc516a63fbe944193e`。
+- Q4 集成提交：`9ba5e9069a794eca5b7ad6a14e141c46a6b8492e`。
+- 已验证 Host run `29973330134` 58/58、Browser run `29973330198` 1/1。
+- 证据：`docs/q5-runtime-power-20260723.md` 与对应 JSON。
+
+本切片证明主机侧软件策略和调度，不证明 LVGL 实际帧耗、MCU sleep residency、目标板电流、
+transition energy 或 battery life。真实功耗 Gate E 保持红色。
+
+### 12.4 Q6 当前结论
+
+Q6 阶段切片已经完成 v1 daily-history capabilities/request/data/ACK、stop-and-wait cursor、
+early-ACK 拒绝、首包 total 锁定、ACK 编码失败不提交、不可变 30-record transaction snapshot，
+以及 drop/duplicate/reorder/delay/disconnect loopback fault。stop/disconnect 会清 queue 和 held
+reorder；golden vectors 覆盖 request/data/ACK 和完整 little-endian daily record。
+
+- 功能提交：`8c52e7bd552e62f8b54c790f81157b2765ee915b`。
+- Q4 集成提交：`f0f227936dda48a221f14c0ac619ba05dbc39032`。
+- 已验证 Host run `29972934272` 58/58、Browser run `29972934359` 1/1。
+- 证据：`docs/q6-history-sync-loopback-20260723.md` 与对应 JSON。
+
+Q6 总 Gate 未完成。仍缺 automatic timeout/retry driver、live metrics、workout session history、
+device config、Notification Inbox、Linux client、simulator bridge、GATT mapping 与真实 BLE。
+
+### 12.5 下一续接顺序与边界
+
+1. 先确认 PR14/PR16/PR17 最新文档 head 的 Host/Browser checks 全绿且工作树 clean。
+2. Q4 继续关闭 12.2 的四项 C Gate 软件/目标构建证据；未闭合前不把 C Gate 标绿。
+3. Q6 下一软件切片优先 automatic timeout/retry driver 和可观测 metrics，再扩业务 domain；
+   所有同步调度必须咨询 Q5 的 `smart_band_runtime_allows_sync()`。
+4. Q5 只可继续改善 host/native 软件证据；没有目标板测量时实际功耗 Gate 始终红色。
+5. 不烧录 Gemini-S1、不写 flash/bootloader、不声明真实 BLE/震动/功耗，不 force-push、不
+   删除远端分支、不发布 release。硬件动作仍需逐次明确授权。
