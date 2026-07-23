@@ -81,6 +81,19 @@ typedef struct
   uint64_t diagnostic_tick_gap_max_ms;
   uint32_t diagnostic_runtime_ticks;
   uint32_t diagnostic_event_pumps;
+  uint32_t diagnostic_haptic_events;
+  uint32_t diagnostic_wake_requests;
+  uint32_t diagnostic_haptic_retries;
+  uint32_t diagnostic_haptic_log_dropped;
+  uint32_t diagnostic_wake_log_dropped;
+  uint32_t diagnostic_last_haptic_notification_id;
+  uint32_t diagnostic_last_haptic_generation;
+  uint32_t diagnostic_last_wake_notification_id;
+  uint32_t diagnostic_last_wake_generation;
+  smart_band_notification_haptic_t diagnostic_last_haptic;
+  smart_band_platform_result_t diagnostic_last_haptic_platform_result;
+  smart_band_lvgl_effect_log_for_test_t effect_log_for_test;
+  void *effect_log_context;
 #endif
 } smart_band_ui_t;
 
@@ -97,6 +110,7 @@ static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
 static void render_page(void);
 static void render_pending(void);
+static void consume_notification_effects(void);
 static void workout_action_cb(void *context,
                               smart_band_workout_view_action_t action);
 static void notification_action_cb(
@@ -169,6 +183,42 @@ static void emit_q3_diagnostics(void)
          (unsigned long long)g_ui.diagnostic_tick_gap_max_ms);
   fflush(stdout);
 }
+
+static void emit_q4_diagnostics(void)
+{
+  smart_band_notification_presentation_t presentation;
+  uint32_t notification_id = 0u;
+  uint32_t generation = 0u;
+  unsigned int presentation_kind = 0u;
+
+  if (smart_band_notification_service_get_active_presentation(
+        &g_ui.runtime.notifications, &notification_id, &generation,
+        &presentation))
+    {
+      presentation_kind = presentation.full_screen ? 2u :
+                          presentation.overlay ? 1u : 0u;
+    }
+
+  printf("smart_band:q4:v1 elapsed_ms=%llu notifications=%u dnd=%u "
+         "active_id=%lu active_generation=%lu presentation=%u "
+         "haptic_events=%lu wake_requests=%lu haptic_retries=%lu "
+         "haptic_log_dropped=%lu wake_log_dropped=%lu "
+         "pending_effects=%u inbox_dropped=%u\n",
+         (unsigned long long)g_ui.runtime.last_clock.elapsed_ms,
+         (unsigned int)smart_band_notification_count(
+           &g_ui.runtime.notifications.model),
+         g_ui.runtime.notifications.policy.dnd_enabled ? 1u : 0u,
+         (unsigned long)notification_id, (unsigned long)generation,
+         presentation_kind,
+         (unsigned long)g_ui.diagnostic_haptic_events,
+         (unsigned long)g_ui.diagnostic_wake_requests,
+         (unsigned long)g_ui.diagnostic_haptic_retries,
+         (unsigned long)g_ui.diagnostic_haptic_log_dropped,
+         (unsigned long)g_ui.diagnostic_wake_log_dropped,
+         (unsigned int)g_ui.runtime.notifications.effect_count,
+         g_ui.runtime.external_events.dropped);
+  fflush(stdout);
+}
 #endif
 
 static time_t runtime_wall_now(void *context)
@@ -223,6 +273,185 @@ static int runtime_init(const smart_band_clock_source_t *clock_source)
       smart_band_event_mutex_deinit(&g_ui.event_mutex);
     }
   return result;
+}
+
+static const char *notification_haptic_name(
+  smart_band_notification_haptic_t haptic)
+{
+  switch (haptic)
+    {
+      case SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE:
+        return "subtle";
+      case SMART_BAND_NOTIFICATION_HAPTIC_NORMAL:
+        return "normal";
+      case SMART_BAND_NOTIFICATION_HAPTIC_URGENT:
+        return "urgent";
+      case SMART_BAND_NOTIFICATION_HAPTIC_NONE:
+      default:
+        return "none";
+    }
+}
+
+static bool emit_effect_log(const char *line)
+{
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  if (g_ui.effect_log_for_test != NULL)
+    {
+      return g_ui.effect_log_for_test(g_ui.effect_log_context, line);
+    }
+#endif
+  if (printf("%s\n", line) <= 0)
+    {
+      return false;
+    }
+
+  return fflush(stdout) == 0;
+}
+
+static bool emit_simulated_haptic(uint32_t notification_id,
+                                  uint32_t generation,
+                                  smart_band_notification_haptic_t haptic)
+{
+  char line[160];
+
+  (void)snprintf(
+    line, sizeof(line),
+    "smart_band:q4:haptic:v1 notification_id=%lu generation=%lu "
+    "pattern=%s simulated=1",
+    (unsigned long)notification_id, (unsigned long)generation,
+    notification_haptic_name(haptic));
+  return emit_effect_log(line);
+}
+
+static bool emit_synthetic_wake(uint32_t notification_id,
+                                uint32_t generation)
+{
+  char line[176];
+
+  (void)snprintf(
+    line, sizeof(line),
+    "smart_band:q4:wake:v1 notification_id=%lu generation=%lu "
+    "reason=notification synthetic=1 power_transition=0",
+    (unsigned long)notification_id, (unsigned long)generation);
+  return emit_effect_log(line);
+}
+
+static size_t notification_haptic_pulses(
+  smart_band_notification_haptic_t haptic,
+  smart_band_haptic_pulse_t pulses[3])
+{
+  memset(pulses, 0, sizeof(*pulses) * 3u);
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE)
+    {
+      pulses[0].on_ms = 40u;
+      pulses[0].strength = 35u;
+      return 1u;
+    }
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_NORMAL)
+    {
+      pulses[0].on_ms = 70u;
+      pulses[0].off_ms = 50u;
+      pulses[0].strength = 60u;
+      pulses[1].on_ms = 70u;
+      pulses[1].strength = 60u;
+      return 2u;
+    }
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_URGENT)
+    {
+      size_t index;
+
+      for (index = 0u; index < 3u; index++)
+        {
+          pulses[index].on_ms = 120u;
+          pulses[index].off_ms = index + 1u < 3u ? 70u : 0u;
+          pulses[index].strength = 100u;
+        }
+      return 3u;
+    }
+
+  return 0u;
+}
+
+/* These consumers deliberately acknowledge only their own service-owned
+ * effect generation. Visual acknowledgement remains in notification_view.
+ * The wake marker is synthetic evidence only; Q5 owns power-state changes. */
+static void consume_notification_effects(void)
+{
+  uint32_t notification_id;
+  uint32_t generation;
+  smart_band_notification_haptic_t haptic;
+  smart_band_haptic_pulse_t pulses[3];
+  smart_band_platform_result_t platform_result;
+  size_t pulse_count;
+
+  while (smart_band_notification_service_peek_haptic(
+           &g_ui.runtime.notifications, &notification_id, &generation,
+           &haptic))
+    {
+      pulse_count = notification_haptic_pulses(haptic, pulses);
+      if (pulse_count == 0u || g_ui.runtime.platform.haptic.ops == NULL ||
+          g_ui.runtime.platform.haptic.ops->play == NULL)
+        {
+          platform_result = SMART_BAND_PLATFORM_INVALID;
+        }
+      else
+        {
+          platform_result = g_ui.runtime.platform.haptic.ops->play(
+            g_ui.runtime.platform.haptic.context, pulses, pulse_count);
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_last_haptic_platform_result = platform_result;
+#endif
+      if (platform_result != SMART_BAND_PLATFORM_OK &&
+          platform_result != SMART_BAND_PLATFORM_UNAVAILABLE)
+        {
+          /* BUSY, IO, INVALID and future adapter failures retain the exact
+           * service generation for a later pump retry. */
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_haptic_retries++;
+#endif
+          break;
+        }
+      if (platform_result == SMART_BAND_PLATFORM_UNAVAILABLE &&
+          !emit_simulated_haptic(notification_id, generation, haptic))
+        {
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_haptic_log_dropped++;
+#endif
+        }
+      if (!smart_band_notification_service_ack_haptic(
+            &g_ui.runtime.notifications, notification_id, generation))
+        {
+          break;
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_haptic_events++;
+      g_ui.diagnostic_last_haptic_notification_id = notification_id;
+      g_ui.diagnostic_last_haptic_generation = generation;
+      g_ui.diagnostic_last_haptic = haptic;
+#endif
+    }
+
+  while (smart_band_notification_service_peek_wake(
+           &g_ui.runtime.notifications, &notification_id, &generation))
+    {
+      if (!emit_synthetic_wake(notification_id, generation))
+        {
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_wake_log_dropped++;
+#endif
+        }
+      if (!smart_band_notification_service_ack_wake(
+            &g_ui.runtime.notifications, notification_id, generation))
+        {
+          break;
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_wake_requests++;
+      g_ui.diagnostic_last_wake_notification_id = notification_id;
+      g_ui.diagnostic_last_wake_generation = generation;
+#endif
+    }
 }
 
 static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
@@ -1480,6 +1709,7 @@ static void timer_cb(lv_timer_t *timer)
   render_pending();
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
   emit_q3_diagnostics();
+  emit_q4_diagnostics();
 #endif
 }
 
@@ -1490,6 +1720,7 @@ static void event_pump_timer_cb(lv_timer_t *timer)
   g_ui.diagnostic_event_pumps++;
 #endif
   smart_band_runtime_dispatch_pending(&g_ui.runtime);
+  consume_notification_effects();
   render_pending();
 }
 
@@ -1804,6 +2035,18 @@ bool smart_band_lvgl_post_notification_external(
            &g_ui.runtime, input, monotonic_ms);
 }
 
+bool smart_band_lvgl_set_notification_policy(
+  const smart_band_notification_policy_t *policy)
+{
+  if (!smart_band_runtime_set_notification_policy(&g_ui.runtime, policy))
+    {
+      return false;
+    }
+
+  render_pending();
+  return true;
+}
+
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
 bool smart_band_lvgl_get_diagnostics(
   smart_band_lvgl_diagnostics_t *diagnostics)
@@ -1815,6 +2058,22 @@ bool smart_band_lvgl_get_diagnostics(
 
   diagnostics->runtime_ticks = g_ui.diagnostic_runtime_ticks;
   diagnostics->event_pumps = g_ui.diagnostic_event_pumps;
+  diagnostics->haptic_events = g_ui.diagnostic_haptic_events;
+  diagnostics->wake_requests = g_ui.diagnostic_wake_requests;
+  diagnostics->haptic_retries = g_ui.diagnostic_haptic_retries;
+  diagnostics->haptic_log_dropped = g_ui.diagnostic_haptic_log_dropped;
+  diagnostics->wake_log_dropped = g_ui.diagnostic_wake_log_dropped;
+  diagnostics->last_haptic_notification_id =
+    g_ui.diagnostic_last_haptic_notification_id;
+  diagnostics->last_haptic_generation =
+    g_ui.diagnostic_last_haptic_generation;
+  diagnostics->last_wake_notification_id =
+    g_ui.diagnostic_last_wake_notification_id;
+  diagnostics->last_wake_generation =
+    g_ui.diagnostic_last_wake_generation;
+  diagnostics->last_haptic = g_ui.diagnostic_last_haptic;
+  diagnostics->last_haptic_platform_result =
+    g_ui.diagnostic_last_haptic_platform_result;
   return true;
 }
 
@@ -1823,5 +2082,31 @@ bool smart_band_lvgl_diagnostics_is_idle(void)
   return g_ui.root == NULL && g_ui.runtime_timer == NULL &&
          g_ui.event_pump_timer == NULL && !g_ui.runtime.initialized &&
          !g_ui.event_mutex.initialized;
+}
+
+bool smart_band_lvgl_set_haptic_adapter_for_test(
+  const smart_band_haptic_t *haptic)
+{
+  if (!g_ui.runtime.initialized || haptic == NULL || haptic->ops == NULL ||
+      haptic->ops->play == NULL)
+    {
+      return false;
+    }
+
+  g_ui.runtime.platform.haptic = *haptic;
+  return true;
+}
+
+bool smart_band_lvgl_set_effect_logger_for_test(
+  smart_band_lvgl_effect_log_for_test_t logger, void *context)
+{
+  if (!g_ui.runtime.initialized)
+    {
+      return false;
+    }
+
+  g_ui.effect_log_for_test = logger;
+  g_ui.effect_log_context = context;
+  return true;
 }
 #endif
