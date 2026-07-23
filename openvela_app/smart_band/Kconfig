@@ -38,7 +38,7 @@ config LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS
 	bool "Emit machine-readable smart band E2E state"
 	default n
 	---help---
-		Emit one bounded, parseable Q3 state line per UI timer tick for
-		native emulator evidence. Leave disabled in normal builds.
+		Emit bounded, parseable Q3 and Q4 state lines per UI timer tick
+		for native emulator evidence. Leave disabled in normal builds.
 
 endif

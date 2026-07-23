@@ -42,6 +42,79 @@ static unsigned int g_timer_calls;
 
 typedef struct
 {
+  smart_band_platform_result_t results[4];
+  size_t result_count;
+  size_t result_index;
+  size_t play_calls;
+  smart_band_haptic_pulse_t pulses[3];
+  size_t pulse_count;
+} fake_haptic_t;
+
+typedef struct
+{
+  size_t calls;
+  size_t haptic_lines;
+  size_t wake_lines;
+  bool fail;
+} fake_effect_logger_t;
+
+static smart_band_platform_result_t fake_haptic_play(
+  void *context, const smart_band_haptic_pulse_t *pulses,
+  size_t pulse_count)
+{
+  fake_haptic_t *fake = context;
+  smart_band_platform_result_t result;
+
+  if (fake == NULL || pulses == NULL || pulse_count == 0u ||
+      pulse_count > 3u || fake->result_count == 0u)
+    {
+      return SMART_BAND_PLATFORM_INVALID;
+    }
+  fake->play_calls++;
+  fake->pulse_count = pulse_count;
+  memcpy(fake->pulses, pulses, pulse_count * sizeof(pulses[0]));
+  result = fake->results[fake->result_index];
+  if (fake->result_index + 1u < fake->result_count)
+    {
+      fake->result_index++;
+    }
+  return result;
+}
+
+static smart_band_platform_result_t fake_haptic_stop(void *context)
+{
+  (void)context;
+  return SMART_BAND_PLATFORM_OK;
+}
+
+static const smart_band_haptic_ops_t g_fake_haptic_ops =
+{
+  fake_haptic_play,
+  fake_haptic_stop
+};
+
+static bool fake_effect_logger(void *context, const char *line)
+{
+  fake_effect_logger_t *logger = context;
+
+  if (logger == NULL || line == NULL)
+    {
+      return false;
+    }
+  logger->calls++;
+  if (strstr(line, "smart_band:q4:haptic:v1") != NULL)
+    {
+      logger->haptic_lines++;
+    }
+  if (strstr(line, "smart_band:q4:wake:v1") != NULL)
+    {
+      logger->wake_lines++;
+    }
+  return !logger->fail;
+}
+
+typedef struct
+{
   smart_band_event_lock_t lock;
   unsigned int counter;
 } event_mutex_shared_t;
@@ -956,6 +1029,265 @@ static int test_notification_overlay_pump_and_timeout(void)
   return 0;
 }
 
+static int test_notification_haptic_platform_contract(void)
+{
+  smart_band_lvgl_diagnostics_t diagnostics;
+  fake_haptic_t fake;
+  fake_effect_logger_t logger;
+  smart_band_haptic_t adapter = {&g_fake_haptic_ops, &fake};
+  smart_band_notification_input_t input;
+  size_t calls_before;
+
+  memset(&fake, 0, sizeof(fake));
+  memset(&logger, 0, sizeof(logger));
+  fake_lvgl_reset();
+  CHECK(!smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  CHECK(!smart_band_lvgl_set_effect_logger_for_test(fake_effect_logger,
+                                                     &logger));
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(!smart_band_lvgl_set_haptic_adapter_for_test(NULL));
+  CHECK(smart_band_lvgl_set_effect_logger_for_test(fake_effect_logger,
+                                                    &logger));
+
+  fake.results[0] = SMART_BAND_PLATFORM_OK;
+  fake.result_count = 1u;
+  CHECK(smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  input = make_notification(
+    501u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter OK",
+    "Play before ack");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 0u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 1u && fake.pulse_count == 2u);
+  CHECK(fake.pulses[0].on_ms == 70u && fake.pulses[0].off_ms == 50u &&
+        fake.pulses[0].strength == 60u);
+  CHECK(fake.pulses[1].on_ms == 70u && fake.pulses[1].off_ms == 0u &&
+        fake.pulses[1].strength == 60u);
+  CHECK(logger.haptic_lines == 0u && logger.wake_lines == 1u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 1u &&
+        diagnostics.wake_requests == 1u &&
+        diagnostics.last_haptic_platform_result == SMART_BAND_PLATFORM_OK);
+
+  memset(&fake, 0, sizeof(fake));
+  fake.results[0] = SMART_BAND_PLATFORM_BUSY;
+  fake.results[1] = SMART_BAND_PLATFORM_OK;
+  fake.result_count = 2u;
+  CHECK(smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  input = make_notification(
+    502u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter busy",
+    "Retry same generation");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 50u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 1u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 1u &&
+        diagnostics.wake_requests == 2u &&
+        diagnostics.haptic_retries == 1u &&
+        diagnostics.last_haptic_platform_result == SMART_BAND_PLATFORM_BUSY);
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 2u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.haptic_retries == 1u &&
+        diagnostics.last_haptic_notification_id == 502u);
+
+  memset(&fake, 0, sizeof(fake));
+  fake.results[0] = SMART_BAND_PLATFORM_IO;
+  fake.results[1] = SMART_BAND_PLATFORM_OK;
+  fake.result_count = 2u;
+  CHECK(smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  input = make_notification(
+    503u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Adapter IO",
+    "Retain pending on IO");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 150u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 1u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.wake_requests == 3u &&
+        diagnostics.haptic_retries == 2u &&
+        diagnostics.last_haptic_platform_result == SMART_BAND_PLATFORM_IO);
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 2u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 3u &&
+        diagnostics.last_haptic_notification_id == 503u);
+
+  memset(&fake, 0, sizeof(fake));
+  fake.results[0] = SMART_BAND_PLATFORM_UNAVAILABLE;
+  fake.result_count = 1u;
+  CHECK(smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  input = make_notification(
+    504u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Fallback",
+    "Structured simulator marker");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 250u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == 1u && logger.haptic_lines == 1u &&
+        logger.wake_lines == 4u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 4u &&
+        diagnostics.wake_requests == 4u &&
+        diagnostics.last_haptic_platform_result ==
+          SMART_BAND_PLATFORM_UNAVAILABLE);
+
+  logger.fail = true;
+  input = make_notification(
+    505u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Platform", "Log failure",
+    "Best effort does not block ack");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 300u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 5u &&
+        diagnostics.wake_requests == 5u &&
+        diagnostics.haptic_log_dropped == 1u &&
+        diagnostics.wake_log_dropped == 1u);
+  calls_before = fake.play_calls;
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.play_calls == calls_before);
+
+  logger.fail = false;
+  memset(&fake, 0, sizeof(fake));
+  fake.results[0] = SMART_BAND_PLATFORM_OK;
+  fake.result_count = 1u;
+  CHECK(smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  input = make_notification(
+    506u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+    SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "Platform", "Subtle",
+    "Single pulse mapping");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 400u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.pulse_count == 1u && fake.pulses[0].on_ms == 40u &&
+        fake.pulses[0].off_ms == 0u && fake.pulses[0].strength == 35u);
+  input = make_notification(
+    507u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Urgent",
+    "Three pulse mapping");
+  CHECK(smart_band_lvgl_post_notification_external(&input, 450u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(fake.pulse_count == 3u);
+  CHECK(fake.pulses[0].on_ms == 120u && fake.pulses[0].off_ms == 70u &&
+        fake.pulses[0].strength == 100u);
+  CHECK(fake.pulses[1].on_ms == 120u && fake.pulses[1].off_ms == 70u &&
+        fake.pulses[1].strength == 100u);
+  CHECK(fake.pulses[2].on_ms == 120u && fake.pulses[2].off_ms == 0u &&
+        fake.pulses[2].strength == 100u);
+
+  smart_band_lvgl_destroy();
+  CHECK(!smart_band_lvgl_set_haptic_adapter_for_test(&adapter));
+  CHECK(!smart_band_lvgl_set_effect_logger_for_test(NULL, NULL));
+  CHECK(resources_are_zero());
+  return 0;
+}
+
+static int test_notification_effects_dnd_long_text_and_content_update(void)
+{
+  ui_tree_t tree;
+  smart_band_lvgl_diagnostics_t diagnostics;
+  smart_band_notification_policy_t policy = {false, false};
+  char long_body[SMART_BAND_NOTIFICATION_BODY_CAPACITY * 2u];
+  char truncated_body[SMART_BAND_NOTIFICATION_BODY_CAPACITY];
+  smart_band_notification_input_t update;
+  smart_band_notification_input_t dnd;
+  lv_obj_t *body_label;
+  lv_obj_t *overlay;
+  uint32_t first_generation;
+
+  memset(long_body, 'L', sizeof(long_body));
+  long_body[sizeof(long_body) - 1u] = '\0';
+  memset(truncated_body, 'L', sizeof(truncated_body));
+  truncated_body[sizeof(truncated_body) - 1u] = '\0';
+  update = make_notification(
+    401u, SMART_BAND_NOTIFICATION_TYPE_APP,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Mail", "Original notice",
+    "Original content");
+  dnd = make_notification(
+    402u, SMART_BAND_NOTIFICATION_TYPE_SYSTEM,
+    SMART_BAND_NOTIFICATION_PRIORITY_CRITICAL, "System", "DND retained",
+    "Stored without presentation");
+
+  fake_lvgl_reset();
+  CHECK(!smart_band_lvgl_set_notification_policy(&policy));
+  lv_obj_set_size(lv_scr_act(), 320, 480);
+  CHECK(smart_band_lvgl_create(NULL) == 0);
+  CHECK(!smart_band_lvgl_set_notification_policy(NULL));
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 0u &&
+        diagnostics.wake_requests == 0u);
+
+  CHECK(smart_band_lvgl_post_notification_external(&update, 0u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("Original notice", 0u) != NULL);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 1u &&
+        diagnostics.wake_requests == 1u);
+  CHECK(diagnostics.last_haptic_notification_id == 401u &&
+        diagnostics.last_wake_notification_id == 401u);
+  CHECK(diagnostics.last_haptic == SMART_BAND_NOTIFICATION_HAPTIC_NORMAL);
+  CHECK(diagnostics.last_haptic_generation != 0u &&
+        diagnostics.last_haptic_generation ==
+          diagnostics.last_wake_generation);
+  first_generation = diagnostics.last_haptic_generation;
+
+  update.title = "Updated notice";
+  update.body = long_body;
+  CHECK(smart_band_lvgl_post_notification_external(&update, 50u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("Original notice", 0u) == NULL);
+  CHECK(find_visible_text("Updated notice", 0u) != NULL);
+  body_label = find_visible_text(truncated_body, 0u);
+  CHECK(body_label != NULL);
+  overlay = fake_lvgl_obj_parent(body_label);
+  CHECK(overlay != NULL);
+  CHECK(fake_lvgl_obj_absolute_x(body_label) >=
+        fake_lvgl_obj_absolute_x(overlay));
+  CHECK(fake_lvgl_obj_absolute_y(body_label) >=
+        fake_lvgl_obj_absolute_y(overlay));
+  CHECK(fake_lvgl_obj_absolute_x(body_label) + lv_obj_get_width(body_label) <=
+        fake_lvgl_obj_absolute_x(overlay) + lv_obj_get_width(overlay));
+  CHECK(fake_lvgl_obj_absolute_y(body_label) + lv_obj_get_height(body_label) <=
+        fake_lvgl_obj_absolute_y(overlay) + lv_obj_get_height(overlay));
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.wake_requests == 2u);
+  CHECK(diagnostics.last_haptic_generation != first_generation &&
+        diagnostics.last_haptic_generation ==
+          diagnostics.last_wake_generation);
+
+  CHECK(smart_band_lvgl_post_notification_external(&update, 100u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.wake_requests == 2u);
+  CHECK(click_object_center(find_visible_text("Dismiss", 0u)) != NULL);
+
+  policy.dnd_enabled = true;
+  CHECK(smart_band_lvgl_set_notification_policy(&policy));
+  CHECK(smart_band_lvgl_post_notification_external(&dnd, 150u));
+  CHECK(fake_lvgl_advance_tick(50u) == 1u);
+  CHECK(find_visible_text("DND retained", 0u) == NULL);
+  CHECK(smart_band_lvgl_get_diagnostics(&diagnostics));
+  CHECK(diagnostics.haptic_events == 2u &&
+        diagnostics.wake_requests == 2u);
+
+  CHECK(navigate_to_apps(&tree) == 0);
+  fake_lvgl_send_event(find_visible_text("Notifications", 0u),
+                       LV_EVENT_CLICKED);
+  CHECK(find_visible_text("New: System / DND retained", 0u) != NULL);
+  CHECK(find_visible_text("Stored without presentation", 0u) != NULL);
+  CHECK(find_visible_text("Mail / Updated notice", 0u) != NULL);
+  CHECK(find_visible_text(truncated_body, 0u) != NULL);
+
+  smart_band_lvgl_destroy();
+  CHECK(resources_are_zero());
+  return 0;
+}
+
 static int test_notification_center_actions_and_paging(void)
 {
   ui_tree_t tree;
@@ -1231,6 +1563,8 @@ int main(void)
   CHECK(test_navigation_and_timer() == 0);
   CHECK(test_workout_and_history_system_views() == 0);
   CHECK(test_notification_overlay_pump_and_timeout() == 0);
+  CHECK(test_notification_haptic_platform_contract() == 0);
+  CHECK(test_notification_effects_dnd_long_text_and_content_update() == 0);
   CHECK(test_notification_center_actions_and_paging() == 0);
   CHECK(test_notification_center_failure_rollback() == 0);
   CHECK(test_notification_call_capture_and_backlog() == 0);
