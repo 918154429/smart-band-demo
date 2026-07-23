@@ -269,10 +269,12 @@ jobs:
             > "$EVIDENCE_DIR/emulator-commit.txt"
           git -C "$tools_root" rev-parse HEAD \
             > "$EVIDENCE_DIR/emulator-tools-commit.txt"
-          sha256sum \
-            "$emulator_root/emulator" \
-            "$emulator_root/qemu/linux-x86_64/qemu-system-aarch64-headless" \
-            > "$EVIDENCE_DIR/emulator-binaries.sha256"
+          (
+            cd "$emulator_root"
+            sha256sum \
+              emulator \
+              qemu/linux-x86_64/qemu-system-aarch64-headless
+          ) > "$EVIDENCE_DIR/emulator-binaries.sha256"
 
       - name: Install pinned official openvela skills
         shell: bash
@@ -372,10 +374,13 @@ jobs:
             strings "$image" | grep -Fq 'smart_band'
           fi
 
-          sha256sum "$image" | tee "$EVIDENCE_DIR/nuttx.sha256"
           file "$image" | tee "$EVIDENCE_DIR/nuttx-file.txt"
           cp "$image" "$EVIDENCE_DIR/nuttx"
           cp "$config" "$EVIDENCE_DIR/nuttx.config"
+          (
+            cd "$EVIDENCE_DIR"
+            sha256sum nuttx
+          ) | tee "$EVIDENCE_DIR/nuttx.sha256"
           runtime_dir="$OPENVELA_ROOT/cmake_out/vela_goldfish-arm64-v8a-ap"
           target_elf="$runtime_dir/vela_ap.elf"
           linker_map="$runtime_dir/nuttx.map"
@@ -490,22 +495,23 @@ jobs:
           mapfile -d '' process_files < <(
             find "$EVIDENCE_DIR" -type f -name emulator-process.json -print0
           )
-          if [ "${#process_files[@]}" -eq 0 ]; then
-            echo "no emulator process metadata was recorded" > "$cleanup_log"
-            exit 0
-          fi
 
           python3 - \
             "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_native_e2e.py" \
-            "$cleanup_log" "${process_files[@]}" <<'PY'
+            "$cleanup_log" "$EVIDENCE_DIR" "$OPENVELA_ROOT" \
+            "${{ inputs.q4_native_e2e }}" "${process_files[@]}" <<'PY'
           import importlib.util
           import json
+          import re
           import sys
           from pathlib import Path
 
           helper_path = Path(sys.argv[1])
           cleanup_log = Path(sys.argv[2])
-          process_files = [Path(value) for value in sys.argv[3:]]
+          evidence_dir = Path(sys.argv[3]).resolve()
+          openvela_root = Path(sys.argv[4]).resolve()
+          q4_enabled = sys.argv[5] == "true"
+          process_files = [Path(value) for value in sys.argv[6:]]
           spec = importlib.util.spec_from_file_location(
               "workflow_native_cleanup", helper_path
           )
@@ -516,34 +522,112 @@ jobs:
 
           failed = False
           lines = []
+          q4_metadata_count = 0
+          q4_scenarios_seen = set()
+          required_q4_scenarios = {
+              "ordinary", "center", "calls", "workout"
+          }
+          q4_scenarios_root = (
+              evidence_dir / "q4-native" / "scenarios"
+          ).resolve()
+          expected_executables = (
+              (
+                  openvela_root
+                  / "prebuilts/emulator/linux-x86_64/emulator"
+              ).resolve(),
+              (
+                  openvela_root
+                  / "prebuilts/emulator/linux-x86_64/qemu/"
+                  "linux-x86_64/qemu-system-aarch64-headless"
+              ).resolve(),
+          )
           for process_file in process_files:
-              try:
-                  metadata = json.loads(process_file.read_text(encoding="utf-8"))
-              except (OSError, ValueError) as exc:
-                  lines.append(f"{process_file}: invalid metadata: {exc}")
-                  failed = failed or "q4-native" in process_file.parts
-                  continue
-              required = {"run_id", "runtime_output", "executables", "baseline"}
-              if not required.issubset(metadata):
+              resolved_file = process_file.resolve()
+              is_q4 = q4_scenarios_root in resolved_file.parents
+              if not is_q4:
                   lines.append(
                       f"{process_file}: skipped legacy metadata without "
-                      "run/runtime attribution"
+                      "Q4 run/runtime attribution"
                   )
-                  failed = failed or "q4-native" in process_file.parts
                   continue
-              result = native.cleanup_attributed_processes(
-                  metadata["run_id"],
-                  Path(metadata["runtime_output"]),
-                  tuple(Path(value) for value in metadata["executables"]),
-                  metadata["baseline"],
-              )
-              output = process_file.with_name("workflow-process-cleanup.json")
-              native.write_json(output, result)
+              q4_metadata_count += 1
+              try:
+                  metadata = json.loads(process_file.read_text(encoding="utf-8"))
+                  if not isinstance(metadata, dict):
+                      raise ValueError("metadata root is not an object")
+                  required = {
+                      "run_id", "runtime_output", "executables", "baseline"
+                  }
+                  if not required.issubset(metadata):
+                      raise ValueError("required attribution fields are missing")
+                  scenario = process_file.parent.name
+                  if scenario not in required_q4_scenarios:
+                      raise ValueError(f"invalid Q4 scenario path: {scenario}")
+                  if process_file.parent.parent.resolve() != q4_scenarios_root:
+                      raise ValueError("Q4 metadata is outside the scenario root")
+                  run_id = metadata["run_id"]
+                  if (
+                      not isinstance(run_id, str)
+                      or re.fullmatch(
+                          rf"[0-9a-f]{{32}}-{scenario}", run_id
+                      )
+                      is None
+                  ):
+                      raise ValueError("invalid Q4 run id")
+                  expected_runtime = (
+                      process_file.parent / "runtime-output"
+                  ).resolve()
+                  runtime_output = metadata["runtime_output"]
+                  if (
+                      not isinstance(runtime_output, str)
+                      or Path(runtime_output).resolve() != expected_runtime
+                  ):
+                      raise ValueError("invalid Q4 runtime-output attribution")
+                  executables = metadata["executables"]
+                  if (
+                      not isinstance(executables, list)
+                      or len(executables) != len(expected_executables)
+                      or tuple(Path(value).resolve() for value in executables)
+                      != expected_executables
+                  ):
+                      raise ValueError("invalid Q4 executable attribution")
+                  if not isinstance(metadata["baseline"], list):
+                      raise ValueError("invalid Q4 process baseline")
+                  q4_scenarios_seen.add(scenario)
+                  result = native.cleanup_attributed_processes(
+                      run_id,
+                      expected_runtime,
+                      expected_executables,
+                      [],
+                  )
+                  output = process_file.with_name(
+                      "workflow-process-cleanup.json"
+                  )
+                  native.write_json(output, result)
+                  lines.append(
+                      f"{process_file}: absent={result['absent']} "
+                      f"actions={len(result['actions'])}"
+                  )
+                  failed = failed or not result["absent"]
+              except Exception as exc:
+                  lines.append(f"{process_file}: invalid Q4 metadata: {exc}")
+                  failed = True
+                  continue
+          if q4_enabled and q4_metadata_count == 0:
               lines.append(
-                  f"{process_file}: absent={result['absent']} "
-                  f"actions={len(result['actions'])}"
+                  "Q4 native journey was enabled but no attributed "
+                  "emulator metadata was recorded"
               )
-              failed = failed or not result["absent"]
+              failed = True
+          if q4_enabled and q4_scenarios_seen != required_q4_scenarios:
+              lines.append(
+                  "Q4 attributed metadata scenario set mismatch: "
+                  f"seen={sorted(q4_scenarios_seen)} "
+                  f"required={sorted(required_q4_scenarios)}"
+              )
+              failed = True
+          if not process_files:
+              lines.append("no emulator process metadata was recorded")
           cleanup_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
           raise SystemExit(1 if failed else 0)
           PY
