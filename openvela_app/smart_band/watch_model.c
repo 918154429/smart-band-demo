@@ -430,6 +430,15 @@ void smart_band_state_begin_sensor_cycle_at(smart_band_state_t *state,
                                             uint64_t monotonic_ms,
                                             bool wall_rollback)
 {
+  smart_band_state_begin_sensor_cycle_masked_at(
+    state, wall_now, monotonic_ms, wall_rollback,
+    (UINT32_C(1) << SMART_BAND_METRIC_COUNT) - UINT32_C(1));
+}
+
+void smart_band_state_begin_sensor_cycle_masked_at(
+  smart_band_state_t *state, time_t wall_now, uint64_t monotonic_ms,
+  bool wall_rollback, uint32_t metric_mask)
+{
   smart_band_metric_t metric;
 
   if (state == NULL)
@@ -441,6 +450,11 @@ void smart_band_state_begin_sensor_cycle_at(smart_band_state_t *state,
        metric < SMART_BAND_METRIC_COUNT; metric++)
     {
       smart_band_metric_info_t *info = metric_info(state, metric);
+
+      if ((metric_mask & (UINT32_C(1) << metric)) == 0u)
+        {
+          continue;
+        }
 
       if (!source_is_sensor(info->source))
         {

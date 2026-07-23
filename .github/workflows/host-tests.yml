@@ -210,6 +210,8 @@ jobs:
             script: tests/test_notification_service.py
           - name: Power policy
             script: tests/test_power_policy.py
+          - name: Power manager
+            script: tests/test_power_manager.py
           - name: Sync protocol
             script: tests/test_sync_protocol.py
         toolchain:

@@ -238,9 +238,54 @@ static void dispatch_workout_event(smart_band_runtime_t *runtime,
   runtime->dirty |= SMART_BAND_DIRTY_WORKOUT | SMART_BAND_DIRTY_HISTORY;
 }
 
-static void dispatch_domain_events(smart_band_runtime_t *runtime)
+static bool power_result_accepted(smart_band_power_policy_result_t result)
+{
+  return result == SMART_BAND_POWER_POLICY_OK ||
+         result == SMART_BAND_POWER_POLICY_DUPLICATE_TIMESTAMP ||
+         result == SMART_BAND_POWER_POLICY_LARGE_TIME_JUMP;
+}
+
+static void apply_power_events(smart_band_runtime_t *runtime,
+                               uint32_t power_events,
+                               uint32_t wake_notification_id,
+                               uint32_t wake_generation)
+{
+  smart_band_power_policy_result_t result;
+
+  if (power_events == 0u)
+    {
+      return;
+    }
+
+  result = smart_band_power_manager_handle(
+    &runtime->power, runtime->last_clock.elapsed_ms, power_events);
+  if (!power_result_accepted(result))
+    {
+      return;
+    }
+
+  if ((power_events & SMART_BAND_POWER_EVENT_NOTIFICATION) != 0u &&
+      wake_notification_id != 0u && wake_generation != 0u)
+    {
+      (void)smart_band_notification_service_ack_wake(
+        &runtime->notifications, wake_notification_id, wake_generation);
+    }
+  runtime->dirty |= (power_events &
+    (SMART_BAND_POWER_EVENT_BUTTON | SMART_BAND_POWER_EVENT_TOUCH |
+     SMART_BAND_POWER_EVENT_NOTIFICATION | SMART_BAND_POWER_EVENT_WRIST |
+     SMART_BAND_POWER_EVENT_CHARGING)) != 0u ?
+    SMART_BAND_DIRTY_ALL : SMART_BAND_DIRTY_POWER;
+}
+
+static void dispatch_domain_events(smart_band_runtime_t *runtime,
+                                   uint32_t initial_power_events)
 {
   smart_band_event_t event;
+  uint32_t power_events = initial_power_events;
+  uint32_t wake_notification_id = 0u;
+  uint32_t wake_generation = 0u;
+  bool workout_was_live =
+    smart_band_workout_service_is_live(&runtime->workout);
 
   while (smart_band_event_queue_take_next_domain(&runtime->events, &event))
     {
@@ -250,8 +295,23 @@ static void dispatch_domain_events(smart_band_runtime_t *runtime)
         }
       else if (event.type == SMART_BAND_EVENT_WORKOUT_CHECKPOINT)
         {
-          (void)smart_band_workout_service_checkpoint(
-            &runtime->workout, runtime->last_clock.elapsed_ms);
+          if (runtime->power.desired.allow_checkpoint)
+            {
+              (void)smart_band_workout_service_checkpoint(
+                &runtime->workout, runtime->last_clock.elapsed_ms);
+            }
+        }
+      else if (event.type == SMART_BAND_EVENT_TOUCH_ACTIVITY)
+        {
+          power_events |= SMART_BAND_POWER_EVENT_TOUCH;
+        }
+      else if (event.type == SMART_BAND_EVENT_WRIST_RAISED)
+        {
+          power_events |= SMART_BAND_POWER_EVENT_WRIST;
+        }
+      else if (event.type == SMART_BAND_EVENT_POWER_TIMEOUT)
+        {
+          power_events |= SMART_BAND_POWER_EVENT_TICK;
         }
       else
         {
@@ -262,12 +322,27 @@ static void dispatch_domain_events(smart_band_runtime_t *runtime)
           runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
         }
     }
+
+  if (workout_was_live !=
+      smart_band_workout_service_is_live(&runtime->workout))
+    {
+      power_events |= workout_was_live ?
+        SMART_BAND_POWER_EVENT_WORKOUT_STOP :
+        SMART_BAND_POWER_EVENT_WORKOUT_START;
+    }
   sync_notification_policy(runtime);
   if (smart_band_notification_service_tick(
         &runtime->notifications, runtime->last_clock.monotonic_ms))
     {
       runtime->dirty |= SMART_BAND_DIRTY_NOTIFICATION;
     }
+  if (smart_band_notification_service_peek_wake(
+        &runtime->notifications, &wake_notification_id, &wake_generation))
+    {
+      power_events |= SMART_BAND_POWER_EVENT_NOTIFICATION;
+    }
+  apply_power_events(runtime, power_events, wake_notification_id,
+                     wake_generation);
 }
 
 void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime)
@@ -281,7 +356,7 @@ void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime)
           return;
         }
 
-      dispatch_domain_events(runtime);
+      dispatch_domain_events(runtime, 0u);
     }
 }
 
@@ -296,6 +371,10 @@ static bool advance_runtime(smart_band_runtime_t *runtime,
   const smart_band_metric_info_t *heart_info;
   bool workout_changed;
   bool heart_valid;
+  bool charging_started;
+  bool heart_sample_due;
+  uint32_t sampling_mask;
+  smart_band_power_state_t power_state_before;
 
   if (!sample_runtime_clock(runtime))
     {
@@ -309,9 +388,31 @@ static bool advance_runtime(smart_band_runtime_t *runtime,
   smart_band_state_set_wall_time(&runtime->model,
                                  runtime->last_clock.wall_time,
                                  runtime->last_clock.wall_valid);
-  smart_band_sensor_bridge_update_clocked(
+  power_state_before = runtime->power.desired.state;
+  (void)smart_band_power_manager_handle(
+    &runtime->power, runtime->last_clock.elapsed_ms,
+    SMART_BAND_POWER_EVENT_TICK);
+  if (power_state_before != runtime->power.desired.state)
+    {
+      runtime->dirty |= SMART_BAND_DIRTY_POWER;
+    }
+  heart_sample_due = smart_band_power_manager_heart_sample_due(
+    &runtime->power, runtime->last_clock.elapsed_ms);
+  sampling_mask = SMART_BAND_SENSOR_SAMPLE_STEP |
+                  SMART_BAND_SENSOR_SAMPLE_ENV |
+                  SMART_BAND_SENSOR_SAMPLE_BATTERY;
+  if (heart_sample_due)
+    {
+      sampling_mask |= SMART_BAND_SENSOR_SAMPLE_HEART;
+    }
+  if (runtime->power.desired.allow_motion_sampling)
+    {
+      sampling_mask |= SMART_BAND_SENSOR_SAMPLE_MOTION;
+    }
+  smart_band_sensor_bridge_update_clocked_masked(
     &runtime->sensors, &runtime->model, runtime->last_clock.wall_time,
-    runtime->last_clock.elapsed_ms, runtime->last_clock.wall_rollback);
+    runtime->last_clock.elapsed_ms, runtime->last_clock.wall_rollback,
+    sampling_mask);
   if (!runtime_step_sample(runtime, &step_sample))
     {
       return false;
@@ -338,7 +439,10 @@ static bool advance_runtime(smart_band_runtime_t *runtime,
       runtime->dirty |= SMART_BAND_DIRTY_WORKOUT |
                         SMART_BAND_DIRTY_HISTORY;
     }
-  dispatch_domain_events(runtime);
+  charging_started = !before.battery_charging &&
+                     runtime->model.battery_charging;
+  dispatch_domain_events(
+    runtime, charging_started ? SMART_BAND_POWER_EVENT_CHARGING : 0u);
   capture_view_snapshot(&runtime->model, &after);
   runtime->dirty |= view_changes(&before, &after);
 
@@ -394,6 +498,16 @@ int smart_band_runtime_init_with_platform(
       return -1;
     }
 
+  if (smart_band_power_manager_init(&runtime->power, NULL,
+                                    &runtime->platform.power,
+                                    runtime->last_clock.elapsed_ms) != 0)
+    {
+      (void)smart_band_event_inbox_close(&runtime->external_events);
+      memset(runtime, 0, sizeof(*runtime));
+      return -1;
+    }
+  runtime->power_initialized = true;
+
   if (smart_band_store_init(&runtime->storage,
                             &runtime->platform.storage) == 0)
     {
@@ -436,6 +550,8 @@ int smart_band_runtime_init_with_platform(
       runtime->sensors_initialized = false;
       smart_band_notification_service_reset(&runtime->notifications);
       runtime->notifications_initialized = false;
+      smart_band_power_manager_reset(&runtime->power);
+      runtime->power_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -456,6 +572,8 @@ int smart_band_runtime_init_with_platform(
       runtime->sensors_initialized = false;
       smart_band_notification_service_reset(&runtime->notifications);
       runtime->notifications_initialized = false;
+      smart_band_power_manager_reset(&runtime->power);
+      runtime->power_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -482,6 +600,8 @@ int smart_band_runtime_init_with_platform(
       runtime->sensors_initialized = false;
       smart_band_notification_service_reset(&runtime->notifications);
       runtime->notifications_initialized = false;
+      smart_band_power_manager_reset(&runtime->power);
+      runtime->power_initialized = false;
       if (runtime->storage_initialized)
         {
           smart_band_store_deinit(&runtime->storage);
@@ -542,6 +662,11 @@ void smart_band_runtime_deinit(smart_band_runtime_t *runtime)
   if (runtime->storage_initialized)
     {
       smart_band_store_deinit(&runtime->storage);
+    }
+
+  if (runtime->power_initialized)
+    {
+      smart_band_power_manager_deinit(&runtime->power);
     }
 
   memset(runtime, 0, sizeof(*runtime));
@@ -689,6 +814,50 @@ bool smart_band_runtime_refresh_sensors(smart_band_runtime_t *runtime)
   capture_view_snapshot(&runtime->model, &after);
   runtime->dirty |= view_changes(&before, &after);
   return true;
+}
+
+bool smart_band_runtime_wake(smart_band_runtime_t *runtime,
+                             smart_band_power_wake_reason_t reason)
+{
+  smart_band_power_policy_result_t result;
+
+  if (runtime == NULL || !runtime->initialized ||
+      !sample_runtime_clock(runtime))
+    {
+      return false;
+    }
+  result = smart_band_power_manager_wake(
+    &runtime->power, runtime->last_clock.elapsed_ms, reason);
+  if (result != SMART_BAND_POWER_POLICY_OK &&
+      result != SMART_BAND_POWER_POLICY_DUPLICATE_TIMESTAMP &&
+      result != SMART_BAND_POWER_POLICY_LARGE_TIME_JUMP)
+    {
+      return false;
+    }
+  runtime->dirty |= SMART_BAND_DIRTY_ALL;
+  return true;
+}
+
+bool smart_band_runtime_power_snapshot(
+  const smart_band_runtime_t *runtime,
+  smart_band_power_manager_snapshot_t *snapshot)
+{
+  return runtime != NULL && runtime->initialized &&
+         smart_band_power_manager_snapshot(&runtime->power, snapshot);
+}
+
+bool smart_band_runtime_render_due(smart_band_runtime_t *runtime,
+                                   bool urgent)
+{
+  return runtime != NULL && runtime->initialized &&
+         smart_band_power_manager_render_due(
+           &runtime->power, runtime->last_clock.elapsed_ms, urgent);
+}
+
+bool smart_band_runtime_allows_sync(const smart_band_runtime_t *runtime)
+{
+  return runtime != NULL && runtime->initialized &&
+         runtime->power.desired.allow_sync;
 }
 
 void smart_band_runtime_mark_dirty(smart_band_runtime_t *runtime,

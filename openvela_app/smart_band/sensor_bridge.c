@@ -307,13 +307,55 @@ void smart_band_sensor_bridge_update_clocked(
   smart_band_sensor_bridge_t *bridge, smart_band_state_t *state,
   time_t wall_now, uint64_t monotonic_ms, bool wall_rollback)
 {
+  smart_band_sensor_bridge_update_clocked_masked(
+    bridge, state, wall_now, monotonic_ms, wall_rollback,
+    SMART_BAND_SENSOR_SAMPLE_ALL);
+}
+
+void smart_band_sensor_bridge_update_clocked_masked(
+  smart_band_sensor_bridge_t *bridge, smart_band_state_t *state,
+  time_t wall_now, uint64_t monotonic_ms, bool wall_rollback,
+  uint32_t sampling_mask)
+{
+  uint32_t metric_mask = 0u;
+
   if (bridge == NULL || state == NULL)
     {
       return;
     }
 
-  smart_band_state_begin_sensor_cycle_at(state, wall_now, monotonic_ms,
-                                         wall_rollback);
+  sampling_mask &= SMART_BAND_SENSOR_SAMPLE_ALL;
+  bridge->last_sampling_mask = sampling_mask;
+  bridge->sampling_cycles++;
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_STEP) != 0u)
+    {
+      bridge->step_sampling_cycles++;
+    }
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_MOTION) != 0u)
+    {
+      bridge->motion_sampling_cycles++;
+    }
+
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_HEART) != 0u)
+    {
+      metric_mask |= UINT32_C(1) << SMART_BAND_METRIC_HEART_RATE;
+    }
+  if ((sampling_mask & (SMART_BAND_SENSOR_SAMPLE_STEP |
+                        SMART_BAND_SENSOR_SAMPLE_MOTION)) != 0u)
+    {
+      metric_mask |= UINT32_C(1) << SMART_BAND_METRIC_STEPS;
+    }
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_BATTERY) != 0u)
+    {
+      metric_mask |= UINT32_C(1) << SMART_BAND_METRIC_BATTERY;
+    }
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_ENV) != 0u)
+    {
+      metric_mask |= (UINT32_C(1) << SMART_BAND_METRIC_TEMPERATURE) |
+                     (UINT32_C(1) << SMART_BAND_METRIC_HUMIDITY);
+    }
+  smart_band_state_begin_sensor_cycle_masked_at(
+    state, wall_now, monotonic_ms, wall_rollback, metric_mask);
 
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_USE_SENSORS)
   if (state->data_mode == SMART_BAND_DATA_MODE_SIMULATION)
@@ -321,15 +363,26 @@ void smart_band_sensor_bridge_update_clocked(
       return;
     }
 
-  update_heart_rate(bridge, state, wall_now, monotonic_ms);
-  if (!update_steps_from_counter(bridge, state, wall_now, monotonic_ms))
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_HEART) != 0u)
+    {
+      update_heart_rate(bridge, state, wall_now, monotonic_ms);
+    }
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_STEP) != 0u &&
+      !update_steps_from_counter(bridge, state, wall_now, monotonic_ms) &&
+      (sampling_mask & SMART_BAND_SENSOR_SAMPLE_MOTION) != 0u)
     {
       update_steps_from_accel(bridge, state, wall_now, monotonic_ms);
     }
 
-  update_battery(bridge, state, wall_now, monotonic_ms);
-  update_temperature(bridge, state, wall_now, monotonic_ms);
-  update_humidity(bridge, state, wall_now, monotonic_ms);
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_BATTERY) != 0u)
+    {
+      update_battery(bridge, state, wall_now, monotonic_ms);
+    }
+  if ((sampling_mask & SMART_BAND_SENSOR_SAMPLE_ENV) != 0u)
+    {
+      update_temperature(bridge, state, wall_now, monotonic_ms);
+      update_humidity(bridge, state, wall_now, monotonic_ms);
+    }
 #endif
 }
 
