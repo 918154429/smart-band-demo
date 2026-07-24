@@ -9,6 +9,7 @@
 #include "smart_band_platform.h"
 #include "smart_band_store.h"
 #include "smart_band_history.h"
+#include "smart_band_notification_service.h"
 #include "smart_band_workout_service.h"
 #include "watch_model.h"
 
@@ -39,12 +40,15 @@ typedef struct
   smart_band_history_t history;
   smart_band_workout_service_t workout;
   smart_band_workout_service_result_t last_workout_result;
+  smart_band_notification_service_t notifications;
+  smart_band_notification_service_result_t last_notification_result;
   uint32_t dirty;
   bool initialized;
   bool sensors_initialized;
   bool storage_initialized;
   bool history_initialized;
   bool workout_initialized;
+  bool notifications_initialized;
 } smart_band_runtime_t;
 
 typedef uint32_t smart_band_dirty_flags_t;
@@ -60,7 +64,8 @@ typedef uint32_t smart_band_dirty_flags_t;
 #define SMART_BAND_DIRTY_PAGE        (1u << 7)
 #define SMART_BAND_DIRTY_WORKOUT     (1u << 8)
 #define SMART_BAND_DIRTY_HISTORY     (1u << 9)
-#define SMART_BAND_DIRTY_ALL         ((1u << 10) - 1u)
+#define SMART_BAND_DIRTY_NOTIFICATION (1u << 10)
+#define SMART_BAND_DIRTY_ALL         ((1u << 11) - 1u)
 
 int smart_band_runtime_init(
   smart_band_runtime_t *runtime,
@@ -76,6 +81,24 @@ bool smart_band_runtime_post(smart_band_runtime_t *runtime,
                              const smart_band_event_t *event);
 bool smart_band_runtime_post_external(void *context,
                                       const smart_band_event_t *event);
+/* UI-thread/trusted C-string helper. Adapters and concurrent producers must
+ * use the explicit-length UTF-8 external ingress below. */
+bool smart_band_runtime_post_notification(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_input_t *input, uint32_t monotonic_ms);
+bool smart_band_runtime_post_notification_external(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms);
+bool smart_band_runtime_inject_notification_demo(
+  smart_band_runtime_t *runtime, uint32_t seed, uint32_t sequence,
+  uint32_t monotonic_ms);
+bool smart_band_runtime_post_notification_action(
+  smart_band_runtime_t *runtime, uint32_t notification_id,
+  smart_band_notification_command_t command, uint32_t monotonic_ms);
+bool smart_band_runtime_set_notification_policy(
+  smart_band_runtime_t *runtime,
+  const smart_band_notification_policy_t *policy);
 size_t smart_band_runtime_drain_external(smart_band_runtime_t *runtime,
                                          size_t limit);
 void smart_band_runtime_dispatch_pending(smart_band_runtime_t *runtime);

@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "schema": "smart-band-q4-c-gate-summary/v1",
+  "gate": "Q4-C-notifications-functional",
+  "scope": "host-browser-and-pinned-openvela-goldfish",
+  "status": "passed",
+  "completed_at": "2026-07-24T16:08:00+08:00",
+  "source_commit": "743ff28a32e222255f39c51c89921cc29a16ab31",
+  "pull_request": {
+    "number": 14,
+    "url": "https://github.com/918154429/smart-band-demo/pull/14",
+    "merged": false
+  },
+  "features": {
+    "notification_center": true,
+    "ordinary_overlay": true,
+    "fullscreen_call_accept_reject": true,
+    "dnd_retention": true,
+    "workout_nonblocking_call": true,
+    "external_ingress_contract": "explicit-byte-span-strict-utf8-no-embedded-nul",
+    "cross_inbox_main_order": true,
+    "duplicate_id_idempotence": true,
+    "pressure_events": 1000,
+    "haptic_contract": "simulated-structured-marker",
+    "wake_contract": "synthetic-request-power_transition-false"
+  },
+  "pr_ci": {
+    "head_commit": "743ff28a32e222255f39c51c89921cc29a16ab31",
+    "merge_state": "CLEAN",
+    "host": {
+      "run_id": 30076233905,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/30076233905",
+      "jobs_passed": 55,
+      "jobs_total": 55
+    },
+    "browser": {
+      "run_id": 30076233918,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/30076233918",
+      "jobs_passed": 1,
+      "jobs_total": 1
+    },
+    "jobs_passed": 56,
+    "jobs_total": 56,
+    "passed": true
+  },
+  "coverage": {
+    "overall": {"covered_lines": 4972, "total_lines": 5346, "percent": 93.0},
+    "event_queue": {"covered_lines": 156, "total_lines": 160, "percent": 97.5},
+    "event_inbox": {"covered_lines": 91, "total_lines": 92, "percent": 98.9},
+    "runtime": {"covered_lines": 316, "total_lines": 350, "percent": 90.3},
+    "notification_service": {"covered_lines": 465, "total_lines": 490, "percent": 94.9}
+  },
+  "fixed_openvela": {
+    "workflow_run_id": 30076360836,
+    "job_id": 89427862674,
+    "workflow_url": "https://github.com/918154429/smart-band-demo/actions/runs/30076360836",
+    "source_commit": "743ff28a32e222255f39c51c89921cc29a16ab31",
+    "status": "success",
+    "artifact": {
+      "id": 8590281295,
+      "name": "openvela-fixed-release-30076360836",
+      "size_bytes": 50283762,
+      "digest": "sha256:f2d5be444305166cd811f4a175385db725fe05ab77a1acf8cc3135c06a4e7d20"
+    },
+    "target_artifacts": {
+      "vela_ap_elf_sha256": "bcc3a2cdd6dcff7de060e2891200be6d51645fdd211e200b6fe697d8c3969a57",
+      "nuttx_map_sha256": "45d5b0b38a707e9e686f04f2bc27242488419b458446c5e5945c8cc000bb3c50",
+      "system_map_sha256": "38a7395f8f79dc63c4c7805abe40d298fab5f6e260cdc188a2a61a3ba1a45d00",
+      "vela_system_sha256": "3699969636c94dbab49c180c3c6c2d02cf6fa163a2f932fba2a9d5bc9e936f8b",
+      "vela_data_sha256": "c35f4a7b63bdc677a3e69ab474ac09062ffbba713bc58879737d22d170626d21"
+    }
+  },
+  "native_journey": {
+    "run_id": "c50370c81438d5692076288d427f856e",
+    "started_at": "2026-07-24T07:53:59.996671+00:00",
+    "completed_at": "2026-07-24T07:55:19.078013+00:00",
+    "status": "passed",
+    "failure": null,
+    "json_sha256": "c1222534d76a5caa126fb1b7276493a6b4583feab22c32a9741ebe62487a7bbe",
+    "checks_passed": 24,
+    "checks_total": 24,
+    "boots": 4,
+    "scenario_order": ["ordinary", "center", "calls", "workout"],
+    "actions": [
+      {"command": "dismiss", "notification_id": 701, "result": "applied"},
+      {"command": "read", "notification_id": 715, "result": "applied"},
+      {"command": "delete", "notification_id": 715, "result": "applied"},
+      {"command": "accept", "notification_id": 721, "result": "applied"},
+      {"command": "reject", "notification_id": 722, "result": "applied"},
+      {"command": "reject", "notification_id": 731, "result": "applied"}
+    ],
+    "effect_markers": {
+      "haptic": "simulated=1",
+      "wake": "synthetic=1 power_transition=0",
+      "identity_pairing_passed": true
+    },
+    "call_visual_contract": {
+      "region": [453, 43, 826, 757],
+      "dark_luminance_max_exclusive": 90,
+      "minimum_dark_pixel_fraction": 0.8,
+      "alice": {"dark_pixel_fraction": 0.904841, "passed": true},
+      "bob": {"dark_pixel_fraction": 0.90415, "passed": true},
+      "distinct_sha256": true,
+      "passed": true
+    },
+    "stack": {
+      "configured_stack_size_bytes": 32768,
+      "sample_count": 4,
+      "scenario_count": 4,
+      "maximum_used_bytes": 15000,
+      "minimum_margin_bytes": 17496,
+      "minimum_margin_percent": 53.84047267355982,
+      "minimum_margin_scenario": "workout",
+      "budget_minimum_percent": 25.0,
+      "passed": true
+    },
+    "cleanup": {
+      "source_output_unchanged": true,
+      "runtime_trees_removed": true,
+      "process_cleanup": true,
+      "port_cleanup": true
+    }
+  },
+  "manual_review": {
+    "status": "passed",
+    "reviewed_at": "2026-07-24T16:05:00+08:00",
+    "reviewer": "Codex visual inspection",
+    "screenshots_expected": 8,
+    "screenshots_reviewed": 8,
+    "all_passed": true,
+    "items": [
+      {
+        "name": "ordinary-initial.png",
+        "path": "q4-native/scenarios/ordinary/ordinary-initial.png",
+        "sha256": "e808fce359a671c968a8fec16c391f8586d4673ffc867ae31e472cc3c472fcf8",
+        "expected_semantics": "Native message initial overlay and dismiss action",
+        "result": "passed",
+        "notes": "Initial explicit-length body is visible without clipping."
+      },
+      {
+        "name": "ordinary-updated-long-utf8.png",
+        "path": "q4-native/scenarios/ordinary/ordinary-updated-long-utf8.png",
+        "sha256": "a78221f8c022b5b4b9515f4fdb76c891962137daa4cc6232839277e8ee3b497b",
+        "expected_semantics": "Title update and bounded long explicit-length UTF-8 layout",
+        "result": "passed-with-boundary",
+        "notes": "Title changes to Native message updated; non-ASCII glyphs are tofu, so glyph readability is not claimed."
+      },
+      {
+        "name": "center-dnd.png",
+        "path": "q4-native/scenarios/center/center-dnd.png",
+        "sha256": "a07975e88644cd41e615dfb3e8361ac91957e2af35a686239ce1e2e011d43cfc",
+        "expected_semantics": "Five DND-retained rows with Mark read and Delete",
+        "result": "passed",
+        "notes": "Full Mark read labels are visible."
+      },
+      {
+        "name": "center-marked-read.png",
+        "path": "q4-native/scenarios/center/center-marked-read.png",
+        "sha256": "88347dbd6850255b9f72cef1051816c29388167b8c553797ae75308307764ab5",
+        "expected_semantics": "Top row transitions to read while Delete remains",
+        "result": "passed",
+        "notes": "New prefix and Mark read action disappear on the first row."
+      },
+      {
+        "name": "calls-alice.png",
+        "path": "q4-native/scenarios/calls/calls-alice.png",
+        "sha256": "126eeccb867311dc69b9bdc2f45e8f298ad6fccb0ab8884c70d266b7ef85b9e8",
+        "expected_semantics": "Alice full-screen incoming call",
+        "result": "passed",
+        "notes": "Alice, body, Reject and Accept are visible."
+      },
+      {
+        "name": "calls-bob-promoted.png",
+        "path": "q4-native/scenarios/calls/calls-bob-promoted.png",
+        "sha256": "712beaf93838ab4415c4b55f97bae4a4db5267885a63c7b5df1892b3edd76048",
+        "expected_semantics": "Distinct promoted Bob full-screen incoming call",
+        "result": "passed",
+        "notes": "Bob, promoted body, Reject and Accept are visible."
+      },
+      {
+        "name": "workout-call.png",
+        "path": "q4-native/scenarios/workout/workout-call.png",
+        "sha256": "8179d55d7ba0e136ee16ddfeb2d33899c6662dbdfdeec82220d38cab7a395eea",
+        "expected_semantics": "Coach call remains over active workout",
+        "result": "passed",
+        "notes": "Pause and Pauses 0 are visible."
+      },
+      {
+        "name": "workout-paused-with-call.png",
+        "path": "q4-native/scenarios/workout/workout-paused-with-call.png",
+        "sha256": "0287f32349f7f7ce9da4c81c5423e495ec12a193cb4455d7fa2b762436c164a5",
+        "expected_semantics": "Workout pauses while Coach call remains",
+        "result": "passed",
+        "notes": "Resume and Pauses 1 are visible."
+      }
+    ]
+  },
+  "evidence": {
+    "downloaded_root": "output/github-openvela-30076360836/openvela-fixed-release-30076360836",
+    "root_manifest": {"entries": 336, "verified": true, "failures": 0},
+    "q4_manifest": {"entries": 167, "verified": true, "failures": 0},
+    "native_manifest": {"entries": 75, "verified": true, "failures": 0},
+    "screenshots": {"count": 8, "width": 1280, "height": 800},
+    "unicode_glyph_readability_passed": false,
+    "unicode_glyph_observation": "Non-ASCII body glyphs render as tofu; explicit-length and layout handling passed."
+  },
+  "linker_audit": {
+    "relevant_defined_elf_symbols": 221,
+    "global_or_weak_defined_symbols": 204,
+    "system_map_missing_symbols": 0,
+    "system_map_address_mismatches": 0,
+    "linker_anchor_count": 5,
+    "linker_anchor_mismatches": 0,
+    "anchors": [
+      "smart_band_main",
+      "smart_band_lvgl_create",
+      "smart_band_notification_view_mount",
+      "smart_band_notification_service_process",
+      "smart_band_notification_event_received_utf8"
+    ],
+    "source_objects_present": [
+      "app_lvgl.c.o",
+      "notification_view.c.o",
+      "notification_service.c.o"
+    ]
+  },
+  "prior_evidence": [
+    {
+      "path": "docs/evidence/q4-notification-service-summary-20260722.json",
+      "scope": "notification-service-and-deterministic-ingress",
+      "snapshot_status": "passed-c-gate-open"
+    },
+    {
+      "path": "docs/evidence/q4-notification-lifecycle-summary-20260722.json",
+      "scope": "notification-presentation-lifecycle-and-runtime-ordering",
+      "snapshot_status": "passed-c-gate-open"
+    },
+    {
+      "path": "docs/evidence/q4-notification-ui-summary-20260722.json",
+      "scope": "application-event-pump-and-notification-ui",
+      "snapshot_status": "passed-c-gate-open"
+    },
+    {
+      "path": "docs/evidence/q4-notification-ingress-order-summary-20260723.json",
+      "scope": "explicit-length-utf8-and-cross-inbox-main-order",
+      "snapshot_status": "passed-host-and-linux"
+    },
+    {
+      "path": "docs/evidence/q4-notification-effects-summary-20260723.json",
+      "scope": "notification-effects-and-input-capture",
+      "snapshot_status": "passed-c-gate-open"
+    }
+  ],
+  "independent_outer_host": {
+    "host_alias": "ubuntu24-hushen",
+    "journey_run_id": "27598215109e7eda1367f60b783dc2ec",
+    "checks_passed": 24,
+    "checks_total": 24,
+    "manifest_entries": 167,
+    "manifest_failures": 0,
+    "minimum_stack_margin_percent": 53.22501230920729,
+    "passed": true
+  },
+  "boundaries": {
+    "unicode_glyph_readability_claimed": false,
+    "physical_haptic_claimed": false,
+    "real_display_wake_claimed": false,
+    "real_power_transition_claimed": false,
+    "gemini_s1_execution_claimed": false,
+    "rk3568_execution_claimed": false,
+    "real_touch_claimed": false,
+    "real_ble_claimed": false,
+    "battery_life_claimed": false,
+    "measured_power_claimed": false,
+    "board_flash_claimed": false,
+    "bootloader_claimed": false,
+    "long_duration_q4_native_soak_passed": false,
+    "simulator_rc_passed": false,
+    "release_gate_passed": false,
+    "field_qualification_claimed": false,
+    "pull_request_merged": false
+  }
+}

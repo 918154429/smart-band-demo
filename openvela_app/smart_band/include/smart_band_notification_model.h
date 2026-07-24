@@ -43,7 +43,8 @@ typedef enum
   SMART_BAND_NOTIFICATION_COMMAND_READ = 0,
   SMART_BAND_NOTIFICATION_COMMAND_DISMISS,
   SMART_BAND_NOTIFICATION_COMMAND_ACCEPT,
-  SMART_BAND_NOTIFICATION_COMMAND_REJECT
+  SMART_BAND_NOTIFICATION_COMMAND_REJECT,
+  SMART_BAND_NOTIFICATION_COMMAND_DELETE
 } smart_band_notification_command_t;
 
 typedef enum
@@ -81,6 +82,26 @@ typedef struct
   const char *body;
   uint64_t wall_timestamp;
 } smart_band_notification_input_t;
+
+/* Adapter-facing text is always supplied as an explicit byte span. The
+ * ingress validator rejects malformed UTF-8 and embedded NUL bytes, then
+ * truncates only at a complete code-point boundary. */
+typedef struct
+{
+  const char *data;
+  size_t length;
+} smart_band_notification_utf8_span_t;
+
+typedef struct
+{
+  uint32_t id;
+  smart_band_notification_type_t type;
+  smart_band_notification_priority_t priority;
+  smart_band_notification_utf8_span_t source;
+  smart_band_notification_utf8_span_t title;
+  smart_band_notification_utf8_span_t body;
+  uint64_t wall_timestamp;
+} smart_band_notification_utf8_input_t;
 
 typedef struct
 {

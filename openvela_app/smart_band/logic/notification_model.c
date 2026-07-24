@@ -256,7 +256,7 @@ smart_band_notification_action_result_t smart_band_notification_apply(
 
   if (!valid_model(model) || id == 0u ||
       command < SMART_BAND_NOTIFICATION_COMMAND_READ ||
-      command > SMART_BAND_NOTIFICATION_COMMAND_REJECT)
+      command > SMART_BAND_NOTIFICATION_COMMAND_DELETE)
     {
       return SMART_BAND_NOTIFICATION_ACTION_INVALID;
     }
@@ -265,6 +265,13 @@ smart_band_notification_action_result_t smart_band_notification_apply(
   if (notification == NULL)
     {
       return SMART_BAND_NOTIFICATION_ACTION_NOT_FOUND;
+    }
+
+  if (command == SMART_BAND_NOTIFICATION_COMMAND_DELETE)
+    {
+      return smart_band_notification_remove(model, id) ?
+        SMART_BAND_NOTIFICATION_ACTION_APPLIED :
+        SMART_BAND_NOTIFICATION_ACTION_NOT_FOUND;
     }
 
   if (command == SMART_BAND_NOTIFICATION_COMMAND_READ)

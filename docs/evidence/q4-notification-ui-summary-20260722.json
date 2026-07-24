@@ -1,0 +1,110 @@
+{
+  "schema": "smart-band-q4-notification-ui-summary/v1",
+  "date": "2026-07-22",
+  "scope": "application-event-pump-and-notification-ui",
+  "status": "passed",
+  "c_gate": "open",
+  "head_commit": "71e7e32a6f8bfd57c4481917cfbfbdcbfee8cafd",
+  "pull_request": "https://github.com/918154429/smart-band-demo/pull/14",
+  "runs": {
+    "host": {
+      "id": 29906060140,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29906060140",
+      "conclusion": "success",
+      "jobs_passed": 55,
+      "jobs_total": 55
+    },
+    "browser": {
+      "id": 29906060196,
+      "url": "https://github.com/918154429/smart-band-demo/actions/runs/29906060196",
+      "conclusion": "success",
+      "jobs_passed": 1,
+      "jobs_total": 1
+    }
+  },
+  "coverage": {
+    "overall": {
+      "percent": 92.9,
+      "covered": 4838,
+      "total": 5207
+    },
+    "event_queue_c": {
+      "percent": 98.3,
+      "covered": 113,
+      "total": 115
+    },
+    "runtime_c": {
+      "percent": 90.3,
+      "covered": 315,
+      "total": 349
+    },
+    "notification_service_c": {
+      "percent": 94.8,
+      "covered": 401,
+      "total": 423
+    }
+  },
+  "application_contract": {
+    "runtime_tick_ms": 1000,
+    "event_pump_ms": 50,
+    "pump_calls_runtime_tick": false,
+    "event_pump_operations": [
+      "dispatch-pending",
+      "render-pending"
+    ],
+    "external_ingress": {
+      "concurrent_producers": "supported-while-created-application-is-alive",
+      "copies_through_locked_inbox": true,
+      "concurrent_with_destroy": false,
+      "required_shutdown_order": [
+        "stop-producers",
+        "join-producers",
+        "smart-band-lvgl-destroy"
+      ]
+    }
+  },
+  "input_policy": {
+    "ordinary_overlay": "card-region-blocking-outside-nonblocking",
+    "fullscreen_call": "fullscreen-input-capture",
+    "workout_call": "ordinary-overlay-workout-controls-remain-available"
+  },
+  "verified": [
+    "application-owned-windows-posix-event-mutex",
+    "four-thread-8000-operation-mutex-contention",
+    "external-ingress-through-locked-inbox",
+    "external-ingress-rejected-before-create-and-after-destroy",
+    "999ms-pump-without-business-tick",
+    "notification-visible-on-50ms-pump-boundary",
+    "notification-dirty-rendered-independent-of-page-mask",
+    "notification-center-four-row-newest-first-paging",
+    "notification-center-read-and-delete",
+    "notification-center-create-failure-rollback-and-retry",
+    "ordinary-overlay-5000ms-boundary",
+    "ordinary-overlay-covered-region-input-isolation",
+    "fullscreen-call-opaque-foreground-input-capture",
+    "accept-promotes-next-call-and-reject-removes-it",
+    "workout-call-overlay-leaves-uncovered-controls-usable",
+    "launcher-reachability-at-320x480-and-667x375",
+    "two-timer-create-failure-rollback-and-retry",
+    "global-deadline-fake-timer-scheduling",
+    "1000-create-destroy-resource-soak",
+    "gcc-clang-msvc-strict-ui-builds"
+  ],
+  "lifecycle_contracts": {
+    "concurrent_producers_while_application_alive": true,
+    "producer_stop_and_join_before_destroy_required": true,
+    "ingress_concurrent_with_destroy_supported": false
+  },
+  "open": [
+    "haptic-structured-simulator-log",
+    "synthetic-wake-consumer-contract",
+    "dnd-ui-journey",
+    "long-text-ui-journey",
+    "same-id-content-update-ui-journey",
+    "q4-native-diagnostics-and-e2e-journey",
+    "native-reviewed-visual-evidence",
+    "cross-inbox-main-total-order",
+    "explicit-length-utf8-ingress",
+    "target-elf-map-and-stack-budget"
+  ]
+}

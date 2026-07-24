@@ -28,6 +28,11 @@ on:
         options:
           - "0"
           - "1800"
+      q4_native_e2e:
+        description: Run reviewed native Q4 notification journey
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -45,7 +50,7 @@ env:
   EVIDENCE_DIR: ${{ github.workspace }}/openvela-nightly-evidence
   SMART_BAND_BUILD_JOBS: ${{ inputs.build_jobs || '2' }}
   SMART_BAND_STORAGE_PATH: ${{ inputs.q3_native_e2e && '/data/smart-band-q3' || '' }}
-  SMART_BAND_E2E_DIAGNOSTICS: ${{ inputs.q3_native_e2e && '1' || '0' }}
+  SMART_BAND_E2E_DIAGNOSTICS: ${{ (inputs.q3_native_e2e || inputs.q4_native_e2e) && '1' || '0' }}
 
 jobs:
   goldfish-arm64:
@@ -264,10 +269,12 @@ jobs:
             > "$EVIDENCE_DIR/emulator-commit.txt"
           git -C "$tools_root" rev-parse HEAD \
             > "$EVIDENCE_DIR/emulator-tools-commit.txt"
-          sha256sum \
-            "$emulator_root/emulator" \
-            "$emulator_root/qemu/linux-x86_64/qemu-system-aarch64-headless" \
-            > "$EVIDENCE_DIR/emulator-binaries.sha256"
+          (
+            cd "$emulator_root"
+            sha256sum \
+              emulator \
+              qemu/linux-x86_64/qemu-system-aarch64-headless
+          ) > "$EVIDENCE_DIR/emulator-binaries.sha256"
 
       - name: Install pinned official openvela skills
         shell: bash
@@ -354,21 +361,51 @@ jobs:
           if [ "${{ inputs.q3_native_e2e }}" = "true" ]; then
             grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH="/data/smart-band-q3"' \
               "$config"
+          fi
+          if [ "${{ inputs.q3_native_e2e || inputs.q4_native_e2e }}" = "true" ]; then
             grep -Fq 'CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS=y' "$config"
             grep -Fq 'CONFIG_FS_PROCFS=y' "$config"
             grep -Fq 'CONFIG_MM_RECORD_PID=y' "$config"
             grep -Fq 'CONFIG_NSH_PROC_MOUNTPOINT="/proc"' "$config"
+            grep -Fq 'CONFIG_STACK_COLORATION=y' "$config"
           fi
           if ! readelf --symbols --wide "$image" 2>/dev/null | \
                grep -Eq 'smart_band(_main)?'; then
             strings "$image" | grep -Fq 'smart_band'
           fi
 
-          sha256sum "$image" | tee "$EVIDENCE_DIR/nuttx.sha256"
           file "$image" | tee "$EVIDENCE_DIR/nuttx-file.txt"
           cp "$image" "$EVIDENCE_DIR/nuttx"
           cp "$config" "$EVIDENCE_DIR/nuttx.config"
+          (
+            cd "$EVIDENCE_DIR"
+            sha256sum nuttx
+          ) | tee "$EVIDENCE_DIR/nuttx.sha256"
           runtime_dir="$OPENVELA_ROOT/cmake_out/vela_goldfish-arm64-v8a-ap"
+          target_elf="$runtime_dir/vela_ap.elf"
+          linker_map="$runtime_dir/nuttx.map"
+          system_map="$runtime_dir/System.map"
+          test -s "$target_elf"
+          test -s "$linker_map"
+          test -s "$system_map"
+          cp "$target_elf" "$EVIDENCE_DIR/vela_ap.elf"
+          cp "$linker_map" "$EVIDENCE_DIR/nuttx.map"
+          cp "$system_map" "$EVIDENCE_DIR/System.map"
+          (
+            cd "$EVIDENCE_DIR"
+            sha256sum vela_ap.elf nuttx.map System.map
+          ) | tee "$EVIDENCE_DIR/target-linker-artifacts.sha256"
+          file "$target_elf" | tee "$EVIDENCE_DIR/target-elf-file.txt"
+          size -A -d "$target_elf" | tee "$EVIDENCE_DIR/target-elf-sections.txt"
+          readelf -h -SW "$target_elf" \
+            > "$EVIDENCE_DIR/target-elf-readelf.txt"
+          readelf --symbols --wide "$target_elf" | \
+            grep -E 'smart_band|notification' \
+            > "$EVIDENCE_DIR/target-smart-band-symbols.txt"
+          test -s "$EVIDENCE_DIR/target-smart-band-symbols.txt"
+          grep -E 'smart_band|notification' "$linker_map" \
+            > "$EVIDENCE_DIR/target-smart-band-map-lines.txt"
+          test -s "$EVIDENCE_DIR/target-smart-band-map-lines.txt"
           for runtime_image in vela_system.bin vela_data.bin; do
             test -s "$runtime_dir/$runtime_image"
             cp "$runtime_dir/$runtime_image" "$EVIDENCE_DIR/$runtime_image"
@@ -437,44 +474,163 @@ jobs:
               --soak-seconds "$soak_seconds" \
               --sample-interval-seconds 10
 
+      - name: Run reviewed native Q4 notification journey
+        if: inputs.q4_native_e2e
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          timeout --signal=TERM --kill-after=30s 35m \
+            python3 "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_q4_native_e2e.py" \
+              --openvela-root "$OPENVELA_ROOT" \
+              --evidence-dir "$EVIDENCE_DIR/q4-native" \
+              --console-port 5566
+
       - name: Ensure emulator process group is stopped
         if: always()
         shell: bash
         run: |
           set +e
           cleanup_log="$EVIDENCE_DIR/workflow-emulator-cleanup.txt"
-          process_file="$EVIDENCE_DIR/emulator-process.json"
           mkdir -p "$EVIDENCE_DIR"
+          mapfile -d '' process_files < <(
+            find "$EVIDENCE_DIR" -type f -name emulator-process.json -print0
+          )
 
-          if [ ! -f "$process_file" ]; then
-            echo "no emulator process metadata was recorded" > "$cleanup_log"
-            exit 0
-          fi
+          python3 - \
+            "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_native_e2e.py" \
+            "$cleanup_log" "$EVIDENCE_DIR" "$OPENVELA_ROOT" \
+            "${{ inputs.q4_native_e2e }}" "${process_files[@]}" <<'PY'
+          import importlib.util
+          import json
+          import re
+          import sys
+          from pathlib import Path
 
-          pgid="$(python3 -c \
-            'import json, sys; print(json.load(open(sys.argv[1]))["pgid"])' \
-            "$process_file" 2>>"$cleanup_log")"
-          case "$pgid" in
-            ''|*[!0-9]*)
-              echo "invalid emulator process group: $pgid" >> "$cleanup_log"
-              exit 0
-              ;;
-          esac
+          helper_path = Path(sys.argv[1])
+          cleanup_log = Path(sys.argv[2])
+          evidence_dir = Path(sys.argv[3]).resolve()
+          openvela_root = Path(sys.argv[4]).resolve()
+          q4_enabled = sys.argv[5] == "true"
+          process_files = [Path(value) for value in sys.argv[6:]]
+          spec = importlib.util.spec_from_file_location(
+              "workflow_native_cleanup", helper_path
+          )
+          if spec is None or spec.loader is None:
+              raise SystemExit(f"cannot load cleanup helper: {helper_path}")
+          native = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(native)
 
-          ps -eo pid=,pgid=,args= | \
-            awk -v pgid="$pgid" '$2 == pgid { print }' >> "$cleanup_log"
-          if kill -0 -- "-$pgid" 2>/dev/null; then
-            echo "sending SIGTERM to emulator process group $pgid" >> "$cleanup_log"
-            kill -TERM -- "-$pgid" 2>>"$cleanup_log"
-            for _ in 1 2 3 4 5; do
-              kill -0 -- "-$pgid" 2>/dev/null || break
-              sleep 1
-            done
-          fi
-          if kill -0 -- "-$pgid" 2>/dev/null; then
-            echo "sending SIGKILL to emulator process group $pgid" >> "$cleanup_log"
-            kill -KILL -- "-$pgid" 2>>"$cleanup_log"
-          fi
+          failed = False
+          lines = []
+          q4_metadata_count = 0
+          q4_scenarios_seen = set()
+          required_q4_scenarios = {
+              "ordinary", "center", "calls", "workout"
+          }
+          q4_scenarios_root = (
+              evidence_dir / "q4-native" / "scenarios"
+          ).resolve()
+          expected_executables = (
+              (
+                  openvela_root
+                  / "prebuilts/emulator/linux-x86_64/emulator"
+              ).resolve(),
+              (
+                  openvela_root
+                  / "prebuilts/emulator/linux-x86_64/qemu/"
+                  "linux-x86_64/qemu-system-aarch64-headless"
+              ).resolve(),
+          )
+          for process_file in process_files:
+              resolved_file = process_file.resolve()
+              is_q4 = q4_scenarios_root in resolved_file.parents
+              if not is_q4:
+                  lines.append(
+                      f"{process_file}: skipped legacy metadata without "
+                      "Q4 run/runtime attribution"
+                  )
+                  continue
+              q4_metadata_count += 1
+              try:
+                  metadata = json.loads(process_file.read_text(encoding="utf-8"))
+                  if not isinstance(metadata, dict):
+                      raise ValueError("metadata root is not an object")
+                  required = {
+                      "run_id", "runtime_output", "executables", "baseline"
+                  }
+                  if not required.issubset(metadata):
+                      raise ValueError("required attribution fields are missing")
+                  scenario = process_file.parent.name
+                  if scenario not in required_q4_scenarios:
+                      raise ValueError(f"invalid Q4 scenario path: {scenario}")
+                  if process_file.parent.parent.resolve() != q4_scenarios_root:
+                      raise ValueError("Q4 metadata is outside the scenario root")
+                  run_id = metadata["run_id"]
+                  if (
+                      not isinstance(run_id, str)
+                      or re.fullmatch(
+                          rf"[0-9a-f]{{32}}-{scenario}", run_id
+                      )
+                      is None
+                  ):
+                      raise ValueError("invalid Q4 run id")
+                  expected_runtime = (
+                      process_file.parent / "runtime-output"
+                  ).resolve()
+                  runtime_output = metadata["runtime_output"]
+                  if (
+                      not isinstance(runtime_output, str)
+                      or Path(runtime_output).resolve() != expected_runtime
+                  ):
+                      raise ValueError("invalid Q4 runtime-output attribution")
+                  executables = metadata["executables"]
+                  if (
+                      not isinstance(executables, list)
+                      or len(executables) != len(expected_executables)
+                      or tuple(Path(value).resolve() for value in executables)
+                      != expected_executables
+                  ):
+                      raise ValueError("invalid Q4 executable attribution")
+                  if not isinstance(metadata["baseline"], list):
+                      raise ValueError("invalid Q4 process baseline")
+                  q4_scenarios_seen.add(scenario)
+                  result = native.cleanup_attributed_processes(
+                      run_id,
+                      expected_runtime,
+                      expected_executables,
+                      [],
+                  )
+                  output = process_file.with_name(
+                      "workflow-process-cleanup.json"
+                  )
+                  native.write_json(output, result)
+                  lines.append(
+                      f"{process_file}: absent={result['absent']} "
+                      f"actions={len(result['actions'])}"
+                  )
+                  failed = failed or not result["absent"]
+              except Exception as exc:
+                  lines.append(f"{process_file}: invalid Q4 metadata: {exc}")
+                  failed = True
+                  continue
+          if q4_enabled and q4_metadata_count == 0:
+              lines.append(
+                  "Q4 native journey was enabled but no attributed "
+                  "emulator metadata was recorded"
+              )
+              failed = True
+          if q4_enabled and q4_scenarios_seen != required_q4_scenarios:
+              lines.append(
+                  "Q4 attributed metadata scenario set mismatch: "
+                  f"seen={sorted(q4_scenarios_seen)} "
+                  f"required={sorted(required_q4_scenarios)}"
+              )
+              failed = True
+          if not process_files:
+              lines.append("no emulator process metadata was recorded")
+          cleanup_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          raise SystemExit(1 if failed else 0)
+          PY
 
       - name: Capture final diagnostics
         if: always()
@@ -496,6 +652,25 @@ jobs:
           if [ -f "$OPENVELA_ROOT/nuttx/.config" ]; then
             cp "$OPENVELA_ROOT/nuttx/.config" "$EVIDENCE_DIR/nuttx.config"
           fi
+          python3 - \
+            "$GITHUB_WORKSPACE/smart-band-demo/scripts/run_native_e2e.py" \
+            "$EVIDENCE_DIR" <<'PY'
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          helper_path = Path(sys.argv[1])
+          evidence_dir = Path(sys.argv[2])
+          spec = importlib.util.spec_from_file_location(
+              "workflow_evidence_manifest", helper_path
+          )
+          if spec is None or spec.loader is None:
+              raise SystemExit(f"cannot load evidence helper: {helper_path}")
+          native = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(native)
+          count = native.write_evidence_manifest(evidence_dir)
+          print(f"root evidence manifest entries: {count}")
+          PY
 
       - name: Upload build evidence
         if: always()

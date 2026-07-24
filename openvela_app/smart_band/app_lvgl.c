@@ -5,6 +5,7 @@
 #include "app_lvgl.h"
 
 #include "icon_assets.h"
+#include "smart_band_event_mutex.h"
 #include "smart_band_runtime.h"
 #include "smart_band_storage_backend.h"
 #include "smart_band_watch_face.h"
@@ -12,6 +13,7 @@
 #include "ui/lvgl/components.h"
 #include "ui/lvgl/watch_face_picker.h"
 #include "ui/lvgl/history_view.h"
+#include "ui/lvgl/notification_view.h"
 #include "ui/lvgl/workout_view.h"
 #include "ui/lvgl/watch_pages.h"
 
@@ -29,7 +31,8 @@ typedef enum
 {
   SMART_BAND_SYSTEM_VIEW_NONE = 0,
   SMART_BAND_SYSTEM_VIEW_WORKOUT,
-  SMART_BAND_SYSTEM_VIEW_HISTORY
+  SMART_BAND_SYSTEM_VIEW_HISTORY,
+  SMART_BAND_SYSTEM_VIEW_NOTIFICATIONS
 } smart_band_system_view_t;
 
 typedef struct
@@ -55,9 +58,12 @@ typedef struct
   lv_obj_t *app_back;
   smart_band_workout_view_t workout_view;
   smart_band_history_view_t history_view;
+  smart_band_notification_view_t notification_view;
   smart_band_system_view_t system_view;
 
-  lv_timer_t *timer;
+  lv_timer_t *runtime_timer;
+  lv_timer_t *event_pump_timer;
+  smart_band_event_mutex_t event_mutex;
   smart_band_runtime_t runtime;
   smart_band_storage_file_t storage_file;
   lv_coord_t screen_w;
@@ -73,6 +79,22 @@ typedef struct
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
   uint64_t diagnostic_last_elapsed_ms;
   uint64_t diagnostic_tick_gap_max_ms;
+  uint32_t diagnostic_runtime_ticks;
+  uint32_t diagnostic_event_pumps;
+  uint32_t diagnostic_haptic_events;
+  uint32_t diagnostic_wake_requests;
+  uint32_t diagnostic_haptic_retries;
+  uint32_t diagnostic_haptic_log_dropped;
+  uint32_t diagnostic_wake_log_dropped;
+  uint32_t diagnostic_last_haptic_notification_id;
+  uint32_t diagnostic_last_haptic_generation;
+  uint32_t diagnostic_last_wake_notification_id;
+  uint32_t diagnostic_last_wake_generation;
+  smart_band_notification_haptic_t diagnostic_last_haptic;
+  smart_band_platform_result_t diagnostic_last_haptic_platform_result;
+  lv_timer_t *diagnostic_q4_timer;
+  smart_band_lvgl_effect_log_for_test_t effect_log_for_test;
+  void *effect_log_context;
 #endif
 } smart_band_ui_t;
 
@@ -89,8 +111,12 @@ static void app_back_cb(lv_event_t *event);
 static void step_goal_cb(lv_event_t *event);
 static void render_page(void);
 static void render_pending(void);
+static void consume_notification_effects(void);
 static void workout_action_cb(void *context,
                               smart_band_workout_view_action_t action);
+static void notification_action_cb(
+  void *context, uint32_t notification_id,
+  smart_band_notification_command_t command);
 static lv_obj_t *create_action_button(lv_obj_t *parent, const char *text,
                                       lv_coord_t x, lv_coord_t y,
                                       lv_coord_t w, lv_coord_t h,
@@ -158,6 +184,172 @@ static void emit_q3_diagnostics(void)
          (unsigned long long)g_ui.diagnostic_tick_gap_max_ms);
   fflush(stdout);
 }
+
+static void emit_q4_diagnostics(void)
+{
+  smart_band_notification_presentation_t presentation;
+  uint32_t notification_id = 0u;
+  uint32_t generation = 0u;
+  unsigned int presentation_kind = 0u;
+
+  if (smart_band_notification_service_get_active_presentation(
+        &g_ui.runtime.notifications, &notification_id, &generation,
+        &presentation))
+    {
+      presentation_kind = presentation.full_screen ? 2u :
+                          presentation.overlay ? 1u : 0u;
+    }
+
+  printf("smart_band:q4:v1 elapsed_ms=%llu notifications=%u dnd=%u "
+         "active_id=%lu active_generation=%lu presentation=%u "
+         "haptic_events=%lu wake_requests=%lu haptic_retries=%lu "
+         "haptic_log_dropped=%lu wake_log_dropped=%lu "
+         "pending_effects=%u inbox_dropped=%u\n",
+         (unsigned long long)g_ui.runtime.last_clock.elapsed_ms,
+         (unsigned int)smart_band_notification_count(
+           &g_ui.runtime.notifications.model),
+         g_ui.runtime.notifications.policy.dnd_enabled ? 1u : 0u,
+         (unsigned long)notification_id, (unsigned long)generation,
+         presentation_kind,
+         (unsigned long)g_ui.diagnostic_haptic_events,
+         (unsigned long)g_ui.diagnostic_wake_requests,
+         (unsigned long)g_ui.diagnostic_haptic_retries,
+         (unsigned long)g_ui.diagnostic_haptic_log_dropped,
+         (unsigned long)g_ui.diagnostic_wake_log_dropped,
+         (unsigned int)g_ui.runtime.notifications.effect_count,
+         g_ui.runtime.external_events.dropped);
+  fflush(stdout);
+}
+
+static void emit_q4_inject_marker(const char *scenario, const char *phase,
+                                  size_t accepted, size_t requested)
+{
+  printf("smart_band:q4:inject:v1 scenario=%s phase=%s "
+         "accepted=%u requested=%u\n",
+         scenario, phase, (unsigned int)accepted, (unsigned int)requested);
+  fflush(stdout);
+}
+
+static const char *notification_command_name(
+  smart_band_notification_command_t command)
+{
+  switch (command)
+    {
+      case SMART_BAND_NOTIFICATION_COMMAND_READ:
+        return "read";
+      case SMART_BAND_NOTIFICATION_COMMAND_DISMISS:
+        return "dismiss";
+      case SMART_BAND_NOTIFICATION_COMMAND_ACCEPT:
+        return "accept";
+      case SMART_BAND_NOTIFICATION_COMMAND_REJECT:
+        return "reject";
+      case SMART_BAND_NOTIFICATION_COMMAND_DELETE:
+        return "delete";
+      default:
+        return "invalid";
+    }
+}
+
+static const char *notification_action_result_name(
+  smart_band_notification_action_result_t result)
+{
+  switch (result)
+    {
+      case SMART_BAND_NOTIFICATION_ACTION_APPLIED:
+        return "applied";
+      case SMART_BAND_NOTIFICATION_ACTION_NO_CHANGE:
+        return "no_change";
+      case SMART_BAND_NOTIFICATION_ACTION_NOT_FOUND:
+        return "not_found";
+      case SMART_BAND_NOTIFICATION_ACTION_INVALID:
+      default:
+        return "invalid";
+    }
+}
+
+static void emit_q4_action_marker(
+  uint32_t notification_id, smart_band_notification_command_t command,
+  smart_band_notification_action_result_t result)
+{
+  printf("smart_band:q4:action:v1 notification_id=%lu command=%s result=%s\n",
+         (unsigned long)notification_id, notification_command_name(command),
+         notification_action_result_name(result));
+  fflush(stdout);
+}
+
+static bool diagnostic_post_notification(
+  uint32_t id, smart_band_notification_type_t type,
+  smart_band_notification_priority_t priority, const char *source,
+  const char *title, const char *body)
+{
+  smart_band_notification_utf8_input_t input;
+
+  if (source == NULL || title == NULL || body == NULL)
+    {
+      return false;
+    }
+
+  memset(&input, 0, sizeof(input));
+  input.id = id;
+  input.type = type;
+  input.priority = priority;
+  input.source.data = source;
+  input.source.length = strlen(source);
+  input.title.data = title;
+  input.title.length = strlen(title);
+  input.body.data = body;
+  input.body.length = strlen(body);
+  input.wall_timestamp = UINT64_C(1700000000) + id;
+  return smart_band_lvgl_post_notification_external(&input, lv_tick_get());
+}
+
+static void diagnostic_q4_timer_done(lv_timer_t *timer)
+{
+  if (g_ui.diagnostic_q4_timer == timer)
+    {
+      g_ui.diagnostic_q4_timer = NULL;
+    }
+  lv_timer_del(timer);
+}
+
+static void diagnostic_q4_ordinary_update_cb(lv_timer_t *timer)
+{
+  static const char long_utf8_body[] =
+    "\xe9\x95\xbf\xe6\x96\x87\xe9\x80\x9a\xe7\x9f\xa5\xe6\xad\xa3\xe5\x9c\xa8"
+    "\xe9\xaa\x8c\xe8\xaf\x81 UTF-8 \xe5\xae\x89\xe5\x85\xa8\xe6\x88\xaa\xe6\x96\xad"
+    "\xef\xbc\x8c\xe5\xa4\x9a\xe5\xad\x97\xe8\x8a\x82\xe5\xad\x97\xe7\xac\xa6\xe5\xbf\x85"
+    "\xe9\xa1\xbb\xe4\xbf\x9d\xe6\x8c\x81\xe5\xae\x8c\xe6\x95\xb4\xe3\x80\x82"
+    "\xe9\x95\xbf\xe6\x96\x87\xe9\x80\x9a\xe7\x9f\xa5\xe6\xad\xa3\xe5\x9c\xa8"
+    "\xe9\xaa\x8c\xe8\xaf\x81 UTF-8 \xe5\xae\x89\xe5\x85\xa8\xe6\x88\xaa\xe6\x96\xad"
+    "\xef\xbc\x8c\xe5\xa4\x9a\xe5\xad\x97\xe8\x8a\x82\xe5\xad\x97\xe7\xac\xa6\xe5\xbf\x85"
+    "\xe9\xa1\xbb\xe4\xbf\x9d\xe6\x8c\x81\xe5\xae\x8c\xe6\x95\xb4\xe3\x80\x82";
+  bool accepted = diagnostic_post_notification(
+    701u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Messages",
+    "Native message updated", long_utf8_body);
+
+  emit_q4_inject_marker("ordinary", "updated", accepted ? 1u : 0u, 1u);
+  diagnostic_q4_timer_done(timer);
+}
+
+static void diagnostic_q4_workout_poll_cb(lv_timer_t *timer)
+{
+  smart_band_workout_snapshot_t workout;
+  bool accepted;
+
+  if (!smart_band_workout_service_snapshot(&g_ui.runtime.workout, &workout) ||
+      workout.state != SMART_BAND_WORKOUT_STATE_ACTIVE)
+    {
+      return;
+    }
+
+  accepted = diagnostic_post_notification(
+    731u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+    SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Coach",
+    "Workout call remains non-blocking");
+  emit_q4_inject_marker("workout", "active", accepted ? 1u : 0u, 1u);
+  diagnostic_q4_timer_done(timer);
+}
 #endif
 
 static time_t runtime_wall_now(void *context)
@@ -175,25 +367,224 @@ static uint32_t runtime_monotonic_now(void *context)
 static int runtime_init(const smart_band_clock_source_t *clock_source)
 {
   smart_band_platform_t platform;
+  int result;
+
+  if (smart_band_event_mutex_init(&g_ui.event_mutex) != 0)
+    {
+      return -1;
+    }
 
   smart_band_platform_init_noop(&platform);
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH)
   if (CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH[0] != '\0')
     {
-      smart_band_platform_result_t result = smart_band_storage_file_init(
+      smart_band_platform_result_t storage_result =
+        smart_band_storage_file_init(
         &g_ui.storage_file, CONFIG_LVX_DEMO_SMART_BAND_STORAGE_PATH,
         &platform.storage);
 
-      if (result != SMART_BAND_PLATFORM_OK)
+      if (storage_result != SMART_BAND_PLATFORM_OK)
         {
-          fprintf(stderr, "smart_band: storage unavailable (%d)\n", result);
+          fprintf(stderr, "smart_band: storage unavailable (%d)\n",
+                  storage_result);
           smart_band_platform_init_noop(&platform);
         }
     }
 #endif
 
-  return smart_band_runtime_init_with_platform(
+  if (!smart_band_event_mutex_get_lock(&g_ui.event_mutex,
+                                       &platform.event_lock))
+    {
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
+      return -1;
+    }
+
+  result = smart_band_runtime_init_with_platform(
     &g_ui.runtime, clock_source, NULL, &platform);
+  if (result != 0)
+    {
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
+    }
+  return result;
+}
+
+static const char *notification_haptic_name(
+  smart_band_notification_haptic_t haptic)
+{
+  switch (haptic)
+    {
+      case SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE:
+        return "subtle";
+      case SMART_BAND_NOTIFICATION_HAPTIC_NORMAL:
+        return "normal";
+      case SMART_BAND_NOTIFICATION_HAPTIC_URGENT:
+        return "urgent";
+      case SMART_BAND_NOTIFICATION_HAPTIC_NONE:
+      default:
+        return "none";
+    }
+}
+
+static bool emit_effect_log(const char *line)
+{
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  if (g_ui.effect_log_for_test != NULL)
+    {
+      return g_ui.effect_log_for_test(g_ui.effect_log_context, line);
+    }
+#endif
+  if (printf("%s\n", line) <= 0)
+    {
+      return false;
+    }
+
+  return fflush(stdout) == 0;
+}
+
+static bool emit_simulated_haptic(uint32_t notification_id,
+                                  uint32_t generation,
+                                  smart_band_notification_haptic_t haptic)
+{
+  char line[160];
+
+  (void)snprintf(
+    line, sizeof(line),
+    "smart_band:q4:haptic:v1 notification_id=%lu generation=%lu "
+    "pattern=%s simulated=1",
+    (unsigned long)notification_id, (unsigned long)generation,
+    notification_haptic_name(haptic));
+  return emit_effect_log(line);
+}
+
+static bool emit_synthetic_wake(uint32_t notification_id,
+                                uint32_t generation)
+{
+  char line[176];
+
+  (void)snprintf(
+    line, sizeof(line),
+    "smart_band:q4:wake:v1 notification_id=%lu generation=%lu "
+    "reason=notification synthetic=1 power_transition=0",
+    (unsigned long)notification_id, (unsigned long)generation);
+  return emit_effect_log(line);
+}
+
+static size_t notification_haptic_pulses(
+  smart_band_notification_haptic_t haptic,
+  smart_band_haptic_pulse_t pulses[3])
+{
+  memset(pulses, 0, sizeof(*pulses) * 3u);
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_SUBTLE)
+    {
+      pulses[0].on_ms = 40u;
+      pulses[0].strength = 35u;
+      return 1u;
+    }
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_NORMAL)
+    {
+      pulses[0].on_ms = 70u;
+      pulses[0].off_ms = 50u;
+      pulses[0].strength = 60u;
+      pulses[1].on_ms = 70u;
+      pulses[1].strength = 60u;
+      return 2u;
+    }
+  if (haptic == SMART_BAND_NOTIFICATION_HAPTIC_URGENT)
+    {
+      size_t index;
+
+      for (index = 0u; index < 3u; index++)
+        {
+          pulses[index].on_ms = 120u;
+          pulses[index].off_ms = index + 1u < 3u ? 70u : 0u;
+          pulses[index].strength = 100u;
+        }
+      return 3u;
+    }
+
+  return 0u;
+}
+
+/* These consumers deliberately acknowledge only their own service-owned
+ * effect generation. Visual acknowledgement remains in notification_view.
+ * The wake marker is synthetic evidence only; Q5 owns power-state changes. */
+static void consume_notification_effects(void)
+{
+  uint32_t notification_id;
+  uint32_t generation;
+  smart_band_notification_haptic_t haptic;
+  smart_band_haptic_pulse_t pulses[3];
+  smart_band_platform_result_t platform_result;
+  size_t pulse_count;
+
+  while (smart_band_notification_service_peek_haptic(
+           &g_ui.runtime.notifications, &notification_id, &generation,
+           &haptic))
+    {
+      pulse_count = notification_haptic_pulses(haptic, pulses);
+      if (pulse_count == 0u || g_ui.runtime.platform.haptic.ops == NULL ||
+          g_ui.runtime.platform.haptic.ops->play == NULL)
+        {
+          platform_result = SMART_BAND_PLATFORM_INVALID;
+        }
+      else
+        {
+          platform_result = g_ui.runtime.platform.haptic.ops->play(
+            g_ui.runtime.platform.haptic.context, pulses, pulse_count);
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_last_haptic_platform_result = platform_result;
+#endif
+      if (platform_result != SMART_BAND_PLATFORM_OK &&
+          platform_result != SMART_BAND_PLATFORM_UNAVAILABLE)
+        {
+          /* BUSY, IO, INVALID and future adapter failures retain the exact
+           * service generation for a later pump retry. */
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_haptic_retries++;
+#endif
+          break;
+        }
+      if (platform_result == SMART_BAND_PLATFORM_UNAVAILABLE &&
+          !emit_simulated_haptic(notification_id, generation, haptic))
+        {
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_haptic_log_dropped++;
+#endif
+        }
+      if (!smart_band_notification_service_ack_haptic(
+            &g_ui.runtime.notifications, notification_id, generation))
+        {
+          break;
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_haptic_events++;
+      g_ui.diagnostic_last_haptic_notification_id = notification_id;
+      g_ui.diagnostic_last_haptic_generation = generation;
+      g_ui.diagnostic_last_haptic = haptic;
+#endif
+    }
+
+  while (smart_band_notification_service_peek_wake(
+           &g_ui.runtime.notifications, &notification_id, &generation))
+    {
+      if (!emit_synthetic_wake(notification_id, generation))
+        {
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+          g_ui.diagnostic_wake_log_dropped++;
+#endif
+        }
+      if (!smart_band_notification_service_ack_wake(
+            &g_ui.runtime.notifications, notification_id, generation))
+        {
+          break;
+        }
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      g_ui.diagnostic_wake_requests++;
+      g_ui.diagnostic_last_wake_notification_id = notification_id;
+      g_ui.diagnostic_last_wake_generation = generation;
+#endif
+    }
 }
 
 static const lv_font_t *font_12(void) { return smart_band_ui_font_12(); }
@@ -364,6 +755,7 @@ static int switch_watch_face(smart_band_watch_face_id_t selected_face)
   fprintf(stderr, "smart_band: watch face selected id=%d name=%s storage=%d\n",
           (int)selected_face, next_descriptor->name,
           (int)g_ui.face_settings_result);
+  (void)fflush(stderr);
 
   return 0;
 }
@@ -621,12 +1013,19 @@ static void render_system_view(void)
       build_history_view_state(&state);
       smart_band_history_view_render(&g_ui.history_view, &state);
     }
+  else if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_NOTIFICATIONS &&
+           g_ui.notification_view.center_mounted)
+    {
+      smart_band_notification_view_render_center(
+        &g_ui.notification_view, &g_ui.runtime.notifications.model);
+    }
 }
 
 static void close_system_view(void)
 {
   smart_band_workout_view_unmount(&g_ui.workout_view);
   smart_band_history_view_unmount(&g_ui.history_view);
+  smart_band_notification_view_unmount_center(&g_ui.notification_view);
   g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
   set_page_visible(g_ui.dots_row, true);
   set_label_text(g_ui.app_title, "Apps");
@@ -641,6 +1040,7 @@ static void open_system_view(smart_band_system_view_t system_view)
   smart_band_app_unmount(&g_ui.runtime.apps);
   smart_band_workout_view_unmount(&g_ui.workout_view);
   smart_band_history_view_unmount(&g_ui.history_view);
+  smart_band_notification_view_unmount_center(&g_ui.notification_view);
   lv_obj_clean(g_ui.app_content);
   g_ui.system_view = system_view;
   set_page_visible(g_ui.dots_row, false);
@@ -657,11 +1057,18 @@ static void open_system_view(smart_band_system_view_t system_view)
       result = smart_band_history_view_mount(
         &g_ui.history_view, g_ui.app_content, &g_ui.components);
     }
+  else if (system_view == SMART_BAND_SYSTEM_VIEW_NOTIFICATIONS)
+    {
+      set_label_text(g_ui.app_title, "Notifications");
+      result = smart_band_notification_view_mount_center(
+        &g_ui.notification_view, g_ui.app_content);
+    }
 
   if (result != 0)
     {
       smart_band_workout_view_unmount(&g_ui.workout_view);
       smart_band_history_view_unmount(&g_ui.history_view);
+      smart_band_notification_view_unmount_center(&g_ui.notification_view);
       g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
       set_page_visible(g_ui.dots_row, true);
       set_label_text(g_ui.app_title, "View failed");
@@ -685,6 +1092,7 @@ static void open_app(smart_band_app_id_t id)
   host = make_app_host();
   smart_band_workout_view_unmount(&g_ui.workout_view);
   smart_band_history_view_unmount(&g_ui.history_view);
+  smart_band_notification_view_unmount_center(&g_ui.notification_view);
   g_ui.system_view = SMART_BAND_SYSTEM_VIEW_NONE;
   smart_band_app_unmount(&g_ui.runtime.apps);
   lv_obj_clean(g_ui.app_content);
@@ -710,6 +1118,8 @@ static int create_system_launcher_card(lv_obj_t *parent, const char *title_text,
   lv_obj_t *card = lv_btn_create(parent);
   lv_obj_t *icon;
   lv_obj_t *title;
+  lv_coord_t icon_size = min_coord(sx(42), h - sy(8));
+  lv_coord_t title_x = sx(8) + icon_size + sx(4);
 
   if (card == NULL)
     {
@@ -728,7 +1138,7 @@ static int create_system_launcher_card(lv_obj_t *parent, const char *title_text,
   lv_obj_add_event_cb(card, system_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)system_view);
 
-  icon = create_icon_image(card, icon_source, sx(8), sy(7), sx(48));
+  icon = create_icon_image(card, icon_source, sx(8), sy(4), icon_size);
   title = create_label(card, title_text, font_12(), lv_color_hex(0x234a50),
                        LV_TEXT_ALIGN_CENTER);
   if (icon == NULL || title == NULL)
@@ -742,7 +1152,8 @@ static int create_system_launcher_card(lv_obj_t *parent, const char *title_text,
   lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(title, system_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)system_view);
-  place_label(title, sx(60), sy(16), w - sx(66), sy(24));
+  place_label(title, title_x, (h - sy(24)) / 2,
+              max_coord(w - title_x - sx(4), 1), sy(24));
   return 0;
 }
 
@@ -754,6 +1165,8 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_t *card = lv_btn_create(parent);
   lv_obj_t *icon;
   lv_obj_t *title;
+  lv_coord_t icon_size = min_coord(sx(42), h - sy(8));
+  lv_coord_t title_x = sx(8) + icon_size + sx(4);
 
   if (card == NULL || def == NULL)
     {
@@ -776,8 +1189,7 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_event_cb(card, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
 
-  icon = create_icon_image(card, def->icon, sx(8), sy(7),
-                           sx(48));
+  icon = create_icon_image(card, def->icon, sx(8), sy(4), icon_size);
   if (icon == NULL)
     {
       return -1;
@@ -797,7 +1209,8 @@ static int create_launcher_card(lv_obj_t *parent,
   lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(title, app_icon_cb, LV_EVENT_CLICKED,
                       (void *)(uintptr_t)def->id);
-  place_label(title, sx(60), sy(16), w - sx(66), sy(24));
+  place_label(title, title_x, (h - sy(24)) / 2,
+              max_coord(w - title_x - sx(4), 1), sy(24));
   return 0;
 }
 
@@ -808,9 +1221,9 @@ static int create_apps_page(void)
   lv_obj_t *title;
   lv_coord_t margin = sx(18);
   lv_coord_t gap_x = sx(10);
-  lv_coord_t gap_y = sy(10);
+  lv_coord_t gap_y = sy(6);
   lv_coord_t card_w = (g_ui.screen_w - margin * 2 - gap_x) / 2;
-  lv_coord_t card_h = sy(62);
+  lv_coord_t card_h = sy(52);
   lv_coord_t grid_y = sy(126);
   lv_coord_t content_y = sy(94);
 
@@ -867,14 +1280,18 @@ static int create_apps_page(void)
       create_system_launcher_card(
         g_ui.apps_launcher, "History", &smart_band_icon_stopwatch,
         SMART_BAND_SYSTEM_VIEW_HISTORY, margin + card_w + gap_x,
-        grid_y, card_w, card_h) != 0)
+        grid_y, card_w, card_h) != 0 ||
+      create_system_launcher_card(
+        g_ui.apps_launcher, "Notifications", &smart_band_icon_heart,
+        SMART_BAND_SYSTEM_VIEW_NOTIFICATIONS, margin,
+        grid_y + card_h + gap_y, card_w, card_h) != 0)
     {
       return -1;
     }
 
   for (size_t i = 0; i < app_count; i++)
     {
-      size_t position = i + 2u;
+      size_t position = i + 3u;
       lv_coord_t row = (lv_coord_t)(position / 2u);
       lv_coord_t col = (lv_coord_t)(position % 2u);
 
@@ -1222,12 +1639,32 @@ static void render_pending(void)
     {
       render_page();
     }
+
+  if ((dirty & SMART_BAND_DIRTY_NOTIFICATION) != 0u)
+    {
+      smart_band_notification_view_render_center(
+        &g_ui.notification_view, &g_ui.runtime.notifications.model);
+      (void)smart_band_notification_view_render_presentation(
+        &g_ui.notification_view, &g_ui.runtime.notifications);
+      if (smart_band_notification_view_presentation_root(
+            &g_ui.notification_view) != NULL)
+        {
+          lv_obj_move_foreground(
+            smart_band_notification_view_presentation_root(
+              &g_ui.notification_view));
+        }
+    }
 }
 
 static void app_icon_cb(lv_event_t *event)
 {
   smart_band_app_id_t id =
     (smart_band_app_id_t)(uintptr_t)lv_event_get_user_data(event);
+
+  if (smart_band_notification_view_captures_input(&g_ui.notification_view))
+    {
+      return;
+    }
 
   if (g_ui.page_swipe_consumed &&
       lv_tick_elaps(g_ui.page_swipe_at) < SMART_BAND_SWIPE_CLICK_GUARD_MS)
@@ -1244,6 +1681,11 @@ static void system_icon_cb(lv_event_t *event)
   smart_band_system_view_t system_view =
     (smart_band_system_view_t)(uintptr_t)lv_event_get_user_data(event);
 
+  if (smart_band_notification_view_captures_input(&g_ui.notification_view))
+    {
+      return;
+    }
+
   if (g_ui.page_swipe_consumed &&
       lv_tick_elaps(g_ui.page_swipe_at) < SMART_BAND_SWIPE_CLICK_GUARD_MS)
     {
@@ -1257,6 +1699,11 @@ static void system_icon_cb(lv_event_t *event)
 static void app_back_cb(lv_event_t *event)
 {
   (void)event;
+
+  if (smart_band_notification_view_captures_input(&g_ui.notification_view))
+    {
+      return;
+    }
 
   if (g_ui.system_view == SMART_BAND_SYSTEM_VIEW_WORKOUT &&
       smart_band_workout_view_captures_input(&g_ui.workout_view))
@@ -1354,11 +1801,35 @@ static void workout_action_cb(void *context,
   render_system_view();
 }
 
+static void notification_action_cb(
+  void *context, uint32_t notification_id,
+  smart_band_notification_command_t command)
+{
+  (void)context;
+
+  if (smart_band_runtime_post_notification_action(
+        &g_ui.runtime, notification_id, command, lv_tick_get()))
+    {
+      smart_band_runtime_dispatch_pending(&g_ui.runtime);
+      render_pending();
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      emit_q4_action_marker(
+        notification_id, command,
+        g_ui.runtime.notifications.last_action_result);
+#endif
+    }
+}
+
 static void step_goal_cb(lv_event_t *event)
 {
   uintptr_t direction = (uintptr_t)lv_event_get_user_data(event);
   int delta = direction == 0 ? -SMART_BAND_STEP_GOAL_DELTA :
               SMART_BAND_STEP_GOAL_DELTA;
+
+  if (smart_band_notification_view_captures_input(&g_ui.notification_view))
+    {
+      return;
+    }
 
   smart_band_adjust_step_goal(&g_ui.runtime.model, delta);
   smart_band_runtime_mark_dirty(&g_ui.runtime, SMART_BAND_DIRTY_STEPS);
@@ -1368,13 +1839,28 @@ static void step_goal_cb(lv_event_t *event)
 static void timer_cb(lv_timer_t *timer)
 {
   (void)timer;
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  g_ui.diagnostic_runtime_ticks++;
+#endif
   (void)smart_band_runtime_tick(
     &g_ui.runtime, g_ui.runtime.model.page == SMART_BAND_PAGE_APPS);
 
   render_pending();
 #if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
   emit_q3_diagnostics();
+  emit_q4_diagnostics();
 #endif
+}
+
+static void event_pump_timer_cb(lv_timer_t *timer)
+{
+  (void)timer;
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  g_ui.diagnostic_event_pumps++;
+#endif
+  smart_band_runtime_dispatch_pending(&g_ui.runtime);
+  consume_notification_effects();
+  render_pending();
 }
 
 static void next_page(void)
@@ -1401,7 +1887,8 @@ static void page_drag_cb(lv_event_t *event)
   lv_coord_t threshold = max_coord(sx(36), 28);
   uint32_t press_duration;
 
-  if (g_ui.system_view != SMART_BAND_SYSTEM_VIEW_NONE)
+  if (g_ui.system_view != SMART_BAND_SYSTEM_VIEW_NONE ||
+      smart_band_notification_view_captures_input(&g_ui.notification_view))
     {
       return;
     }
@@ -1485,6 +1972,11 @@ static void dot_click_cb(lv_event_t *event)
   smart_band_page_t page =
     (smart_band_page_t)(uintptr_t)lv_event_get_user_data(event);
 
+  if (smart_band_notification_view_captures_input(&g_ui.notification_view))
+    {
+      return;
+    }
+
   switch_to_page(page);
 }
 
@@ -1531,7 +2023,13 @@ int smart_band_lvgl_create(lv_obj_t *parent)
       return -1;
     }
 
-  if (g_ui.root != NULL || g_ui.timer != NULL || g_ui.runtime.initialized)
+  if (g_ui.root != NULL || g_ui.runtime_timer != NULL ||
+      g_ui.event_pump_timer != NULL || g_ui.runtime.initialized ||
+      g_ui.event_mutex.initialized
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      || g_ui.diagnostic_q4_timer != NULL
+#endif
+     )
     {
       smart_band_lvgl_destroy();
     }
@@ -1585,16 +2083,46 @@ int smart_band_lvgl_create(lv_obj_t *parent)
     {
       smart_band_watch_face_unmount(&g_ui.watch_face);
       smart_band_runtime_deinit(&g_ui.runtime);
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
       return -1;
     }
 
-  g_ui.timer = lv_timer_create(timer_cb, 1000, NULL);
-  if (g_ui.timer == NULL)
+  if (smart_band_notification_view_mount(
+        &g_ui.notification_view, g_ui.screen, &g_ui.components,
+        notification_action_cb, NULL) != 0)
     {
+      smart_band_notification_view_unmount(&g_ui.notification_view);
       smart_band_watch_face_unmount(&g_ui.watch_face);
       smart_band_runtime_deinit(&g_ui.runtime);
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
+      lv_obj_del(owned_root);
+      g_ui.root = NULL;
+      return -1;
+    }
+
+  g_ui.runtime_timer = lv_timer_create(timer_cb, 1000, NULL);
+  if (g_ui.runtime_timer == NULL)
+    {
+      smart_band_notification_view_unmount(&g_ui.notification_view);
+      smart_band_watch_face_unmount(&g_ui.watch_face);
+      smart_band_runtime_deinit(&g_ui.runtime);
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
+      lv_obj_del(owned_root);
+      g_ui.root = NULL;
+      return -1;
+    }
+
+  g_ui.event_pump_timer = lv_timer_create(event_pump_timer_cb, 50, NULL);
+  if (g_ui.event_pump_timer == NULL)
+    {
+      lv_timer_del(g_ui.runtime_timer);
+      g_ui.runtime_timer = NULL;
+      smart_band_notification_view_unmount(&g_ui.notification_view);
+      smart_band_watch_face_unmount(&g_ui.watch_face);
+      smart_band_runtime_deinit(&g_ui.runtime);
+      smart_band_event_mutex_deinit(&g_ui.event_mutex);
       lv_obj_del(owned_root);
       g_ui.root = NULL;
       return -1;
@@ -1607,16 +2135,32 @@ int smart_band_lvgl_create(lv_obj_t *parent)
 
 void smart_band_lvgl_destroy(void)
 {
-  if (g_ui.timer != NULL)
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+  if (g_ui.diagnostic_q4_timer != NULL)
     {
-      lv_timer_del(g_ui.timer);
-      g_ui.timer = NULL;
+      lv_timer_del(g_ui.diagnostic_q4_timer);
+      g_ui.diagnostic_q4_timer = NULL;
+    }
+#endif
+
+  if (g_ui.event_pump_timer != NULL)
+    {
+      lv_timer_del(g_ui.event_pump_timer);
+      g_ui.event_pump_timer = NULL;
+    }
+
+  if (g_ui.runtime_timer != NULL)
+    {
+      lv_timer_del(g_ui.runtime_timer);
+      g_ui.runtime_timer = NULL;
     }
 
   smart_band_workout_view_unmount(&g_ui.workout_view);
   smart_band_history_view_unmount(&g_ui.history_view);
+  smart_band_notification_view_unmount(&g_ui.notification_view);
   smart_band_watch_face_picker_unmount(&g_ui.face_picker);
   smart_band_runtime_deinit(&g_ui.runtime);
+  smart_band_event_mutex_deinit(&g_ui.event_mutex);
   smart_band_watch_face_unmount(&g_ui.watch_face);
 
   if (g_ui.root != NULL)
@@ -1633,3 +2177,181 @@ void smart_band_lvgl_destroy(void)
   g_ui.screen = NULL;
   g_ui.face_host = NULL;
 }
+
+bool smart_band_lvgl_post_notification_external(
+  const smart_band_notification_utf8_input_t *input,
+  uint32_t monotonic_ms)
+{
+  return g_ui.runtime.initialized &&
+         smart_band_runtime_post_notification_external(
+           &g_ui.runtime, input, monotonic_ms);
+}
+
+bool smart_band_lvgl_set_notification_policy(
+  const smart_band_notification_policy_t *policy)
+{
+  if (!smart_band_runtime_set_notification_policy(&g_ui.runtime, policy))
+    {
+      return false;
+    }
+
+  render_pending();
+  return true;
+}
+
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+bool smart_band_lvgl_get_diagnostics(
+  smart_band_lvgl_diagnostics_t *diagnostics)
+{
+  if (diagnostics == NULL || !g_ui.runtime.initialized)
+    {
+      return false;
+    }
+
+  diagnostics->runtime_ticks = g_ui.diagnostic_runtime_ticks;
+  diagnostics->event_pumps = g_ui.diagnostic_event_pumps;
+  diagnostics->haptic_events = g_ui.diagnostic_haptic_events;
+  diagnostics->wake_requests = g_ui.diagnostic_wake_requests;
+  diagnostics->haptic_retries = g_ui.diagnostic_haptic_retries;
+  diagnostics->haptic_log_dropped = g_ui.diagnostic_haptic_log_dropped;
+  diagnostics->wake_log_dropped = g_ui.diagnostic_wake_log_dropped;
+  diagnostics->last_haptic_notification_id =
+    g_ui.diagnostic_last_haptic_notification_id;
+  diagnostics->last_haptic_generation =
+    g_ui.diagnostic_last_haptic_generation;
+  diagnostics->last_wake_notification_id =
+    g_ui.diagnostic_last_wake_notification_id;
+  diagnostics->last_wake_generation =
+    g_ui.diagnostic_last_wake_generation;
+  diagnostics->last_haptic = g_ui.diagnostic_last_haptic;
+  diagnostics->last_haptic_platform_result =
+    g_ui.diagnostic_last_haptic_platform_result;
+  return true;
+}
+
+bool smart_band_lvgl_diagnostics_is_idle(void)
+{
+  return g_ui.root == NULL && g_ui.runtime_timer == NULL &&
+         g_ui.event_pump_timer == NULL &&
+         g_ui.diagnostic_q4_timer == NULL && !g_ui.runtime.initialized &&
+         !g_ui.event_mutex.initialized;
+}
+
+bool smart_band_lvgl_inject_q4_native_scenario_for_test(
+  const char *scenario)
+{
+  static const char *const center_titles[] =
+  {
+    "Center one", "Center two", "Center three", "Center four", "Center five"
+  };
+  smart_band_notification_policy_t policy = {true, false};
+  size_t accepted = 0u;
+  size_t index;
+
+  if (!g_ui.runtime.initialized || scenario == NULL ||
+      g_ui.diagnostic_q4_timer != NULL)
+    {
+      return false;
+    }
+
+  if (strcmp(scenario, "ordinary") == 0)
+    {
+      bool initial = diagnostic_post_notification(
+        701u, SMART_BAND_NOTIFICATION_TYPE_SMS,
+        SMART_BAND_NOTIFICATION_PRIORITY_NORMAL, "Messages",
+        "Native message", "Initial explicit-length notification");
+
+      emit_q4_inject_marker("ordinary", "initial", initial ? 1u : 0u, 1u);
+      if (!initial)
+        {
+          return false;
+        }
+      g_ui.diagnostic_q4_timer = lv_timer_create(
+        diagnostic_q4_ordinary_update_cb, 2500u, NULL);
+      return g_ui.diagnostic_q4_timer != NULL;
+    }
+
+  if (strcmp(scenario, "center") == 0)
+    {
+      if (!smart_band_lvgl_set_notification_policy(&policy))
+        {
+          emit_q4_inject_marker("center", "ready", 0u, 5u);
+          return false;
+        }
+      for (index = 0u; index < 5u; index++)
+        {
+          if (diagnostic_post_notification(
+                711u + (uint32_t)index, SMART_BAND_NOTIFICATION_TYPE_APP,
+                SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Inbox",
+                center_titles[index], "DND-retained center row"))
+            {
+              accepted++;
+            }
+        }
+      emit_q4_inject_marker("center", "ready", accepted, 5u);
+      return accepted == 5u;
+    }
+
+  if (strcmp(scenario, "calls") == 0)
+    {
+      if (diagnostic_post_notification(
+            721u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+            SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Alice",
+            "First native incoming call"))
+        {
+          accepted++;
+        }
+      if (diagnostic_post_notification(
+            722u, SMART_BAND_NOTIFICATION_TYPE_CALL,
+            SMART_BAND_NOTIFICATION_PRIORITY_HIGH, "Phone", "Bob",
+            "Promoted native incoming call"))
+        {
+          accepted++;
+        }
+      emit_q4_inject_marker("calls", "ready", accepted, 2u);
+      return accepted == 2u;
+    }
+
+  if (strcmp(scenario, "workout") == 0)
+    {
+      g_ui.diagnostic_q4_timer = lv_timer_create(
+        diagnostic_q4_workout_poll_cb, 100u, NULL);
+      if (g_ui.diagnostic_q4_timer == NULL)
+        {
+          emit_q4_inject_marker("workout", "failed", 0u, 1u);
+          return false;
+        }
+      emit_q4_inject_marker("workout", "armed", 0u, 1u);
+      return true;
+    }
+
+  emit_q4_inject_marker(scenario, "rejected", 0u, 0u);
+  return false;
+}
+
+bool smart_band_lvgl_set_haptic_adapter_for_test(
+  const smart_band_haptic_t *haptic)
+{
+  if (!g_ui.runtime.initialized || haptic == NULL || haptic->ops == NULL ||
+      haptic->ops->play == NULL)
+    {
+      return false;
+    }
+
+  g_ui.runtime.platform.haptic = *haptic;
+  return true;
+}
+
+bool smart_band_lvgl_set_effect_logger_for_test(
+  smart_band_lvgl_effect_log_for_test_t logger, void *context)
+{
+  if (!g_ui.runtime.initialized)
+    {
+      return false;
+    }
+
+  g_ui.effect_log_for_test = logger;
+  g_ui.effect_log_context = context;
+  return true;
+}
+#endif

@@ -33,8 +33,10 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     services/storage_transaction.c
     services/history_service.c
     services/workout_service.c
+    services/notification_service.c
     services/sync_protocol.c
     platform/platform_noop.c
+    platform/event_mutex.c
     platform/loopback/sync_loopback.c
     platform/storage/storage_memory.c
     platform/storage/storage_file.c
@@ -49,6 +51,7 @@ if(CONFIG_LVX_USE_DEMO_SMART_BAND_BASIC)
     ui/lvgl/watch_pages.c
     ui/lvgl/workout_view.c
     ui/lvgl/history_view.c
+    ui/lvgl/notification_view.c
     icon_assets.c
     smart_band_apps.c
     apps/weather_app.c

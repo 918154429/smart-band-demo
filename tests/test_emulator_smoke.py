@@ -100,6 +100,26 @@ class EmulatorSmokeHelpersTest(unittest.TestCase):
             "event mouse 168 240 0 0",
         )
 
+    def test_pointer_tap_pumps_guest_between_press_and_release(self) -> None:
+        events: list[tuple[str, tuple[int, int], bool]] = []
+        pumps: list[float] = []
+
+        EMULATOR_SMOKE.send_pointer_tap(
+            lambda name, point, pressed: events.append((name, point, pressed)),
+            pumps.append,
+            "next",
+            (168, 140),
+        )
+
+        self.assertEqual(
+            events,
+            [
+                ("next-down", (168, 140), True),
+                ("next-up", (168, 140), False),
+            ],
+        )
+        self.assertEqual(pumps, [EMULATOR_SMOKE.POINTER_CLICK_HOLD_SECONDS])
+
 
 @unittest.skipUnless(
     os.name == "posix" and hasattr(os, "openpty"),

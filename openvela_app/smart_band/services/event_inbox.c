@@ -13,6 +13,42 @@ static void inbox_unlock(smart_band_event_inbox_t *inbox)
   inbox->lock.unlock(inbox->lock.context);
 }
 
+static bool inbox_has_lock(const smart_band_event_inbox_t *inbox)
+{
+  return inbox->lock.lock != NULL;
+}
+
+static uint64_t inbox_next_sequence(smart_band_event_inbox_t *inbox)
+{
+  inbox->next_sequence++;
+  if (inbox->next_sequence == 0u)
+    {
+      inbox->next_sequence++;
+    }
+
+  return inbox->next_sequence;
+}
+
+static size_t inbox_physical_index(const smart_band_event_inbox_t *inbox,
+                                   size_t logical_index)
+{
+  return (inbox->head + logical_index) % SMART_BAND_EVENT_QUEUE_CAPACITY;
+}
+
+static void inbox_remove_at(smart_band_event_inbox_t *inbox,
+                            size_t logical_index)
+{
+  size_t index;
+
+  for (index = logical_index; index + 1u < inbox->count; index++)
+    {
+      inbox->items[inbox_physical_index(inbox, index)] =
+        inbox->items[inbox_physical_index(inbox, index + 1u)];
+    }
+
+  inbox->count--;
+}
+
 bool smart_band_event_inbox_init(smart_band_event_inbox_t *inbox,
                                  const smart_band_event_lock_t *lock)
 {
@@ -47,7 +83,11 @@ bool smart_band_event_inbox_close(smart_band_event_inbox_t *inbox)
 bool smart_band_event_inbox_post(smart_band_event_inbox_t *inbox,
                                  const smart_band_event_t *event)
 {
+  smart_band_event_t sequenced_event;
   size_t tail;
+  size_t index;
+  size_t lowest_index = 0u;
+  smart_band_event_priority_t incoming_priority;
   bool accepted = false;
 
   if (inbox == NULL || event == NULL || !inbox_lock(inbox))
@@ -55,10 +95,34 @@ bool smart_band_event_inbox_post(smart_band_event_inbox_t *inbox,
       return false;
     }
 
+  incoming_priority = smart_band_event_priority(event);
+  if (inbox->accepting && inbox->count == SMART_BAND_EVENT_QUEUE_CAPACITY)
+    {
+      for (index = 1u; index < inbox->count; index++)
+        {
+          if (smart_band_event_priority(
+                &inbox->items[inbox_physical_index(inbox, index)]) <
+              smart_band_event_priority(
+                &inbox->items[inbox_physical_index(inbox, lowest_index)]))
+            {
+              lowest_index = index;
+            }
+        }
+
+      if (incoming_priority > smart_band_event_priority(
+            &inbox->items[inbox_physical_index(inbox, lowest_index)]))
+        {
+          inbox_remove_at(inbox, lowest_index);
+          inbox->evicted++;
+        }
+    }
+
   if (inbox->accepting && inbox->count < SMART_BAND_EVENT_QUEUE_CAPACITY)
     {
       tail = (inbox->head + inbox->count) % SMART_BAND_EVENT_QUEUE_CAPACITY;
-      inbox->items[tail] = *event;
+      sequenced_event = *event;
+      sequenced_event.ingress_sequence = inbox_next_sequence(inbox);
+      inbox->items[tail] = sequenced_event;
       inbox->count++;
       accepted = true;
     }
@@ -68,6 +132,43 @@ bool smart_band_event_inbox_post(smart_band_event_inbox_t *inbox,
     }
 
   inbox_unlock(inbox);
+  return accepted;
+}
+
+bool smart_band_event_inbox_post_main(smart_band_event_inbox_t *inbox,
+                                      smart_band_event_queue_t *queue,
+                                      const smart_band_event_t *event)
+{
+  smart_band_event_t sequenced_event;
+  bool locked = false;
+  bool accepted;
+
+  if (inbox == NULL || queue == NULL || event == NULL)
+    {
+      return false;
+    }
+
+  if (inbox_has_lock(inbox))
+    {
+      if (!inbox_lock(inbox))
+        {
+          return false;
+        }
+      locked = true;
+      if (!inbox->accepting)
+        {
+          inbox_unlock(inbox);
+          return false;
+        }
+    }
+
+  sequenced_event = *event;
+  sequenced_event.ingress_sequence = inbox_next_sequence(inbox);
+  accepted = smart_band_event_queue_push(queue, &sequenced_event);
+  if (locked)
+    {
+      inbox_unlock(inbox);
+    }
   return accepted;
 }
 

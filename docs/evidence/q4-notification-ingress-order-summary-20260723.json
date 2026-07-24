@@ -1,0 +1,78 @@
+{
+  "schema": "smart-band-q4-notification-ingress-order-summary/v1",
+  "date": "2026-07-23",
+  "scope": "explicit-length-utf8-and-cross-inbox-main-order",
+  "status": "passed-host-and-linux",
+  "contracts": {
+    "external_text": "explicit-byte-span-strict-utf8-no-embedded-nul",
+    "truncation": "longest-complete-code-point-prefix",
+    "ingress_sequence": "shared-nonzero-u64-modular",
+    "domain_dispatch": "oldest-surviving-ingress-sequence",
+    "equal_priority_pressure": "older-incoming-evicts-newest-later",
+    "priority_pressure_preserved": true
+  },
+  "local": {
+    "compiler": "msvc-c11-w4-wx",
+    "notification_service": "passed",
+    "central_runtime": "passed",
+    "complete_fake_lvgl_ui": "passed",
+    "browser": "7/7 passed",
+    "diff_check": "passed"
+  },
+  "linux": {
+    "host": "ubuntu24-hushen",
+    "workspace": "/data/smart-band-q4-ingress-20260723T1047CST",
+    "compiler": "gcc-c11-wall-wextra-werror-pedantic",
+    "notification_service": "passed",
+    "central_runtime": "passed",
+    "complete_fake_lvgl_ui": "passed",
+    "coverage": {
+      "overall": "93.0% (4972/5346)",
+      "services/event_queue.c": "97.5% (156/160)",
+      "services/event_inbox.c": "98.9% (91/92)",
+      "services/notification_service.c": "94.9% (465/490)"
+    }
+  },
+  "github_ci": {
+    "commit": "cc0be669d859908b1beb672aaebbf6961d73f640",
+    "host_tests": {
+      "run_id": 29975646888,
+      "status": "passed"
+    },
+    "browser_tests": {
+      "run_id": 29975646864,
+      "status": "passed"
+    }
+  },
+  "host_abi_bytes": {
+    "event": 240,
+    "queue": 3864,
+    "inbox": 3904,
+    "notification_service": 4344,
+    "queue_inbox_service_subtotal": 12112
+  },
+  "tested": [
+    "non-nul-terminated-valid-spans",
+    "empty-spans",
+    "valid-ascii-and-two-three-four-byte-utf8",
+    "complete-code-point-boundary-truncation",
+    "invalid-lead-continuation-overlong-surrogate-too-high-truncated",
+    "embedded-nul-rejection",
+    "invalid-event-cleared-before-enqueue",
+    "external-receive-before-local-action",
+    "uint64-sequence-wrap",
+    "lock-failure-and-close",
+    "equal-priority-full-main-queue-preserves-older-external"
+  ],
+  "remaining_gate_items": [
+    "reviewed-native-notification-journey",
+    "target-elf-linker-map-and-task-stack-evidence"
+  ],
+  "boundaries": [
+    "host-abi-is-not-target-abi",
+    "fake-lvgl-is-not-native-visual-proof",
+    "simulated-haptic-is-not-physical-vibration",
+    "synthetic-wake-is-not-real-display-or-power-transition",
+    "no-real-ble-transport"
+  ]
+}

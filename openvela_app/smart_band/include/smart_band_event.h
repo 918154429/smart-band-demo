@@ -1,6 +1,8 @@
 #ifndef SMART_BAND_EVENT_H
 #define SMART_BAND_EVENT_H
 
+#include "smart_band_notification_model.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -37,16 +39,11 @@ typedef enum
   SMART_BAND_EVENT_PRIORITY_CRITICAL
 } smart_band_event_priority_t;
 
-typedef enum
-{
-  SMART_BAND_NOTIFICATION_GENERIC = 0,
-  SMART_BAND_NOTIFICATION_CALL
-} smart_band_notification_kind_t;
-
 typedef struct
 {
   smart_band_event_type_t type;
   uint32_t monotonic_ms;
+  uint64_t ingress_sequence;
   union
   {
     struct
@@ -55,9 +52,19 @@ typedef struct
     } metrics;
     struct
     {
-      smart_band_notification_kind_t kind;
-      uint8_t priority;
-    } notification;
+      uint32_t id;
+      smart_band_notification_type_t type;
+      smart_band_notification_priority_t priority;
+      char source[SMART_BAND_NOTIFICATION_SOURCE_CAPACITY];
+      char title[SMART_BAND_NOTIFICATION_TITLE_CAPACITY];
+      char body[SMART_BAND_NOTIFICATION_BODY_CAPACITY];
+      uint64_t wall_timestamp;
+    } notification_received;
+    struct
+    {
+      uint32_t id;
+      smart_band_notification_command_t command;
+    } notification_action;
     struct
     {
       uint32_t code;
@@ -93,7 +100,9 @@ typedef struct
   size_t head;
   size_t count;
   unsigned int dropped;
+  unsigned int evicted;
   smart_band_event_lock_t lock;
+  uint64_t next_sequence;
   bool accepting;
 } smart_band_event_inbox_t;
 
@@ -108,6 +117,10 @@ bool smart_band_event_queue_pop(smart_band_event_queue_t *queue,
 bool smart_band_event_queue_take(smart_band_event_queue_t *queue,
                                  smart_band_event_type_t type,
                                  smart_band_event_t *event);
+bool smart_band_event_queue_take_next_notification(
+  smart_band_event_queue_t *queue, smart_band_event_t *event);
+bool smart_band_event_queue_take_next_domain(
+  smart_band_event_queue_t *queue, smart_band_event_t *event);
 size_t smart_band_event_queue_count(const smart_band_event_queue_t *queue);
 smart_band_event_priority_t
 smart_band_event_priority(const smart_band_event_t *event);
@@ -116,6 +129,12 @@ bool smart_band_event_inbox_init(smart_band_event_inbox_t *inbox,
 bool smart_band_event_inbox_close(smart_band_event_inbox_t *inbox);
 bool smart_band_event_inbox_post(smart_band_event_inbox_t *inbox,
                                  const smart_band_event_t *event);
+/* UI-thread posts and external posts share this inbox sequencer. This keeps
+ * accepted domain events totally ordered even when an older external event
+ * is drained after a newer main-queue event. */
+bool smart_band_event_inbox_post_main(smart_band_event_inbox_t *inbox,
+                                      smart_band_event_queue_t *queue,
+                                      const smart_band_event_t *event);
 bool smart_band_event_inbox_pop(smart_band_event_inbox_t *inbox,
                                 smart_band_event_t *event);
 
