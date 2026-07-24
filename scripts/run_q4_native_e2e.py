@@ -21,10 +21,21 @@ from typing import Any, Callable
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = "cmake_out/vela_goldfish-arm64-v8a-ap"
 SCENARIOS = ("ordinary", "center", "calls", "workout")
+STACK_CHECKPOINTS = {
+    # NuttX stack coloration reports the task-lifetime high-water mark. One
+    # sample at the end of each isolated scenario therefore covers every
+    # earlier transition without making synchronous NSH `ps` disturb a
+    # five-second notification presentation.
+    "ordinary": ("scenario-high-water",),
+    "center": ("scenario-high-water",),
+    "calls": ("scenario-high-water",),
+    "workout": ("scenario-high-water",),
+}
 Q4_STATE_MARKER = "smart_band:q4:v1"
 Q4_INJECT_MARKER = "smart_band:q4:inject:v1"
 Q4_HAPTIC_MARKER = "smart_band:q4:haptic:v1"
 Q4_WAKE_MARKER = "smart_band:q4:wake:v1"
+Q4_ACTION_MARKER = "smart_band:q4:action:v1"
 MIN_STACK_MARGIN_PERCENT = 25.0
 Q4_FIXTURE_IDS = {
     "ordinary": (701,),
@@ -87,6 +98,14 @@ def load_module(name: str, path: Path):
 Q3 = load_module("q4_native_q3", ROOT / "scripts" / "run_q3_native_e2e.py")
 NATIVE = Q3.NATIVE
 SMOKE = NATIVE.SMOKE
+CALL_SCREEN_REGION = (
+    Q3.SCREEN_ORIGIN[0],
+    Q3.SCREEN_ORIGIN[1],
+    Q3.SCREEN_ORIGIN[0] + Q3.SCREEN_SIZE[0],
+    Q3.SCREEN_ORIGIN[1] + Q3.SCREEN_SIZE[1],
+)
+CALL_DARK_LUMINANCE_MAX = 90
+MIN_CALL_DARK_PIXEL_FRACTION = 0.80
 
 
 def parse_args() -> argparse.Namespace:
@@ -274,12 +293,45 @@ def parse_wake_marker(line: str) -> dict[str, Any] | None:
     }
 
 
+def parse_action_marker(line: str) -> dict[str, Any] | None:
+    raw = _marker_tokens(
+        line,
+        Q4_ACTION_MARKER,
+        {"notification_id", "command", "result"},
+    )
+    if raw is None:
+        return None
+    notification_id = _nonnegative_int(
+        raw["notification_id"], Q4_ACTION_MARKER, "notification_id"
+    )
+    if notification_id == 0:
+        raise Q4NativeFailure("Q4 action marker has a zero notification identity")
+    if raw["command"] not in {"read", "dismiss", "accept", "reject", "delete"}:
+        raise Q4NativeFailure(f"invalid Q4 action command: {raw['command']!r}")
+    if raw["result"] not in {"applied", "no_change", "not_found", "invalid"}:
+        raise Q4NativeFailure(f"invalid Q4 action result: {raw['result']!r}")
+    return {
+        "notification_id": notification_id,
+        "command": raw["command"],
+        "result": raw["result"],
+    }
+
+
 def marker_records(
     transcript: bytes | bytearray,
     marker: str,
     parser: Callable[[str], dict[str, Any] | None],
 ) -> list[dict[str, Any]]:
-    text = bytes(transcript).decode("utf-8", errors="replace").replace("\r", "")
+    raw = bytes(transcript)
+    complete_end = raw.rfind(b"\n")
+    if complete_end < 0:
+        return []
+    # PTY reads can stop in the middle of a printf. Only newline-terminated
+    # records are eligible for strict parsing; the next poll will complete the
+    # trailing fragment. A completed malformed marker still fails closed.
+    text = raw[: complete_end + 1].decode(
+        "utf-8", errors="replace"
+    ).replace("\r", "")
     records: list[dict[str, Any]] = []
     for line in text.splitlines():
         if marker not in line:
@@ -342,6 +394,27 @@ def wait_for_q3_state(
     states = Q3.marker_states(child.transcript[start:])
     raise Q4NativeFailure(
         f"timed out waiting for {description}; latest={states[-1] if states else None}"
+    )
+
+
+def wait_action(
+    boot: Boot,
+    notification_id: int,
+    command: str,
+    start: int,
+) -> dict[str, Any]:
+    if boot.child is None:
+        raise Q4NativeFailure("emulator is not running")
+    return wait_for_marker(
+        boot.child,
+        Q4_ACTION_MARKER,
+        parse_action_marker,
+        lambda record: record["notification_id"] == notification_id
+        and record["command"] == command
+        and record["result"] == "applied",
+        boot.args.marker_timeout,
+        f"notification {notification_id} {command} applied action marker",
+        start,
     )
 
 
@@ -411,8 +484,21 @@ def parse_ps_stack(output: str) -> dict[str, Any]:
 def summarize_stack_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
     if not samples:
         raise Q4NativeFailure("no smart_band stack samples were collected")
-    if {sample["scenario"] for sample in samples} != set(SCENARIOS):
-        raise Q4NativeFailure("stack evidence does not cover all Q4 scenarios")
+    actual_checkpoints = collections.Counter(
+        (sample.get("scenario"), sample.get("checkpoint")) for sample in samples
+    )
+    expected_checkpoints = collections.Counter(
+        (scenario, checkpoint)
+        for scenario in SCENARIOS
+        for checkpoint in STACK_CHECKPOINTS[scenario]
+    )
+    if actual_checkpoints != expected_checkpoints:
+        missing = sorted((expected_checkpoints - actual_checkpoints).elements())
+        extra = sorted((actual_checkpoints - expected_checkpoints).elements())
+        raise Q4NativeFailure(
+            "stack evidence checkpoint contract mismatch; "
+            f"missing={missing} extra={extra}"
+        )
     peak_used = max(samples, key=lambda sample: sample["stack_used_bytes"])
     peak_filled = max(samples, key=lambda sample: sample["filled_percent"])
     return {
@@ -435,19 +521,104 @@ def summarize_stack_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "peak_filled_checkpoint": peak_filled["checkpoint"],
         "sample_count": len(samples),
         "scenario_count": len({sample["scenario"] for sample in samples}),
+        "checkpoints_by_scenario": {
+            scenario: list(STACK_CHECKPOINTS[scenario]) for scenario in SCENARIOS
+        },
     }
 
 
-def require_quiescent_effect_pipeline(state: dict[str, int]) -> None:
-    for key in (
+Q4_CUMULATIVE_FAULT_FIELDS = (
         "haptic_retries",
         "haptic_log_dropped",
         "wake_log_dropped",
-        "pending_effects",
         "inbox_dropped",
-    ):
+)
+
+
+def effect_pipeline_quiescent(state: dict[str, int]) -> bool:
+    return state["pending_effects"] == 0
+
+
+def require_no_cumulative_q4_faults(state: dict[str, int]) -> None:
+    for key in Q4_CUMULATIVE_FAULT_FIELDS:
         if state[key] != 0:
-            raise Q4NativeFailure(f"Q4 effect/input invariant failed: {key}={state[key]}")
+            raise Q4NativeFailure(
+                f"Q4 cumulative effect/input invariant failed: {key}={state[key]}"
+            )
+
+
+def require_quiescent_effect_pipeline(state: dict[str, int]) -> None:
+    require_no_cumulative_q4_faults(state)
+    if not effect_pipeline_quiescent(state):
+        raise Q4NativeFailure(
+            "Q4 effect pipeline is not quiescent: "
+            f"pending_effects={state['pending_effects']}"
+        )
+
+
+def screenshots_changed(
+    before: dict[str, Any], after: dict[str, Any]
+) -> bool:
+    return (
+        bool(before.get("sha256"))
+        and bool(after.get("sha256"))
+        and before["sha256"] != after["sha256"]
+    )
+
+
+def call_fullscreen_visual(image: Any) -> dict[str, Any]:
+    if (image.width, image.height) != (
+        NATIVE.EXPECTED_WIDTH,
+        NATIVE.EXPECTED_HEIGHT,
+    ):
+        raise Q4NativeFailure(
+            "call screenshot dimensions do not match the native framebuffer"
+        )
+    left, top, right, bottom = CALL_SCREEN_REGION
+    if not (
+        0 <= left < right <= image.width
+        and 0 <= top < bottom <= image.height
+    ):
+        raise Q4NativeFailure(
+            f"call screenshot region is outside the framebuffer: "
+            f"{CALL_SCREEN_REGION}"
+        )
+
+    dark_pixels = 0
+    total_pixels = (right - left) * (bottom - top)
+    for y in range(top, bottom):
+        for x in range(left, right):
+            offset = (y * image.width + x) * 4
+            red, green, blue = image.pixels[offset : offset + 3]
+            luminance = (
+                red * 2126 + green * 7152 + blue * 722
+            ) // 10000
+            if luminance < CALL_DARK_LUMINANCE_MAX:
+                dark_pixels += 1
+
+    dark_fraction = dark_pixels / total_pixels
+    return {
+        "region": list(CALL_SCREEN_REGION),
+        "dark_luminance_max_exclusive": CALL_DARK_LUMINANCE_MAX,
+        "minimum_dark_pixel_fraction": MIN_CALL_DARK_PIXEL_FRACTION,
+        "dark_pixels": dark_pixels,
+        "total_pixels": total_pixels,
+        "dark_pixel_fraction": round(dark_fraction, 6),
+        "passed": dark_fraction >= MIN_CALL_DARK_PIXEL_FRACTION,
+    }
+
+
+def call_visual_contract(
+    alice_screenshot: dict[str, Any],
+    bob_screenshot: dict[str, Any],
+    alice_visual: dict[str, Any],
+    bob_visual: dict[str, Any],
+) -> bool:
+    return (
+        screenshots_changed(alice_screenshot, bob_screenshot)
+        and alice_visual.get("passed") is True
+        and bob_visual.get("passed") is True
+    )
 
 
 def effect_pairs(
@@ -544,6 +715,8 @@ class Boot:
         self.console = None
         self.launch_offset = 0
         self.stack_samples: list[dict[str, Any]] = []
+        self.pending_stack_samples: list[tuple[str, str]] = []
+        self.pending_screenshots: list[tuple[Path, dict[str, Any]]] = []
         self.cleanup_log: list[str] = []
         self.process_cleanup: dict[str, Any] | None = None
         self.prompt = SMOKE.config_value(
@@ -657,26 +830,102 @@ class Boot:
     def screenshot(self, name: str) -> dict[str, Any]:
         if self.console is None:
             raise Q4NativeFailure("emulator console is not connected")
-        _image, record = NATIVE.capture_screenshot(
-            self.console, self.evidence_dir, name
+        capture_dir = self.evidence_dir / "raw-screenshots" / name
+        capture_dir.mkdir(parents=True)
+        response = self.console.command(
+            f"screenrecord screenshot {capture_dir}",
+            f"console-screenshot-{name}.txt",
         )
-        if not record["console_ok"] or not record["nonblank"]:
-            raise Q4NativeFailure(f"native screenshot failed validation: {name}")
+        console_ok = NATIVE.console_response_ok(response)
+        if not console_ok:
+            raise Q4NativeFailure(
+                f"emulator console rejected native screenshot: {name}"
+            )
+        deadline = time.monotonic() + 5.0
+        candidates: list[Path] = []
+        while time.monotonic() < deadline:
+            candidates = sorted(
+                path for path in capture_dir.glob("*.png")
+                if path.is_file() and path.stat().st_size > 0
+            )
+            if candidates:
+                break
+            time.sleep(0.05)
+        if len(candidates) != 1:
+            raise Q4NativeFailure(
+                f"expected one screenshot for {name}, found "
+                f"{len(candidates)} in {capture_dir}"
+            )
+        destination = self.evidence_dir / f"{name}.png"
+        os.replace(candidates[0], destination)
+        record: dict[str, Any] = {
+            "path": str(destination),
+            "console_response": response.strip(),
+            "console_ok": True,
+            "pending_validation": True,
+        }
+        self.pending_screenshots.append((destination, record))
         return record
+
+    def collect_screenshots(self) -> None:
+        for path, pending in self.pending_screenshots:
+            _image, validated = NATIVE.screenshot_record(
+                path, NATIVE.EXPECTED_WIDTH, NATIVE.EXPECTED_HEIGHT
+            )
+            validated["console_response"] = pending["console_response"]
+            validated["console_ok"] = pending["console_ok"]
+            if not validated["console_ok"] or not validated["nonblank"]:
+                raise Q4NativeFailure(
+                    f"native screenshot failed validation: {path.name}"
+                )
+            pending.clear()
+            pending.update(validated)
+        self.pending_screenshots.clear()
 
     def sample_stack(self, checkpoint: str) -> dict[str, Any]:
         if self.child is None:
             raise Q4NativeFailure("emulator is not running")
-        output = self.child.send_command(
-            "ps",
+        index = len(self.pending_stack_samples) + 1
+        guest_path = f"/data/q4-stack-{self.scenario}-{index:02d}.txt"
+        self.child.send_command(
+            f"ps > {guest_path} &",
             self.prompt,
             self.args.command_timeout,
-            self.evidence_dir / f"nsh-ps-{len(self.stack_samples) + 1:02d}-{checkpoint}.txt",
+            self.evidence_dir / f"nsh-ps-dispatch-{index:02d}-{checkpoint}.txt",
         )
-        sample = parse_ps_stack(output)
-        sample.update({"scenario": self.scenario, "checkpoint": checkpoint})
-        self.stack_samples.append(sample)
-        return sample
+        self.pending_stack_samples.append((checkpoint, guest_path))
+        return {
+            "scenario": self.scenario,
+            "checkpoint": checkpoint,
+            "guest_path": guest_path,
+            "pending": True,
+        }
+
+    def collect_stack_samples(self) -> None:
+        if self.child is None:
+            raise Q4NativeFailure("emulator is not running")
+        self.child.pump(0.5)
+        for index, (checkpoint, guest_path) in enumerate(
+            self.pending_stack_samples, 1
+        ):
+            output = self.child.send_command(
+                f"cat {guest_path}",
+                self.prompt,
+                self.args.command_timeout,
+                self.evidence_dir / f"nsh-ps-{index:02d}-{checkpoint}.txt",
+            )
+            sample = parse_ps_stack(output)
+            sample.update({"scenario": self.scenario, "checkpoint": checkpoint})
+            self.stack_samples.append(sample)
+        if self.pending_stack_samples:
+            paths = " ".join(path for _checkpoint, path in self.pending_stack_samples)
+            self.child.send_command(
+                f"rm {paths}",
+                self.prompt,
+                self.args.command_timeout,
+                self.evidence_dir / "nsh-ps-cleanup.txt",
+            )
+        self.pending_stack_samples.clear()
 
     def markers(self) -> dict[str, Any]:
         if self.child is None:
@@ -694,6 +943,9 @@ class Boot:
             ),
             "wake": marker_records(
                 transcript, Q4_WAKE_MARKER, parse_wake_marker
+            ),
+            "action": marker_records(
+                transcript, Q4_ACTION_MARKER, parse_action_marker
             ),
         }
 
@@ -761,11 +1013,25 @@ def wait_q4_state(
 ) -> dict[str, int]:
     if boot.child is None:
         raise Q4NativeFailure("emulator is not running")
+    # Fault counters are cumulative for the lifetime of this app boot. Audit
+    # every completed state marker, including records before an action-specific
+    # wait boundary, so a later malformed/reset zero cannot erase a failure.
+    for prior in marker_records(
+        boot.child.transcript[boot.launch_offset:],
+        Q4_STATE_MARKER,
+        parse_q4_state,
+    ):
+        require_no_cumulative_q4_faults(prior)
+
+    def state_ready(state: dict[str, int]) -> bool:
+        require_no_cumulative_q4_faults(state)
+        return predicate(state) and effect_pipeline_quiescent(state)
+
     record = wait_for_marker(
         boot.child,
         Q4_STATE_MARKER,
         parse_q4_state,
-        predicate,
+        state_ready,
         boot.args.marker_timeout,
         description,
         boot.launch_offset if start is None else start,
@@ -790,7 +1056,6 @@ def run_ordinary(boot: Boot) -> dict[str, Any]:
     )
     record["initial_state"] = initial
     record["screenshots"]["initial"] = boot.screenshot("ordinary-initial")
-    boot.sample_stack("initial")
 
     q3_before = wait_for_q3_state(
         boot.child,
@@ -829,8 +1094,6 @@ def run_ordinary(boot: Boot) -> dict[str, Any]:
         "overlay_state": isolated,
         "passed": True,
     }
-    boot.sample_stack("input-isolation")
-
     record["updated_inject"] = wait_inject(boot, "updated", 1, 1)
     updated = wait_q4_state(
         boot,
@@ -864,10 +1127,9 @@ def run_ordinary(boot: Boot) -> dict[str, Any]:
             "ordinary wake generation does not match updated haptic generation"
         )
     record["effects"] = ordinary_effects
-    boot.sample_stack("updated-long-utf8")
-
     action_start = len(boot.child.transcript)
     boot.click("ordinary-dismiss", OVERLAY_DISMISS_POINT)
+    record["dismiss_action"] = wait_action(boot, 701, "dismiss", action_start)
     dismissed = wait_q4_state(
         boot,
         lambda state: state["notifications"] == 1
@@ -876,7 +1138,7 @@ def run_ordinary(boot: Boot) -> dict[str, Any]:
         action_start,
     )
     record["dismissed_state"] = dismissed
-    boot.sample_stack("dismissed")
+    boot.sample_stack("scenario-high-water")
     return record
 
 
@@ -913,12 +1175,13 @@ def run_center(boot: Boot) -> dict[str, Any]:
     record["ready_state"] = ready
     record["center_view"] = open_notification_center(boot)
     record["screenshots"]["dnd_center"] = boot.screenshot("center-dnd")
-    boot.sample_stack("center-open")
     record["effects_before_actions"] = effect_pairs(
         boot.child.transcript[boot.launch_offset :], []
     )
 
+    action_start = len(boot.child.transcript)
     boot.click("center-mark-read", CENTER_FIRST_READ_POINT)
+    record["mark_read_action"] = wait_action(boot, 715, "read", action_start)
     boot.child.pump(1.1)
     record["screenshots"]["marked_read"] = boot.screenshot(
         "center-marked-read"
@@ -929,11 +1192,13 @@ def run_center(boot: Boot) -> dict[str, Any]:
         and state["dnd"] == 1
         and state["active_id"] == 0,
         "Notification Center Mark read action",
+        action_start,
     )
     record["after_mark_read"] = after_read
 
     action_start = len(boot.child.transcript)
     boot.click("center-delete", CENTER_FIRST_DELETE_POINT)
+    record["delete_action"] = wait_action(boot, 715, "delete", action_start)
     after_delete = wait_q4_state(
         boot,
         lambda state: state["notifications"] == 4
@@ -946,7 +1211,7 @@ def run_center(boot: Boot) -> dict[str, Any]:
     record["effects_after_actions"] = effect_pairs(
         boot.child.transcript[boot.launch_offset :], []
     )
-    boot.sample_stack("center-actions")
+    boot.sample_stack("scenario-high-water")
     return record
 
 
@@ -965,8 +1230,11 @@ def run_calls(boot: Boot) -> dict[str, Any]:
         "Alice full-screen call",
     )
     record["alice_state"] = alice
+    # The state marker is emitted before Goldfish necessarily presents the
+    # corresponding LVGL draw. Give the first caller the same full flush
+    # interval as the promoted caller before collecting semantic evidence.
+    boot.child.pump(1.1)
     record["screenshots"]["alice"] = boot.screenshot("calls-alice")
-    boot.sample_stack("alice")
 
     q3_before = wait_for_q3_state(
         boot.child,
@@ -1007,34 +1275,44 @@ def run_calls(boot: Boot) -> dict[str, Any]:
 
     action_start = len(boot.child.transcript)
     boot.click("calls-accept-alice", CALL_ACCEPT_POINT)
+    record["accept_alice_action"] = wait_action(
+        boot, 721, "accept", action_start
+    )
     bob = wait_q4_state(
         boot,
-        lambda state: state["notifications"] == 1
+        lambda state: state["notifications"] == 2
         and state["active_id"] == 722
         and state["presentation"] == 2,
         "Bob promoted after Alice Accept",
         action_start,
     )
     record["bob_promoted_state"] = bob
+    # The state marker is emitted before Goldfish necessarily presents the
+    # corresponding LVGL draw. Give the renderer a full flush interval before
+    # capturing the promoted caller.
+    boot.child.pump(1.1)
     record["screenshots"]["bob_promoted"] = boot.screenshot(
         "calls-bob-promoted"
     )
-    boot.sample_stack("bob-promoted")
 
     action_start = len(boot.child.transcript)
     boot.click("calls-reject-bob", CALL_REJECT_POINT)
-    cleared = wait_q4_state(
+    record["reject_bob_action"] = wait_action(
+        boot, 722, "reject", action_start
+    )
+    handled = wait_q4_state(
         boot,
-        lambda state: state["notifications"] == 0
-        and state["active_id"] == 0,
+        lambda state: state["notifications"] == 2
+        and state["active_id"] == 0
+        and state["presentation"] == 0,
         "Bob Reject action",
         action_start,
     )
-    record["cleared_state"] = cleared
+    record["handled_state"] = handled
     record["effects"] = effect_pairs(
         boot.child.transcript[boot.launch_offset :], [721, 722]
     )
-    boot.sample_stack("calls-cleared")
+    boot.sample_stack("scenario-high-water")
     return record
 
 
@@ -1052,7 +1330,6 @@ def run_workout(boot: Boot) -> dict[str, Any]:
         "workout call armed before active workout",
     )
     record["armed_state"] = armed
-    boot.sample_stack("armed")
 
     Q3.open_workout(
         boot.console, boot.child, boot.evidence_dir
@@ -1080,7 +1357,6 @@ def run_workout(boot: Boot) -> dict[str, Any]:
     )
     record["coach_state"] = coach
     record["screenshots"]["workout_call"] = boot.screenshot("workout-call")
-    boot.sample_stack("workout-call")
 
     pause_start = len(boot.child.transcript)
     boot.click("workout-pause-through-overlay", Q3.SESSION_PRIMARY_POINT)
@@ -1107,22 +1383,25 @@ def run_workout(boot: Boot) -> dict[str, Any]:
     record["screenshots"]["paused_with_call"] = boot.screenshot(
         "workout-paused-with-call"
     )
-    boot.sample_stack("paused-with-call")
 
     action_start = len(boot.child.transcript)
     boot.click("workout-reject-call", OVERLAY_REJECT_POINT)
-    cleared = wait_q4_state(
+    record["reject_call_action"] = wait_action(
+        boot, 731, "reject", action_start
+    )
+    handled = wait_q4_state(
         boot,
-        lambda state: state["notifications"] == 0
-        and state["active_id"] == 0,
+        lambda state: state["notifications"] == 1
+        and state["active_id"] == 0
+        and state["presentation"] == 0,
         "workout call Reject action",
         action_start,
     )
-    record["cleared_state"] = cleared
+    record["handled_state"] = handled
     record["effects"] = effect_pairs(
         boot.child.transcript[boot.launch_offset :], [731]
     )
-    boot.sample_stack("workout-call-cleared")
+    boot.sample_stack("scenario-high-water")
     return record
 
 
@@ -1150,6 +1429,7 @@ def run(args: argparse.Namespace) -> int:
         "scenarios": [],
         "checks": {},
         "stack_samples": [],
+        "visual_diagnostics": {},
     }
     failure: dict[str, str] | None = None
     active_boot: Boot | None = None
@@ -1236,6 +1516,46 @@ def run(args: argparse.Namespace) -> int:
             )
             active_boot.start()
             scenario_record = SCENARIO_RUNNERS[scenario](active_boot)
+            active_boot.collect_screenshots()
+            if scenario == "calls":
+                alice_screenshot = scenario_record["screenshots"]["alice"]
+                bob_screenshot = scenario_record["screenshots"]["bob_promoted"]
+                alice_visual = call_fullscreen_visual(
+                    NATIVE.decode_png_rgba(Path(alice_screenshot["path"]))
+                )
+                bob_visual = call_fullscreen_visual(
+                    NATIVE.decode_png_rgba(Path(bob_screenshot["path"]))
+                )
+                scenario_record["call_visuals"] = {
+                    "alice": alice_visual,
+                    "bob_promoted": bob_visual,
+                }
+                result["visual_diagnostics"]["calls"] = (
+                    scenario_record["call_visuals"]
+                )
+                call_visual_checks = {
+                    "calls_alice_fullscreen_visual": alice_visual["passed"],
+                    "calls_bob_fullscreen_visual": bob_visual["passed"],
+                    "calls_distinct_fullscreen_visuals": call_visual_contract(
+                        alice_screenshot,
+                        bob_screenshot,
+                        alice_visual,
+                        bob_visual,
+                    ),
+                }
+                result["checks"].update(call_visual_checks)
+                if not all(call_visual_checks.values()):
+                    raise Q4NativeFailure(
+                        "Alice/Bob screenshots do not prove two distinct "
+                        "full-screen call views; "
+                        f"alice_dark_fraction="
+                        f"{alice_visual['dark_pixel_fraction']} "
+                        f"bob_dark_fraction="
+                        f"{bob_visual['dark_pixel_fraction']} "
+                        f"hashes_changed="
+                        f"{screenshots_changed(alice_screenshot, bob_screenshot)}"
+                    )
+            active_boot.collect_stack_samples()
             scenario_record["markers"] = active_boot.markers()
             scenario_record["stack_samples"] = list(active_boot.stack_samples)
             result["stack_samples"].extend(active_boot.stack_samples)
@@ -1259,9 +1579,25 @@ def run(args: argparse.Namespace) -> int:
             active_runtime_output = None
             result["scenarios"].append(scenario_record)
 
-        result["stack_summary"] = summarize_stack_samples(
-            result["stack_samples"]
+        expected_stack_sample_count = sum(
+            len(STACK_CHECKPOINTS[scenario]) for scenario in SCENARIOS
         )
+        check(
+            "stack_checkpoint_coverage_exact",
+            len(result["stack_samples"]) == expected_stack_sample_count
+            and collections.Counter(
+                (sample.get("scenario"), sample.get("checkpoint"))
+                for sample in result["stack_samples"]
+            )
+            == collections.Counter(
+                (scenario, checkpoint)
+                for scenario in SCENARIOS
+                for checkpoint in STACK_CHECKPOINTS[scenario]
+            ),
+            "Q4 stack evidence does not contain exactly the required "
+            f"{expected_stack_sample_count} scenario checkpoints",
+        )
+        result["stack_summary"] = summarize_stack_samples(result["stack_samples"])
         check(
             "stack_margin_at_least_25_percent",
             result["stack_summary"]["minimum_margin_percent"]

@@ -393,6 +393,8 @@ static int test_fake_primitives(void)
   first = lv_label_create(parent);
   second = lv_obj_create(parent);
   CHECK(parent != NULL && first != NULL && second != NULL);
+  CHECK(fake_lvgl_obj_has_flag(parent, LV_OBJ_FLAG_CLICKABLE));
+  CHECK(fake_lvgl_obj_has_flag(second, LV_OBJ_FLAG_CLICKABLE));
   lv_obj_set_size(parent, 100, 100);
   CHECK(fake_lvgl_live_object_count() == 3);
   CHECK(lv_obj_get_child_count(parent) == 2);
@@ -438,7 +440,7 @@ static int test_fake_primitives(void)
   CHECK(fake_lvgl_send_event_at(lv_scr_act(), 10, 10,
                                 LV_EVENT_CLICKED) == second);
   CHECK(fake_lvgl_send_event_at(lv_scr_act(), 50, 10,
-                                LV_EVENT_CLICKED) == NULL);
+                                LV_EVENT_CLICKED) == parent);
 
   lv_obj_clean(parent);
   CHECK(lv_obj_get_child_count(parent) == 0);
@@ -669,17 +671,23 @@ static int test_watch_face_mount_failure_rollback(void)
   ui_tree_t tree;
   lv_obj_t *next;
   lv_obj_t *apply;
+  lv_obj_t *presentation_root;
+  lv_obj_t *target;
 
   fake_lvgl_reset();
   lv_obj_set_size(lv_scr_act(), 320, 480);
   CHECK(smart_band_lvgl_create(NULL) == 0);
   CHECK(inspect_ui_tree(&tree) == 0);
+  presentation_root = lv_obj_get_child(tree.screen, -1);
+  CHECK(presentation_root != NULL);
+  CHECK(!fake_lvgl_obj_has_flag(presentation_root, LV_OBJ_FLAG_CLICKABLE));
   long_press(tree.face);
   CHECK(!fake_lvgl_obj_has_flag(tree.picker, LV_OBJ_FLAG_HIDDEN));
   next = fake_lvgl_find_text(tree.picker, "Next", 0);
   apply = fake_lvgl_find_text(tree.picker, "Apply", 0);
   CHECK(next != NULL && apply != NULL);
-  fake_lvgl_send_event(next, LV_EVENT_CLICKED);
+  target = click_object_center(next);
+  CHECK(target != NULL && target != presentation_root);
   CHECK(fake_lvgl_find_text(tree.picker, "Activity Rings", 0) != NULL);
 
   fake_lvgl_fail_object_create_at(1);
@@ -999,6 +1007,7 @@ static int test_notification_overlay_pump_and_timeout(void)
     "Five second boundary");
   lv_obj_t *title;
   lv_obj_t *overlay;
+  lv_obj_t *presentation_root;
   lv_obj_t *target;
 
   fake_lvgl_reset();
@@ -1015,6 +1024,9 @@ static int test_notification_overlay_pump_and_timeout(void)
   overlay = fake_lvgl_obj_parent(title);
   CHECK(overlay != NULL &&
         fake_lvgl_obj_has_flag(overlay, LV_OBJ_FLAG_CLICKABLE));
+  presentation_root = fake_lvgl_obj_parent(overlay);
+  CHECK(presentation_root != NULL &&
+        !fake_lvgl_obj_has_flag(presentation_root, LV_OBJ_FLAG_CLICKABLE));
   target = fake_lvgl_send_event_at(lv_scr_act(), 86, 120,
                                    LV_EVENT_CLICKED);
   if (target != overlay)
@@ -1033,6 +1045,9 @@ static int test_notification_overlay_pump_and_timeout(void)
                                 LV_EVENT_PRESSED) == overlay);
   CHECK(fake_lvgl_send_event_at(lv_scr_act(), 50, 120,
                                 LV_EVENT_RELEASED) == overlay);
+  target = fake_lvgl_send_event_at(lv_scr_act(), 10, 300,
+                                   LV_EVENT_CLICKED);
+  CHECK(target != NULL && target != overlay && target != presentation_root);
   CHECK(!fake_lvgl_obj_has_flag(tree.apps, LV_OBJ_FLAG_HIDDEN));
 
   CHECK(click_object_center(find_visible_text("Dismiss", 0u)) != NULL);
@@ -1323,6 +1338,8 @@ static int test_notification_center_actions_and_paging(void)
   lv_obj_t *next;
   lv_obj_t *previous;
   lv_obj_t *back;
+  lv_obj_t *mark_read;
+  lv_obj_t *delete_button;
   size_t static_objects;
   size_t static_events;
   size_t index;
@@ -1360,7 +1377,12 @@ static int test_notification_center_actions_and_paging(void)
   fake_lvgl_send_event(previous, LV_EVENT_CLICKED);
   CHECK(find_visible_text("New: Mail / N5", 0u) != NULL);
 
-  CHECK(click_object_center(find_visible_text("Mark read", 0u)) != NULL);
+  mark_read = find_visible_text("Mark read", 0u);
+  delete_button = find_visible_text("Delete", 0u);
+  CHECK(mark_read != NULL && delete_button != NULL);
+  CHECK(lv_obj_get_width(fake_lvgl_obj_parent(mark_read)) >
+        lv_obj_get_width(fake_lvgl_obj_parent(delete_button)));
+  CHECK(click_object_center(mark_read) != NULL);
   CHECK(find_visible_text("Mail / N5", 0u) != NULL);
   CHECK(click_object_center(find_visible_text("Delete", 0u)) != NULL);
   CHECK(find_visible_text("4 items", 0u) != NULL);
@@ -1455,6 +1477,9 @@ static int test_notification_call_capture_and_backlog(void)
   call_layer = fake_lvgl_obj_parent(find_visible_text("Alice", 0u));
   CHECK(call_layer != NULL &&
         fake_lvgl_obj_has_flag(call_layer, LV_OBJ_FLAG_CLICKABLE));
+  CHECK(fake_lvgl_obj_parent(call_layer) != NULL &&
+        !fake_lvgl_obj_has_flag(fake_lvgl_obj_parent(call_layer),
+                                LV_OBJ_FLAG_CLICKABLE));
   CHECK(lv_obj_get_width(call_layer) == lv_obj_get_width(tree.screen));
   CHECK(lv_obj_get_height(call_layer) == lv_obj_get_height(tree.screen));
   CHECK(fake_lvgl_send_event_at(lv_scr_act(), 5, 5,

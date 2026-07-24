@@ -230,6 +230,53 @@ static void emit_q4_inject_marker(const char *scenario, const char *phase,
   fflush(stdout);
 }
 
+static const char *notification_command_name(
+  smart_band_notification_command_t command)
+{
+  switch (command)
+    {
+      case SMART_BAND_NOTIFICATION_COMMAND_READ:
+        return "read";
+      case SMART_BAND_NOTIFICATION_COMMAND_DISMISS:
+        return "dismiss";
+      case SMART_BAND_NOTIFICATION_COMMAND_ACCEPT:
+        return "accept";
+      case SMART_BAND_NOTIFICATION_COMMAND_REJECT:
+        return "reject";
+      case SMART_BAND_NOTIFICATION_COMMAND_DELETE:
+        return "delete";
+      default:
+        return "invalid";
+    }
+}
+
+static const char *notification_action_result_name(
+  smart_band_notification_action_result_t result)
+{
+  switch (result)
+    {
+      case SMART_BAND_NOTIFICATION_ACTION_APPLIED:
+        return "applied";
+      case SMART_BAND_NOTIFICATION_ACTION_NO_CHANGE:
+        return "no_change";
+      case SMART_BAND_NOTIFICATION_ACTION_NOT_FOUND:
+        return "not_found";
+      case SMART_BAND_NOTIFICATION_ACTION_INVALID:
+      default:
+        return "invalid";
+    }
+}
+
+static void emit_q4_action_marker(
+  uint32_t notification_id, smart_band_notification_command_t command,
+  smart_band_notification_action_result_t result)
+{
+  printf("smart_band:q4:action:v1 notification_id=%lu command=%s result=%s\n",
+         (unsigned long)notification_id, notification_command_name(command),
+         notification_action_result_name(result));
+  fflush(stdout);
+}
+
 static bool diagnostic_post_notification(
   uint32_t id, smart_band_notification_type_t type,
   smart_band_notification_priority_t priority, const char *source,
@@ -708,6 +755,7 @@ static int switch_watch_face(smart_band_watch_face_id_t selected_face)
   fprintf(stderr, "smart_band: watch face selected id=%d name=%s storage=%d\n",
           (int)selected_face, next_descriptor->name,
           (int)g_ui.face_settings_result);
+  (void)fflush(stderr);
 
   return 0;
 }
@@ -1764,6 +1812,11 @@ static void notification_action_cb(
     {
       smart_band_runtime_dispatch_pending(&g_ui.runtime);
       render_pending();
+#if defined(CONFIG_LVX_DEMO_SMART_BAND_E2E_DIAGNOSTICS)
+      emit_q4_action_marker(
+        notification_id, command,
+        g_ui.runtime.notifications.last_action_result);
+#endif
     }
 }
 

@@ -23,6 +23,7 @@ import struct
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 
@@ -34,6 +35,8 @@ APP_FAILURE_MARKERS = (
     "Segmentation fault",
     "PANIC",
 )
+POINTER_CLICK_HOLD_SECONDS = 0.1
+PICKER_RENDER_SETTLE_SECONDS = 1.0
 
 
 class SmokeFailure(RuntimeError):
@@ -178,6 +181,11 @@ def capture_screenshot(
         f"screenrecord screenshot {capture_dir}",
         f"emulator-console-screenshot-{name}.txt",
     )
+    console_ok = re.search(r"(?:^|\r?\n)OK\r?\n?$", response) is not None
+    if not console_ok:
+        raise SmokeFailure(
+            f"emulator console did not confirm the {name} screenshot"
+        )
     candidates = sorted(capture_dir.rglob("*.png"))
     if len(candidates) != 1:
         raise SmokeFailure(
@@ -197,7 +205,7 @@ def capture_screenshot(
         "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
         "width": width,
         "height": height,
-        "console_ok": re.search(r"(?:^|\r?\n)OK\r?\n?$", response) is not None,
+        "console_ok": True,
     }
 
 
@@ -243,6 +251,19 @@ def picker_input_points(width: int, height: int) -> dict[str, tuple[int, int]]:
 
 def mouse_event_command(point: tuple[int, int], pressed: bool) -> str:
     return f"event mouse {point[0]} {point[1]} 0 {1 if pressed else 0}"
+
+
+def send_pointer_tap(
+    send_pointer: Callable[[str, tuple[int, int], bool], None],
+    pump: Callable[[float], None],
+    name: str,
+    point: tuple[int, int],
+) -> None:
+    send_pointer(f"{name}-down", point, True)
+    # Let the guest input poll observe the pressed state before sending the
+    # release. Back-to-back console commands can collapse into release-only.
+    pump(POINTER_CLICK_HOLD_SECONDS)
+    send_pointer(f"{name}-up", point, False)
 
 
 class PtyChild:
@@ -689,7 +710,9 @@ def main() -> int:
             send_pointer("hold-down", points["hold"], True)
             child.pump(0.75)
             send_pointer("hold-up", points["hold"], False)
-            child.pump(0.3)
+            # Goldfish advertises an 800 ms draw-flush interval. Wait beyond
+            # that boundary before treating a framebuffer capture as final.
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             picker_screen = capture_screenshot(
                 console,
                 evidence_dir,
@@ -698,9 +721,8 @@ def main() -> int:
                 "watch-face-picker",
             )
 
-            send_pointer("next-down", points["next"], True)
-            send_pointer("next-up", points["next"], False)
-            child.pump(0.2)
+            send_pointer_tap(send_pointer, child.pump, "next", points["next"])
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             picker_activity = capture_screenshot(
                 console,
                 evidence_dir,
@@ -710,9 +732,8 @@ def main() -> int:
             )
 
             selection_start = len(child.transcript)
-            send_pointer("apply-down", points["apply"], True)
-            send_pointer("apply-up", points["apply"], False)
-            child.pump(0.4)
+            send_pointer_tap(send_pointer, child.pump, "apply", points["apply"])
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             activity_screen = capture_screenshot(
                 console,
                 evidence_dir,
@@ -730,7 +751,7 @@ def main() -> int:
             send_pointer("minimal-hold-down", points["hold"], True)
             child.pump(0.75)
             send_pointer("minimal-hold-up", points["hold"], False)
-            child.pump(0.3)
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             picker_from_activity = capture_screenshot(
                 console,
                 evidence_dir,
@@ -739,9 +760,10 @@ def main() -> int:
                 "watch-face-picker-from-activity",
             )
 
-            send_pointer("minimal-next-down", points["next"], True)
-            send_pointer("minimal-next-up", points["next"], False)
-            child.pump(0.2)
+            send_pointer_tap(
+                send_pointer, child.pump, "minimal-next", points["next"]
+            )
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             picker_minimal = capture_screenshot(
                 console,
                 evidence_dir,
@@ -751,9 +773,10 @@ def main() -> int:
             )
 
             minimal_selection_start = len(child.transcript)
-            send_pointer("minimal-apply-down", points["apply"], True)
-            send_pointer("minimal-apply-up", points["apply"], False)
-            child.pump(0.4)
+            send_pointer_tap(
+                send_pointer, child.pump, "minimal-apply", points["apply"]
+            )
+            child.pump(PICKER_RENDER_SETTLE_SECONDS)
             minimal_screen = capture_screenshot(
                 console,
                 evidence_dir,
@@ -768,19 +791,59 @@ def main() -> int:
                 "watch face selected id=2 name=Minimal Digital"
                 in minimal_selection_output
             )
-            images_changed = (
-                screenshot is not None
-                and screenshot["sha256"] != picker_screen["sha256"]
-                and picker_screen["sha256"] != picker_activity["sha256"]
-                and picker_activity["sha256"] != activity_screen["sha256"]
-                and activity_screen["sha256"] != picker_from_activity["sha256"]
-                and picker_from_activity["sha256"] != picker_minimal["sha256"]
-                and picker_minimal["sha256"] != minimal_screen["sha256"]
+            image_transitions = (
+                ("initial-to-picker", screenshot, picker_screen),
+                ("picker-to-activity-preview", picker_screen, picker_activity),
+                ("activity-preview-to-face", picker_activity, activity_screen),
+                ("activity-face-to-picker", activity_screen, picker_from_activity),
+                (
+                    "picker-to-minimal-preview",
+                    picker_from_activity,
+                    picker_minimal,
+                ),
+                ("minimal-preview-to-face", picker_minimal, minimal_screen),
+            )
+            transition_records = [
+                {
+                    "name": name,
+                    "before_sha256": (
+                        before["sha256"] if before is not None else None
+                    ),
+                    "after_sha256": after["sha256"],
+                    "changed": (
+                        before is not None
+                        and before["sha256"] != after["sha256"]
+                    ),
+                }
+                for name, before, after in image_transitions
+            ]
+            unchanged_transitions = [
+                transition["name"]
+                for transition in transition_records
+                if not transition["changed"]
+            ]
+            images_changed = not unchanged_transitions
+            write_text(
+                evidence_dir / "picker-transition-diagnostics.json",
+                json.dumps(
+                    {
+                        "commands": commands,
+                        "selected_activity": selected_activity,
+                        "selected_minimal": selected_minimal,
+                        "transitions": transition_records,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
             )
             if not all(command["ok"] for command in commands):
                 raise SmokeFailure("one or more picker input events were rejected")
             if not images_changed:
-                raise SmokeFailure("picker journey screenshots did not change")
+                raise SmokeFailure(
+                    "picker journey screenshots did not change: "
+                    + ", ".join(unchanged_transitions)
+                )
             if not selected_activity:
                 raise SmokeFailure("picker did not select Activity Rings")
             if not selected_minimal:
@@ -797,6 +860,7 @@ def main() -> int:
                 "minimal_face": minimal_screen,
                 "selected_minimal": selected_minimal,
                 "images_changed": images_changed,
+                "transitions": transition_records,
             }
 
         pid_output_1 = child.send_command(

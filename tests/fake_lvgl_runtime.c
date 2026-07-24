@@ -506,7 +506,8 @@ lv_event_code_t lv_event_get_code(lv_event_t *event)
 
 lv_obj_t *lv_obj_create(lv_obj_t *parent)
 {
-  return create_object(parent, LV_OBJ_FLAG_SCROLLABLE);
+  return create_object(
+    parent, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 }
 
 lv_obj_t *lv_btn_create(lv_obj_t *parent)

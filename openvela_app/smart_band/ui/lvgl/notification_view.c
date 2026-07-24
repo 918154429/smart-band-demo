@@ -66,6 +66,10 @@ static lv_obj_t *create_layer(lv_obj_t *parent, lv_coord_t width,
   if (layer != NULL)
     {
       smart_band_ui_strip_obj(layer);
+      /* lv_obj_create() is clickable by default in real LVGL. Containers
+       * must stay input-transparent unless the concrete presentation below
+       * explicitly opts in (overlay card or full-screen call). */
+      lv_obj_clear_flag(layer, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_set_pos(layer, 0, 0);
       lv_obj_set_size(layer, width, height);
       lv_obj_set_style_bg_color(layer, color, 0);
@@ -363,9 +367,11 @@ static int create_center_row(smart_band_notification_view_t *view,
   smart_band_notification_view_row_t *row = &view->center_rows[index];
   lv_coord_t margin = max_coord(sx(view, 8), 4);
   lv_coord_t gap = max_coord(sx(view, 5), 3);
-  lv_coord_t button_width = max_coord(sx(view, 54), 40);
+  lv_coord_t read_button_width = max_coord(sx(view, 64), 48);
+  lv_coord_t delete_button_width = max_coord(sx(view, 54), 40);
   lv_coord_t button_height = max_coord(sy(view, 28), 22);
-  lv_coord_t text_width = width - margin * 3 - button_width * 2 - gap;
+  lv_coord_t text_width = width - margin * 3 - read_button_width -
+                          delete_button_width - gap;
 
   if (text_width < 40)
     {
@@ -395,13 +401,14 @@ static int create_center_row(smart_band_notification_view_t *view,
     max_coord(height - sy(view, 35), 14));
   row->read_button = smart_band_ui_create_action_button(
     &view->ui, row->card, "Read",
-    width - margin * 3 - button_width * 2 - gap,
-    (height - button_height) / 2, button_width, button_height,
+    width - margin * 3 - read_button_width - delete_button_width - gap,
+    (height - button_height) / 2, read_button_width, button_height,
     lv_color_hex(0x49a89f), action_cb,
     (uintptr_t)&row->read_binding);
   row->delete_button = smart_band_ui_create_action_button(
-    &view->ui, row->card, "Delete", width - margin * 2 - button_width,
-    (height - button_height) / 2, button_width, button_height,
+    &view->ui, row->card, "Delete",
+    width - margin * 2 - delete_button_width,
+    (height - button_height) / 2, delete_button_width, button_height,
     lv_color_hex(0xc45656), action_cb,
     (uintptr_t)&row->delete_binding);
   if (row->title == NULL || row->body == NULL ||
