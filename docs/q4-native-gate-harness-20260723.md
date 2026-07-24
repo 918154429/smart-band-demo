@@ -2,11 +2,13 @@
 
 ## Status
 
-The deterministic Q4 native notification harness is implemented and locally
-verified, but it has not yet completed a fresh fixed OpenVela run. The Q4 C
-Gate therefore remains **open**. This document records the harness contract and
-pre-run verification only; final evidence must be written from a successful
-artifact and manual review of every native PNG.
+The deterministic Q4 native notification harness is implemented and has now
+completed a fresh fixed OpenVela run. The Q4 C Gate is **passed at the
+software/Goldfish level**. This document remains the implementation and
+pre-run contract; the final artifact audit, eight-image manual review and
+evidence boundaries are recorded in
+`docs/q4-notification-native-gate-20260724.md` and
+`docs/evidence/q4-gate-summary-20260724.json`.
 
 ## Diagnostics-only scenario contract
 
@@ -68,7 +70,7 @@ and relevant linker-map lines. Artifact hashes use paths relative to the
 downloaded evidence root, and the final workflow step regenerates a recursive
 root `evidence.sha256` covering the target files and nested Q4 evidence.
 
-## Pre-run verification
+## Historical pre-run verification
 
 Local Windows verification:
 
@@ -88,21 +90,26 @@ Independent outer development host verification used `ubuntu24-hushen` at
 No real emulator was run on that host, and `codex-2c8g` was not used as the
 development machine.
 
-## Required final audit
+## Final audit completion
 
-A fresh Q4-enabled OpenVela run must still prove all of the following before
-the C Gate can close:
+GitHub run `30076360836` at source commit
+`743ff28a32e222255f39c51c89921cc29a16ab31` completed this audit:
 
-1. four scenario JSON results and every required check are passed;
-2. all native PNGs are manually reviewed, including the ordinary initial/update
-   title difference and all input-isolation checkpoints;
-3. `evidence.sha256` is fully recomputed with no mismatch;
-4. ELF, real linker map, symbols and artifact hashes are present and internally
-   consistent;
-5. stack samples cover every scenario and report a credible peak and minimum
+1. the four-scenario journey passed 24/24 checks;
+2. all eight native PNGs were manually reviewed, including the ordinary
+   initial/update title difference and the Alice/Bob full-screen semantics;
+3. the 336-entry root and 167-entry nested manifests were recomputed with zero
+   mismatch;
+4. ELF, linker map, `System.map`, symbols and artifact hashes are present and
+   internally consistent;
+5. stack samples cover every scenario, with a minimum 53.840% remaining
    margin;
 6. fixed source output, emulator process groups, console port and staged
-   runtime cleanup all pass.
+   runtime cleanup all passed.
 
 This Goldfish evidence cannot prove Gemini-S1 or RK3568 execution, physical
 vibration, real display wake, real power transition or BLE transport.
+The current non-ASCII screenshot also renders tofu and does not prove Unicode
+glyph readability.
+It is a short deterministic journey, not the roadmap's 30-minute per-slice
+soak, two-hour emulator RC or Q8 long-duration/interaction Gate.

@@ -754,3 +754,252 @@ gh workflow run openvela-nightly.yml `
 - RK3568 是独立硬件子机；当前 Goldfish native Gate 不需要触达它。
 - 单独执行 `test -d /data` 只能探测当前登录主机，不能判定整体拓扑。
 - 未经逐次明确授权，不烧录、不写 flash、不修改 bootloader。
+
+## 14. 2026-07-23 Q4 native v8 交接
+
+### 14.1 本地工作树与本轮改动
+
+- 仓库：
+  `E:\C_Moved_From_C\Users\Lenovo\Desktop\schoolwork\smart-band-demo-q4-notifications`
+- 分支：`codex/q4-notifications`
+- HEAD 与远端分支 head：`3998e92d679e224818e012ef8f94fe761f9a12ab`
+- 尚未提交、尚未推送；正式 Q4 evidence、路线图与 PR14 均未更新。
+- 当前修改文件仍为：
+  - `openvela_app/smart_band/app_lvgl.c`
+  - `openvela_app/smart_band/ui/lvgl/notification_view.c`
+  - `scripts/run_q4_native_e2e.py`
+  - `scripts/smoke_openvela_emulator.py`
+  - `tests/fake_lvgl_runtime.c`
+  - `tests/test_emulator_smoke.py`
+  - `tests/test_q4_native_e2e.py`
+  - `tests/ui_compile_smoke.c`
+- `output/` 保持 untracked，含旧失败 run 以及人工复核下载的
+  `q4-v7-review/`、`q4-v8-review/`；不得提交或清理。
+- 当前本地 SHA-256：
+  - `scripts/run_q4_native_e2e.py`：
+    `66ff93a9c4640493c9ad934b7c3c63bfbf5c6e28d6b782c54ebbed199ebae30b`
+  - `tests/test_q4_native_e2e.py`：
+    `b54746b2ae20bf5221ab663904a82a93926f270486a376b55a44c44fd5f4d034`
+- 本地和外层机均已通过：
+  `python -m unittest tests.test_q4_native_e2e tests.test_emulator_smoke`
+  （27 tests，OK）；本地 `py_compile` 与 `git diff --check` 也通过。
+
+本轮新增两项 runner 修复：
+
+1. `pending_effects` 是可恢复瞬态，`wait_q4_state()` 等待它归零；四个累计
+   retry/drop 字段改为跨 wait boundary 扫描并 fail-latched，非零立即按具体字段失败，
+   不能被后续错误的零记录洗掉。
+2. Bob promotion 截图前增加 1.1 秒 draw flush，并新增
+   `calls_bob_visual_transition`，要求 Alice/Bob 两张 PNG SHA 不同。
+
+### 14.2 外层机、固定构建与 v8 自动结果
+
+本轮只连接外层 16 逻辑核开发机：
+
+```text
+ubuntu@sapiens.homono.de:28200
+key: %USERPROFILE%\.ssh\id_ed25519_cloudlinux
+host: ubuntu24-hushen
+```
+
+没有访问 `codex-2c8g`，也没有连接或修改 RK3568。外层已有 RK3568 QEMU 始终未触碰，
+未执行任何宽泛 `pkill`，未烧录、写 flash 或修改 bootloader。
+
+```text
+work:
+/data/smart-band-q4-native-20260723T2145CST
+
+fixed OpenVela:
+/data/smart-band-q1c-20260720T223937CST/openvela
+
+v8 evidence:
+/data/smart-band-q4-native-20260723T2145CST/evidence/q4-four-scenarios-action-marker-v8
+```
+
+v8 自动 runner 终态：
+
+- `status=passed`
+- `failure=null`
+- run ID：`f5f38fd143b5946b6ef596b075301da7`
+- 22/22 自动 checks 为 true
+- 场景顺序严格为 `ordinary / center / calls / workout`
+- action 语义保持：
+  - 701 dismiss
+  - 715 read、delete
+  - 721 accept
+  - 722 reject
+  - 731 reject
+  - 全部 `result=applied`
+- 精确 8 张 1280×800 PNG；JSON 均为 `console_ok=true`、`nonblank=true`。
+- `evidence.sha256` 精确 167 项，GNU strict check 与独立全量重算均为
+  167/167 OK、零 mismatch。
+- 四场景 process cleanup 均 `absent=true`、`remaining=[]`；四个隔离
+  runtime tree 均清理成功；5575 端口空闲，v8/run-id/driver/Goldfish 归属进程残留为 0。
+
+stack 使用 NuttX task-lifetime coloration，每个隔离 boot 只取一个最终 high-water，
+精确 4 个样本：
+
+| 场景 | Used | Margin | Margin % |
+|---|---:|---:|---:|
+| ordinary | 12,928 B | 19,552 B | 60.197% |
+| center | 14,456 B | 18,040 B | 55.515% |
+| calls | 12,960 B | 19,536 B | 60.118% |
+| workout | 15,232 B | 17,264 B | 53.127% |
+
+最低余量为 workout 的 53.1265%，高于 25% 门槛。
+
+固定构建产物未因最后两轮 Python-only runner 修复而重编：
+
+```text
+vela_ap.elf
+  66,776,344 bytes
+  9d02553f37a6b9734bd191394d0a0d1f40f208dcd380863a82be75667edc4526
+
+nuttx.map
+  29,006,397 bytes
+  612469ada0585e2750247faf12c2dba234eaba04ceed7609d6b44c8498e374ec
+
+System.map
+  488,815 bytes
+  6b8477353e62fd6984e5cc6c55c876d9a34f93f070b6051b8529fc5659d333cf
+```
+
+221 个 smart-band/notification 定义符号与 `System.map` 无缺失或地址差异；五个关键
+符号在 ELF、`System.map`、`nuttx.map` 三方地址一致；ELF 含 Q4 action marker，
+map 中存在 `app_lvgl.c.o`、`notification_view.c.o`、
+`notification_service.c.o` 来源。
+
+### 14.3 v7/v8 人工视觉结论：Q4 C Gate 仍 open
+
+不得只看 runner 的 `status=passed`。
+
+- v7 自动通过，但 `calls-alice.png` 与 `calls-bob-promoted.png` 字节级完全相同，
+  两张都显示 Alice。v7 因人工视觉失败，不可采用。
+- v8 的 Bob 图已正确显示 `Bob / Promoted native incoming call`，但
+  `calls-alice.png` 随机截在首次来电完成绘制前，画面仍是普通主表盘，没有 Alice
+  全屏来电。v8 的 8 张图虽然 SHA 全部不同，新增的
+  `calls_bob_visual_transition=true` 仍不足以证明两张图语义正确。
+- ordinary 更新图的 title 确实由 `Native message` 变为
+  `Native message updated`，布局没有崩坏；但非 ASCII body 在当前字体中显示为
+  tofu 方框，只能证明 explicit-length 输入未破坏布局，不能证明 Unicode 可读。
+- Center 的 Mark read 状态迁移正确，但紧凑按钮文字视觉上被截为 `Mark rea`。
+- Workout 两张图能清楚证明来电卡片保留时 Pause 穿透并变为 Resume、Pauses 0→1。
+
+因此 v8 是结构化 journey、action、stack、ELF/map、manifest 与 cleanup 的有效自动证据，
+但不是通过人工 reviewed journey 的最终截图证据。Q4 C Gate 必须继续保持 **open**，
+不得据此更新正式 evidence/路线图为绿色，也不得据此合并 PR14。
+
+### 14.4 下一会话精确续接
+
+用户要求本会话跑完 v8 后立即交接，所以本会话没有启动 v9，也没有继续修改 runner。
+
+下一会话应：
+
+1. 在 Alice 首次截图前也等待确定的 Goldfish/LVGL draw flush；保留 Bob 前的等待。
+2. 不要只用“两张 SHA 不同”作为 call 视觉 gate。至少增加两张 call 图都必须满足
+   full-screen 深色来电画面的 region/dark-fraction 契约；Bob/Alice 文本仍需逐张人工复核，
+   或增加能够证明已呈现 notification ID 的 diagnostics。
+3. 增加单测，覆盖 Alice/Bob 任一图是主表盘但两图不同的假通过。
+4. fresh v9 后逐张人工复核精确 8 张 PNG，再复算 manifest、检查 action/stack/cleanup。
+5. 只有 fresh run 的自动证据和人工视觉都通过，才更新正式 Q4 evidence、路线图和
+   `NEXT_SESSION_HANDOFF.md`，然后普通提交、推送，等待 PR14 Host/Browser 全绿并触发
+   fresh GitHub OpenVela run。
+
+安全边界不变：开发远端默认是外层 `ubuntu24-hushen`；`codex-2c8g` 只作为两核
+Codex/共享 Sub2API 中转机；RK3568 是独立硬件子机，未经逐次明确授权不得连接、烧录、
+写 flash 或修改 bootloader。
+
+## 15. 2026-07-24 Q4 C Gate 最终收口
+
+### 15.1 实现、PR 与 fresh GitHub 证据
+
+- Q4 Gate 实现提交已普通推送：
+  `743ff28a32e222255f39c51c89921cc29a16ab31`。
+- PR14 保持 open，未合并：
+  <https://github.com/918154429/smart-band-demo/pull/14>
+- 实现提交的 Host run `30076233905` 与 Browser run `30076233918`
+  全部通过。
+- fresh 固定 OpenVela run `30076360836` 为 `success`：
+  <https://github.com/918154429/smart-band-demo/actions/runs/30076360836>
+- artifact：`openvela-fixed-release-30076360836`
+  - size：`50,283,762` bytes
+  - digest：
+    `sha256:f2d5be444305166cd811f4a175385db725fe05ab77a1acf8cc3135c06a4e7d20`
+- 下载后根 manifest 336/336、嵌套 Q4 manifest 167/167，独立复算均为
+  零 missing、零 mismatch。
+
+GitHub native journey：
+
+- run ID：`c50370c81438d5692076288d427f856e`
+- `status=passed`、`failure=null`
+- 24/24 checks
+- action：701 dismiss、715 read/delete、721 accept、722 reject、731 reject，
+  全部 `result=applied`
+- Alice/Bob 全屏深色语义门禁均通过：
+  - region `[453,43,826,757]`
+  - luminance `<90`
+  - dark fraction `>=0.80`
+  - Alice `0.904841`、Bob `0.904150`
+- 四个 stack coloration high-water 样本齐全；最低余量为 workout 的
+  `53.84047267355982%`
+- 四场景 fixed source、隔离 runtime、process/tree cleanup 与 5575 端口清理均通过
+
+target/linker 审计：
+
+- `vela_ap.elf`：
+  `bcc3a2cdd6dcff7de060e2891200be6d51645fdd211e200b6fe697d8c3969a57`
+- `nuttx.map`：
+  `45d5b0b38a707e9e686f04f2bc27242488419b458446c5e5945c8cc000bb3c50`
+- `System.map`：
+  `38a7395f8f79dc63c4c7805abe40d298fab5f6e260cdc188a2a61a3ba1a45d00`
+- 221 个相关 ELF 定义符号在 `System.map` 中零缺失、零地址差异
+- 五个关键锚点在 ELF、`System.map`、linker map 三方一致
+- `app_lvgl.c.o`、`notification_view.c.o`、
+  `notification_service.c.o` 均在 map 中
+
+### 15.2 八图人工复核
+
+GitHub artifact 的精确 8 张 1280×800 PNG 已逐张人工复核通过：
+
+- ordinary：title 从 `Native message` 正确变为
+  `Native message updated`，overlay 未崩坏；
+- center：5 条 DND-retained 消息可见，`Mark read` 完整显示；标记已读后
+  `New:` 与对应按钮消失，Delete 保留；
+- calls：Alice 与 Bob 均为正确、不同的全屏来电，姓名、body、Accept/Reject
+  均可见；
+- workout：Coach 来电保持时 `Pause -> Resume` 且 `Pauses 0 -> 1`，
+  证明 workout action 非阻塞。
+
+ordinary 更新图中的非 ASCII body 仍显示 tofu 方框。因此只证明 explicit-length
+ingress 与布局稳定，不证明 Unicode 字形可读。
+
+### 15.3 Gate 决定与文件
+
+Q4 C Gate 已在 **Host/Browser + pinned OpenVela Goldfish 软件层**关闭：
+
+- `docs/q4-notification-native-gate-20260724.md`
+- `docs/evidence/q4-gate-summary-20260724.json`
+- `docs/q4-native-gate-harness-20260723.md` 已从 pre-run 状态指向最终证据
+- `FINALS_TOP_TIER_ROADMAP.md` 的 Q4 状态与 checklist 已更新为完成
+
+边界必须继续保留：
+
+- haptic 是 `simulated=1`，不是真实震动；
+- wake 是 `synthetic=1 power_transition=0`，不是真实屏幕/电源转换；
+- Goldfish 不证明 Gemini-S1/RK3568、真实触摸、BLE、续航或功耗；
+- 本次是短四场景 journey，不是 30 分钟 Q4 定向 soak、2 小时模拟器 RC 或
+  Q8 长稳/交互 Gate；后三者仍 open；
+- PR14 未获自动合并授权；
+- 未连接或修改 RK3568，未烧录、写 flash 或修改 bootloader。
+
+### 15.4 外层机别名
+
+Windows SSH config 已验证别名：
+
+```text
+ssh ubuntu24-hushen
+```
+
+其映射为 `ubuntu@sapiens.homono.de:28200`，使用
+`~/.ssh/id_ed25519_cloudlinux`。无限定的软件开发远端继续使用此外层机；
+`codex-2c8g` 只保留给明确点名的内层中转/共享 Sub2API 场景。
